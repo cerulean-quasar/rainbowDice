@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">RainbowDice</string>
+    <string name="addition">+</string>
+    <string name="subtraction">-</string>
+    <string name="done">Done</string>
+    <string name="roll">Roll</string>
+    <string name="save">Save</string>
+    <string name="load">Load</string>
+    <string name="delete">Delete</string>
+    <string name="addRow">Add Row</string>
+    <string name="configureDice">Configure Dice</string>
+    <string name="diceMessageRolling">Rolling...</string>
+    <string name="diceMessageResult">result: %s = %d</string>
+    <string name="diceMessageToStartRolling">Shake while rolling</string>
+    <string name="diceMessageReRoll">Shake while re-rolling required dice</string>
+    <string name="diceConfigNbrDice">Number of Dice</string>
+    <string name="diceConfigNbrSides">Number of Sides</string>
+    <string name="diceConfigStart">Number dice Start with</string>
+    <string name="diceConfigIncrement">Number to Increase By</string>
+    <string name="diceConfigReRoll">Re-roll and Add if the Dice Roll</string>
+    <string-array name="operationArray">
+        <item>@string/addition</item>
+        <item>@string/subtraction</item>
+    </string-array>
+</resources>
