@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         diceResult = null;
-        roll();
+        rollTheDice();
         startDrawer();
     }
 
@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         diceResult = null;
-        roll();
+        rollTheDice();
         startDrawer();
     }
 
