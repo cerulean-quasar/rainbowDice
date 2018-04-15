@@ -26,6 +26,6 @@ they are simply the vertices of the octohedron (or other similar shape).  The ra
 known and is just the ratio of the width to the height of the image containing the symbol to
 be used as a texture on the die side.
 
-<img src=docs/dieSide.png>
+<img src=/docs/dieSide.png>
 
 
