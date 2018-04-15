@@ -13,7 +13,7 @@ the physics of how the dice bounce and spin.
 The following screen shows the app after rolling the dice.  Note that the result is displayed and computed for the user in a
 separate text box.
 
-![Rainbow Dice 1](/screenshots/rainbowDice1.png)
+![Rainbow Dice 2](/screenshots/rainbowDice2.png)
 
 This picture shows the dice configuration screen.  Note that gamers can enter several rows and an operation indicating whether
 the dice in the two rows should be added or subtracted.
