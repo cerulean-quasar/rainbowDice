@@ -18,7 +18,14 @@ each corner as a UV texture coordinate and don't worry to much about the stretch
 occur because the text texture might not be a square but rather a rectangle.  However fitting
 the bitmap on the other sided die (8 sided say), is more of a challenge.  On these die, each
 side is a triangle.  So, one needs to know how to fit a triangle into a rectangle.  This makes
-each die side have 5 triangles.  The two center triangles are used to hold the texture.  The
-following picture shows a side of the die divided as I specified.  One needs to find the
+each die side have 5 triangles.  The two center triangles are used to hold the texture.
+
+The following picture shows a side of the die divided as I specified.  One needs to find the
 coordinates for vectors: p1prime, p1, p3 and p2.  The coordinates for p0, q, and r are known,
-they are simply the vertices of the octohedron (or other similar shape).
+they are simply the vertices of the octohedron (or other similar shape).  The ratio: a/b is also
+known and is just the ratio of the width to the height of the image containing the symbol to
+be used as a texture on the die side.
+
+<img src=docs/dieSide.png>
+
+
