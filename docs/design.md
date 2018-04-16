@@ -26,6 +26,46 @@ they are simply the vertices of the octohedron (or other similar shape).  The ra
 known and is just the ratio of the width to the height of the image containing the symbol to
 be used as a texture on the die side.
 
-<img src=/docs/dieSide.png>
+<img src=/docs/pictures/dieSideFigure1.png>
 
+Here, H and S are easily computed.  S is just the size of vector r - vector q.  That is:
 
+`S = | r - q |`
+
+H is the size of the vector that results from taking average of vectors q and r and
+subtracting p0.  That is:
+
+`H = | (r + q)/2 - p0 |`
+
+Now, the triangle marked by p0, p1prime, and p1 is similar to the triangle marked by
+p0, q, and r.  (Similar means that the angles are the same and but the sizes may be different.)
+That is:
+
+<img src=/docs/pictures/dieSideFigure2.jpeg>
+
+The two triangles being similar implies that: `a/s = (H-b)/H` thus:
+
+```
+a/s + b/H = 1
+
+(a/(bs) + 1/H) * b = 1
+
+b = 1/(a/(bs) + 1/H) = sH/(Ha/b + s)
+
+b/H = 1/((aH)/(bs) + 1)
+```
+
+Now, because it shows up many times, I will define the new variale:
+
+```
+k = a/b * H/s
+```
+
+Note that k is completely known since I already stated that a/b is known and specified
+how to compute H and s.
+
+```
+b/H = 1/(K+1)
+```
+
+Now we have computed b in terms of a/b, H and s.  Next lets compute a.
