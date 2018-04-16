@@ -68,4 +68,30 @@ how to compute H and s.
 b/H = 1/(K+1)
 ```
 
-Now we have computed b in terms of a/b, H and s.  Next lets compute a.
+Now we have computed `b` in terms of `a/b`, `H` and `s`.  Next lets compute `a`.
+
+```
+a/s + b/H = 1
+
+a(1/s + b/(aH)) = 1
+
+a = 1/(1/s + b/(aH))
+
+a/s = 1/(1+bs/(aH)) = 1/(1+1/k)
+
+```
+
+Now I can compute the vector `p2`.  I can get a vector that points to the center of `s`
+by taking the average of `r` and `q`.  Then we just need to add the bit between the center
+of s ant `p2`.  The size of this bit of vector is `a/2` (since `(r+q)/2` bisects a as well).
+the direction is `r-q` divided by its size or `(r-q)/s`.  That is:
+
+```
+p2 = (r+q)/2 + (r-q)a/(2s) = (1/2 + a/(2s))r + (1/2 - a/(2s))q
+
+p2 = (1/2 + (1/2)(1/(1+1/k))) r + (1/2 - (1/2)(1/(1+1/k)))q
+
+p2 = (1/2) ((2k+1)/(k+1)) r + (1/(2k+2))q
+
+p2 = (1-1/(2k+2)) r + (1/(2k+2))q
+```
