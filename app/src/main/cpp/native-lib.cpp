@@ -41,7 +41,7 @@ ASensorEventQueue *eventQueue = nullptr;
 ALooper *looper = nullptr;
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_MainActivity_initSensors(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_initSensors(
         JNIEnv *env,
         jobject jthis)
 {
@@ -71,7 +71,7 @@ Java_com_indigo_rainbowdice_MainActivity_initSensors(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_MainActivity_initWindow(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
         JNIEnv *env,
         jobject jthis,
         jobject surface) {
@@ -90,7 +90,7 @@ Java_com_indigo_rainbowdice_MainActivity_initWindow(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_MainActivity_initPipeline(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_initPipeline(
         JNIEnv *env,
         jobject jthis) {
     try {
@@ -102,7 +102,7 @@ Java_com_indigo_rainbowdice_MainActivity_initPipeline(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_MainActivity_addSymbol(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbol(
         JNIEnv *env,
         jobject jthis,
         jstring jsymbol,
@@ -125,7 +125,7 @@ Java_com_indigo_rainbowdice_MainActivity_addSymbol(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_MainActivity_sendVertexShader(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_sendVertexShader(
         JNIEnv *env,
         jobject jthis,
         jbyteArray jShader,
@@ -145,7 +145,7 @@ Java_com_indigo_rainbowdice_MainActivity_sendVertexShader(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_MainActivity_sendFragmentShader(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_sendFragmentShader(
         JNIEnv *env,
         jobject jthis,
         jbyteArray jShader,
@@ -165,7 +165,7 @@ Java_com_indigo_rainbowdice_MainActivity_sendFragmentShader(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_indigo_rainbowdice_Draw_draw(
+Java_com_quasar_cerulean_rainbowdice_Draw_draw(
         JNIEnv *env,
         jobject jthis)
 {
@@ -236,14 +236,14 @@ Java_com_indigo_rainbowdice_Draw_draw(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_tellDrawerStop(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_tellDrawerStop(
         JNIEnv *env,
         jobject jthis) {
     stopDrawing = true;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_destroyVulkan(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyVulkan(
         JNIEnv *env,
         jobject jthis) {
     // If this function is being called, it is assumed that the caller already stopped
@@ -252,7 +252,7 @@ Java_com_indigo_rainbowdice_MainActivity_destroyVulkan(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_loadModel(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_loadModel(
         JNIEnv *env,
         jobject jthis,
         jobjectArray jsymbols) {
@@ -269,14 +269,14 @@ Java_com_indigo_rainbowdice_MainActivity_loadModel(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_destroyModels(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyModels(
         JNIEnv *env,
         jobject jthis) {
     diceGraphics.destroyModels();
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_recreateModels(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateModels(
         JNIEnv *env,
         jobject jthis) {
     diceGraphics.recreateModels();
@@ -284,7 +284,7 @@ Java_com_indigo_rainbowdice_MainActivity_recreateModels(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_recreateSwapChain(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateSwapChain(
         JNIEnv *env,
         jobject jthis) {
     diceGraphics.recreateSwapChain();
@@ -292,7 +292,7 @@ Java_com_indigo_rainbowdice_MainActivity_recreateSwapChain(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_roll(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_roll(
         JNIEnv *env,
         jobject jthis) {
     stopDrawing = false;
@@ -301,7 +301,7 @@ Java_com_indigo_rainbowdice_MainActivity_roll(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_indigo_rainbowdice_MainActivity_reRoll(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
         JNIEnv *env,
         jobject jthis,
         jintArray jIndices) {

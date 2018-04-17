@@ -17,7 +17,7 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.indigo.rainbowdice;
+package com.quasar.cerulean.rainbowdice;
 
 import android.view.SurfaceHolder;
 
