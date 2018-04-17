@@ -126,20 +126,25 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
     public void onDeleteFile(View view) {
         Spinner spinner = findViewById(R.id.filename);
-        Object text = spinner.getAdapter().getItem(spinner.getSelectedItemPosition());
-        String filename = text.toString();
-        deleteFile(filename);
-        spinner.setAdapter(new FileAdapter());
+        TextView text = (TextView)spinner.getSelectedView();
+        if (text != null) {
+            String filename = text.getText().toString();
+            if (!filename.isEmpty()) {
+                deleteFile(filename);
+                spinner.setAdapter(new FileAdapter());
+            }
+        }
     }
 
     public void onLoad(View view) {
         Spinner spinner = findViewById(R.id.filename);
-        Object text = spinner.getAdapter().getItem(spinner.getSelectedItemPosition());
-        String filename = text.toString();
-        if (filename.isEmpty()) {
-            return;
+        TextView text = (TextView)spinner.getSelectedView();
+        if (text != null) {
+            String filename = text.getText().toString();
+            if (!filename.isEmpty()) {
+                loadFromFile(filename);
+            }
         }
-        loadFromFile(filename);
     }
 
     public void onDone(MenuItem item) {
