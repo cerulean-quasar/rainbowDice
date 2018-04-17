@@ -306,11 +306,17 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         text = layoutDiceAdded.findViewById(R.id.die_sides);
         text.setText(String.format(Locale.getDefault(), "%d", die.getNumberOfSides()));
         text = layoutDiceAdded.findViewById(R.id.die_start);
-        text.setText(String.format(Locale.getDefault(), "%d", die.getStartAt()));
+        int startAt = die.getStartAt();
+        text.setText(String.format(Locale.getDefault(), "%d", startAt));
         text = layoutDiceAdded.findViewById(R.id.die_increment);
         text.setText(String.format(Locale.getDefault(), "%d", die.getIncrement()));
         text = layoutDiceAdded.findViewById(R.id.die_reroll);
-        text.setText(String.format(Locale.getDefault(), "%d", die.getReRollOn()));
+        int reRoll = die.getReRollOn();
+        if (reRoll >= startAt) {
+            text.setText(String.format(Locale.getDefault(), "%d", reRoll));
+        } else {
+            text.setText("");
+        }
         if (!isEnd) {
             StringArrayAdapter spinAdapter = new StringArrayAdapter(R.array.operationArray);
             Spinner spinner = (Spinner) layoutInflater.inflate(R.layout.operator_view, layoutDiceAdded, false);
