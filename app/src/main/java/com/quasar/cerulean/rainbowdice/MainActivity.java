@@ -296,6 +296,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         surfaceReady = true;
+        rollTheDice();
         startDrawer();
     }
 
