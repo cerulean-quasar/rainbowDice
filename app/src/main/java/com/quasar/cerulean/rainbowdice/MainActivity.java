@@ -152,12 +152,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void rollTheDice() {
-        joinDrawer();
-        diceResult = null;
-        TextView result = findViewById(R.id.rollResult);
-        result.setText(getString(R.string.diceMessageToStartRolling));
-        roll();
-        startDrawer();
+        if (surfaceReady) {
+            joinDrawer();
+            diceResult = null;
+            TextView result = findViewById(R.id.rollResult);
+            result.setText(getString(R.string.diceMessageToStartRolling));
+            roll();
+            startDrawer();
+        }
     }
 
     public void destroySurface() {
@@ -223,12 +225,12 @@ public class MainActivity extends AppCompatActivity {
                 imageBuffer.position(0);
                 imageBuffer.get(bytes);
             } catch (Exception e) {
-                Log.e("RainbowDice Java IO: ", e.getMessage() != null ? e.getMessage() : e.getClass().toString());
+                publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
                 return;
             }
             String err = addSymbol(symbol, TEXWIDTH, TEXHEIGHT, bytes);
             if (err != null && err.length() != 0) {
-                Log.e(NATIVE, err);
+                publishError(err);
                 return;
             }
         }
@@ -250,13 +252,20 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void publishError(String err) {
+        if (err != null && err.length() > 0) {
+            TextView view = findViewById(R.id.rollResult);
+            view.setText(err);
+        }
+    }
+
     public void startDrawing(SurfaceHolder holder) {
         byte[] vertShader = readAssetFile("shaders/shader.vert.spv");
         byte[] fragShader = readAssetFile("shaders/shader.frag.spv");
         Surface drawSurface = holder.getSurface();
         String err = initWindow(drawSurface);
         if (err != null && err.length() != 0) {
-            Log.e(NATIVE, err);
+            publishError(err);
             return;
         }
 
@@ -264,25 +273,25 @@ public class MainActivity extends AppCompatActivity {
 
         err = sendVertexShader(vertShader, vertShader.length);
         if (err != null && err.length() != 0) {
-            Log.e(NATIVE, err);
+            publishError(err);
             return;
         }
 
         err = sendFragmentShader(fragShader, fragShader.length);
         if (err != null && err.length() != 0) {
-            Log.e(NATIVE, err);
+            publishError(err);
             return;
         }
 
         err = initPipeline();
         if (err != null && err.length() != 0) {
-            Log.e(NATIVE, err);
+            publishError(err);
             return;
         }
 
         err = initSensors();
         if (err != null && err.length() != 0) {
-            Log.e(NATIVE, err);
+            publishError(err);
             return;
         }
 
