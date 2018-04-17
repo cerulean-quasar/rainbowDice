@@ -1,26 +1,28 @@
 # Rainbow Dice
 
-This program has some very mathmatical parts.  I would have loved to comment the code in these
+This program has some very mathmatical parts.  We would have loved to comment the code in these
 areas however, comments would not work since these code segments require pictures to explain.
-So, instead of comments, I have this design document.  I used the same variables in it as in
+So, instead of comments, we have this design document.  We used the same variables in it as in
 the code.
 
 ## How to the Textures Were Computed
 
+### Background
+
 The textures for this program are simply the numbers (or perhaps in future, other symbols) that
-go on the sides of the die.  I could not use the normal method of using textures because the user
+go on the sides of the die.  We could not use the normal method of using textures because the user
 might choose any number to go on the die sides.  These textures had to be computed at run time.
-So, I have a canvas that I draw the text into, the obtain the bitmap from it.  Then it is a matter
+So, we have a canvas that we draw the text into, the obtain the bitmap from it.  Then it is a matter
 of fitting the bitmap on the die.
 
-Fitting the bitmap on the six sided die is easy since each die side is a square.  I just use
+Fitting the bitmap on the six sided die is easy since each die side is a square.  We just use
 each corner as a UV texture coordinate and don't worry to much about the stretching that might
 occur because the text texture might not be a square but rather a rectangle.  However fitting
 the bitmap on the other sided die (8 sided say), is more of a challenge.  On these die, each
 side is a triangle.  So, one needs to know how to fit a triangle into a rectangle.  This makes
 each die side have 5 triangles.  The two center triangles are used to hold the texture.
 
-The following picture shows a side of the die divided as I specified.  One needs to find the
+The following picture shows a side of the die divided as we specified.  One needs to find the
 coordinates for vectors: p1prime, p1, p3 and p2.  The coordinates for p0, q, and r are known,
 they are simply the vertices of the octohedron (or other similar shape).  The ratio: a/b is also
 known and is just the ratio of the width to the height of the image containing the symbol to
@@ -28,17 +30,17 @@ be used as a texture on the die side.
 
 <img src=/docs/pictures/dieSideFigure1.png>
 
-Here, H and S are easily computed.  S is just the size of vector r - vector q.  That is:
+Here, `H` and `S` are easily computed.  `S` is just the size of vector `r` - vector `q`.  That is:
 
 `S = | r - q |`
 
-H is the size of the vector that results from taking average of vectors q and r and
-subtracting p0.  That is:
+`H` is the size of the vector that results from taking average of vectors `q` and `r` and
+subtracting `p0`.  That is:
 
 `H = | (r + q)/2 - p0 |`
 
-Now, the triangle marked by p0, p1prime, and p1 is similar to the triangle marked by
-p0, q, and r.  (Similar means that the angles are the same and but the sizes may be different.)
+Now, the triangle marked by `p0`, `p1prime`, and `p1` is similar to the triangle marked by
+`p0`, `q`, and `r`.  (Similar means that the angles are the same and but the sizes may be different.)
 That is:
 
 <img src=/docs/pictures/dieSideFigure2.jpeg>
@@ -55,14 +57,14 @@ b = 1/(a/(bs) + 1/H) = sH/(Ha/b + s)
 b/H = 1/((aH)/(bs) + 1)
 ```
 
-Now, because it shows up many times, I will define the new variale:
+Now, because it shows up many times, we will define the new variale:
 
 ```
 k = a/b * H/s
 ```
 
-Note that k is completely known since I already stated that a/b is known and specified
-how to compute H and s.
+Note that `k` is completely known since we already stated that `a/b` is known and specified
+how to compute `H` and `s`.
 
 ```
 b/H = 1/(K+1)
@@ -81,7 +83,9 @@ a/s = 1/(1+bs/(aH)) = 1/(1+1/k)
 
 ```
 
-Now I can compute the vector `p2`.  I can get a vector that points to the center of `s`
+### Computing p2
+
+Now we can compute the vector `p2`.  We can get a vector that points to the center of `s`
 by taking the average of `r` and `q`.  Then we just need to add the bit between the center
 of s ant `p2`.  The size of this bit of vector is `a/2` (since `(r+q)/2` bisects a as well).
 the direction is `r-q` divided by its size or `(r-q)/s`.  That is:
@@ -94,4 +98,37 @@ p2 = (1/2 + (1/2)(1/(1+1/k))) r + (1/2 - (1/2)(1/(1+1/k)))q
 p2 = (1/2) ((2k+1)/(k+1)) r + (1/(2k+2))q
 
 p2 = (1-1/(2k+2)) r + (1/(2k+2))q
+```
+
+### Computing p3
+
+Computing vector `p3` is similar to computing vector `p2`.  We again compute the average of vectors
+`r` and `s`.  But this time, we need to subtract off the vector `a(r-q)/(2s)` to get from the point
+between `r` and `s` to `p3`.  That is:
+
+```
+p3 = (r+q)/2 - (r-q)a/(2s)
+
+p3 = r/(2k+2) + (1 - 1/(2k+2))*q
+```
+
+### Computing p1
+
+To compute vector `p1`, we start off at vector `p2` which is now known.  Then we need a vector which
+points up towards `p1`.  This is obtained by taking the average of `r` and `q` again (which gets
+us a vector pointing to the center of the line `s`), and then subtracting off `p0`.  This gets us
+a vector pointing from the center of `q` and `r` to `p0`.  This vector is the right direction
+but not the right length.  So, next we normalize it by dividing it by its length: `H`.  Then,
+multiply it by the length we want: `b`.  That is:
+
+```
+p1 = p2 - (((r+q)/2 -p0)/H)b = p2 - ((r+q)/2 - p0)(1/(k+1))
+```
+
+### Computing p1prime
+
+Computing `p1prime` is the same as computing `p1` except we start at `p3`.  That is:
+
+```
+p1prime = p3 - (((r+q)/2 -p0)/H)b = p3 - ((r+q)/2 - p0)(1/(k+1))
 ```
