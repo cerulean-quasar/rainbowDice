@@ -306,7 +306,7 @@ public class MainActivity extends AppCompatActivity {
             bytes.readToBuffer(inputStream);
             return bytes.getBytes();
         } catch (IOException e) {
-            System.out.println("Error in opening asset file: " + filename + " message: " + e.getMessage());
+            publishError("Error in opening asset file: " + filename + " message: " + e.getMessage());
             return null;
         }
     }
