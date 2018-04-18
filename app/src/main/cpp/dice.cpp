@@ -334,22 +334,18 @@ void DiceModelCube::loadModel(TextureAtlas &texAtlas) {
         cubeTop(vertex, i);
         vertex.texCoord = {0,0};
         vertices.push_back(vertex);
-        printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
 
         cubeTop(vertex, (i+1)%4);
         vertex.texCoord = {0,1};
         vertices.push_back(vertex);
-        printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
 
         cubeBottom(vertex, i);
         vertex.texCoord = {1,0};
         vertices.push_back(vertex);
-        printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
 
         cubeBottom(vertex, (i+1)%4);
         vertex.texCoord = {1,1};
         vertices.push_back(vertex);
-        printf("%f %f %f\n\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
 
         indices.push_back(9+4*i);
         indices.push_back(11+4*i);
@@ -364,12 +360,12 @@ void DiceModelCube::loadModel(TextureAtlas &texAtlas) {
 
 void DiceModelCube::cubeTop(Vertex &vertex, uint32_t i) {
     const float pi = glm::acos(-1.0f);
-    vertex.pos = {glm::cos(2*i*pi/4), 1.0f, glm::sin(2*i*pi/4)};
+    vertex.pos = {glm::cos(2*i*pi/4), sqrtf(2)/2, glm::sin(2*i*pi/4)};
 }
 
 void DiceModelCube::cubeBottom(Vertex &vertex, uint32_t i) {
     const float pi = glm::acos(-1.0f);
-    vertex.pos = {glm::cos(2*i*pi/4), -0.5f, glm::sin(2*i*pi/4)};
+    vertex.pos = {glm::cos(2*i*pi/4), -sqrtf(2)/2, glm::sin(2*i*pi/4)};
 }
 
 std::string DiceModelCube::calculateUpFace() {
