@@ -30,7 +30,8 @@ be used as a texture on the die side.
 
 <img src=/docs/pictures/dieSideFigure1.png>
 
-Here, `H` and `S` are easily computed.  `S` is just the size of vector `r` - vector `q`.  That is:
+Here, `H` and `S` are easily computed.  `S` is just the size of vector `r` minus vector `q`.
+That is:
 
 `S = | r - q |`
 
@@ -132,3 +133,49 @@ Computing `p1prime` is the same as computing `p1` except we start at `p3`.  That
 ```
 p1prime = p3 - (((r+q)/2 -p0)/H)b = p3 - ((r+q)/2 - p0)(1/(k+1))
 ```
+
+### Conclusion
+
+Now with vectors: `p1`, `p1prime`, `p2`, and `p3`, we can create all triangles for a side of the
+octohedron (or similar shape).  The vectors: `p1`, `p1prime`, `p2`, and `p3` are used as UV
+coordinates for the textures containing the symbols that go on each die face.
+
+## Which Side is Up After a Roll
+
+When the dice are done rolling, we need to detect which side is up so that we can report the result
+to the user in a text format (as opposed to them looking at the dice on the screen).  We determine
+that the dice are done rolling when the reach a certain minimum speed and are close to the screen.
+(The dice fall towards the screen.)  They might not necesarily have a face flat against the screen.
+So, we need to detect which face is closest to being towards the screen and force that face to be
+flat against the screen.
+
+So first lets figure out which face is closest to facing the screen.  To do this, we need to find
+a vector perpendicular and pointing outwards from each face.  Then find the angle between this
+vector and the z-axis unit vector.  The face for which this angle is the smallest is the face
+pointing towards the screen.  (Note: positive z points out of the screen.)  This method will work
+on a six sided die or the other shaped die.
+
+A vector that is perpendicular to the face of the die is just the cross product of two vectors
+starting at the same point and pointing towards each of the two nearest points to the starting
+point.  We can get these vectors by subtracting the vector describing the starting point from
+the vector describing the ending point.  That is:
+
+<img src=/docs/pictures/dieSideFigure3.jpeg>
+
+A vector perpendicular to the face is the cross product of `(p0-q)` and `(r-q)`:
+
+```
+(p0-q) X (r-q)
+```
+
+Now in order to get the angle just normalize the vector: `(p0-q) X (r-q)` (divide it by its length)
+and take the dot product of that with the z-axis unit vector.  Then take the arccosine of the result.
+That is:
+
+```
+theta = acos(((p0-q) X (r-q)) * z-axis)
+```
+
+Here `*` denotes the dot product and theta is the angle between the z-axis and the vector perpendicular
+to the face of the dice.  We want to calculate theta for each face then find the smallest theta.
+Then we need to rotate the dice so that theta goes to 0 for that face.
