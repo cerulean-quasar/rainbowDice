@@ -149,8 +149,11 @@ public:
     std::string calculateUpFace();
 };
 
+
+// For the dice that look like octahedron but have more sides and other polyhedra that
+// have triangular faces.
 class DiceModelHedron : public DicePhysicsModel {
-private:
+protected:
     uint32_t sides;
 
     void addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i, TextureAtlas &texAtlas);
@@ -165,7 +168,25 @@ public:
     {
     }
 
-    void loadModel(TextureAtlas &texAtlas);
-    std::string calculateUpFace();
+    virtual void loadModel(TextureAtlas &texAtlas);
+    virtual std::string calculateUpFace();
+    virtual int getUpFaceIndex(int i);
 };
+
+class DiceModelTetrahedron : public DiceModelHedron {
+public:
+    DiceModelTetrahedron(std::vector<std::string> &inSymbols)
+        : DiceModelHedron(inSymbols)
+    {
+    }
+
+    DiceModelTetrahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
+        : DiceModelHedron(inSymbols, inPosition)
+    {
+    }
+
+    void loadModel(TextureAtlas &texAtlas);
+    int getUpFaceIndex(int i);
+};
+
 #endif

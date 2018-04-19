@@ -136,8 +136,10 @@ private:
 
         Dice(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
         {
-            int nbrSides = symbols.size();
-            if (6 % nbrSides == 0) {
+            long nbrSides = symbols.size();
+            if (nbrSides == 4) {
+                die = new DiceModelTetrahedron(symbols, position);
+            } else if (6 % nbrSides == 0) {
                 die = new DiceModelCube(symbols, position);
             } else {
                 die = new DiceModelHedron(symbols, position);

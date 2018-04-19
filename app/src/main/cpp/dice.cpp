@@ -479,21 +479,18 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[i%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p1prime;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     // bottom left triangle
@@ -502,21 +499,18 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2) %colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p3;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2) %colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p1prime;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     // bottom right triangle
@@ -525,21 +519,18 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = 0;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     // bottom text triangle
@@ -547,21 +538,18 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = textureToUse;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p3;
     vertex.texCoord = {0.0f, 1.0f};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = textureToUse;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {1.0f, 1.0f};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = textureToUse;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     // top text triangle
@@ -569,21 +557,18 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = textureToUse;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {1.0f, 1.0f};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = textureToUse;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {1.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = textureToUse;
-    printf("%f %f %f\n", vertex.pos.x, vertex.pos.y, vertex.pos.z);
     vertices.push_back(vertex);
 }
 
@@ -607,11 +592,7 @@ std::string DiceModelHedron::calculateUpFace() {
         angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
         if (angleMin > angle) {
             upPerpendicular = perpendicularFaceVec;
-            if (i%2 == 0) {
-                upFace = i/2;
-            } else {
-                upFace = i/2 + sides/2;
-            }
+            upFace = getUpFaceIndex(i);
             angleMin = angle;
         }
     }
@@ -622,3 +603,41 @@ std::string DiceModelHedron::calculateUpFace() {
     return symbols[upFace%symbols.size()];
 }
 
+int DiceModelHedron::getUpFaceIndex(int i) {
+    if (i%2 == 0) {
+        return i/2;
+    } else {
+        return i/2 + sides/2;
+    }
+}
+
+void DiceModelTetrahedron::loadModel(TextureAtlas &texAtlas) {
+    sides = 4;
+
+    glm::vec3 p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
+    glm::vec3 q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
+    glm::vec3 r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
+    addVertices(p0, q, r, 0, texAtlas);
+
+    q = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
+    r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
+    addVertices(p0, q, r, 1, texAtlas);
+
+    q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
+    r = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
+    addVertices(p0, q, r, 2, texAtlas);
+
+    p0 = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
+    q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
+    r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
+    addVertices(p0, q, r, 3, texAtlas);
+
+    // indices - not really using these
+    for (uint32_t i = 0; i < sides*15; i ++) {
+        indices.push_back(i);
+    }
+}
+
+int DiceModelTetrahedron::getUpFaceIndex(int i) {
+    return i;
+}
