@@ -189,4 +189,19 @@ public:
     int getUpFaceIndex(int i);
 };
 
+class DiceModelIcosahedron : public DiceModelHedron {
+public:
+    DiceModelIcosahedron(std::vector<std::string> &inSymbols)
+            : DiceModelHedron(inSymbols)
+    {
+    }
+
+    DiceModelIcosahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
+            : DiceModelHedron(inSymbols, inPosition)
+    {
+    }
+
+    void loadModel(TextureAtlas &texAtlas);
+    int getUpFaceIndex(int i);
+};
 #endif

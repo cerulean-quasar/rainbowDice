@@ -33,7 +33,7 @@ const float DicePhysicsModel::viscosity = 0.002f;
 const float DicePhysicsModel::maxposx = 0.5f;
 const float DicePhysicsModel::maxposy = 0.5f;
 const float DicePhysicsModel::maxposz = 1.0f;
-const float DicePhysicsModel::radius = 0.2f;
+const float DicePhysicsModel::radius = 0.1f;
 const std::vector<glm::vec3> DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
         {1.0f, 0.5f, 0.0f}, // orange
@@ -639,5 +639,122 @@ void DiceModelTetrahedron::loadModel(TextureAtlas &texAtlas) {
 }
 
 int DiceModelTetrahedron::getUpFaceIndex(int i) {
+    return i;
+}
+
+void DiceModelIcosahedron::loadModel(TextureAtlas &texAtlas) {
+    sides = 20;
+    float phi = (1+sqrtf(5.0f))/2;
+    uint32_t i = 0;
+
+    // we'll divide it into top middle and bottom.  First the top:
+    glm::vec3 p0 = {0.0f, 1.0f, phi};
+    glm::vec3 q = {1.0f, phi, 0.0f};
+    glm::vec3 r = {-1.0f, phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {-phi, 0.0f, 1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {0.0f, -1.0f, phi};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {phi, 0.0f, 1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {1.0f, phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    // now for the bottom
+    p0 = {0.0f, -1.0f, -phi};
+    q = {1.0f, -phi, 0.0f};
+    r = {-1.0f, -phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {-phi, 0.0f, -1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {0.0f, 1.0f, -phi};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {phi, 0.0f, -1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = {1.0f, -phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    // now the middle
+    p0 = {-phi, 0.0f, -1.0f};
+    q = {-phi, 0.0f, 1.0f};
+    r = {-1.0f, phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = p0;
+    p0 = q;
+    q = {0.0f, 1.0f, -phi};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {1.0f, phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    p0 = {1.0f, phi, 0.0f};
+    q =  {phi, 0.0f, -1.0f};
+    r = {0.0f, 1.0f, -phi};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {phi, 0.0f, 1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = p0;
+    p0 = q;
+    q =  {1.0f, -phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {0.0f, -1.0f, phi};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    p0 = {0.0f, -1.0f, phi};
+    r = {1.0f, -phi, 0.0f};
+    q =  {-1.0f, -phi, 0.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {-phi, 0.0f, 1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    q = r;
+    r = p0;
+    p0 = q;
+    q =  {-phi, 0.0f, -1.0f};
+    addVertices(p0, q, r, i++, texAtlas);
+
+    // indices - not really using these
+    for (i = 0; i < sides*15; i ++) {
+        indices.push_back(i);
+    }
+}
+
+int DiceModelIcosahedron::getUpFaceIndex(int i) {
     return i;
 }

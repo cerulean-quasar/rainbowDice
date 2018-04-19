@@ -267,14 +267,35 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         DieConfiguration[] dice = new DieConfiguration[nbrDice];
         for (int i=0; i < nbrDice; i++) {
             LinearLayout layoutDice = (LinearLayout)layout.getChildAt(i);
+
             EditText text = layoutDice.findViewById(R.id.number_of_dice);
-            int nbrDiceOfThisType = Integer.parseInt(text.getText().toString(), 10);
+            String textString = text.getText().toString();
+            int nbrDiceOfThisType = 1;
+            if (!textString.isEmpty()) {
+                nbrDiceOfThisType = Integer.parseInt(textString, 10);
+            }
+
             text = layoutDice.findViewById(R.id.die_sides);
-            int nbrSides = Integer.parseInt(text.getText().toString(), 10);
+            textString = text.getText().toString();
+            int nbrSides = 6;
+            if (!textString.isEmpty()) {
+                nbrSides = Integer.parseInt(textString, 10);
+            }
+
             text = layoutDice.findViewById(R.id.die_start);
-            int startAt = Integer.parseInt(text.getText().toString(), 10);
+            textString = text.getText().toString();
+            int startAt = 1;
+            if (!textString.isEmpty()) {
+                startAt = Integer.parseInt(textString, 10);
+            }
+
             text = layoutDice.findViewById(R.id.die_increment);
-            int increment = Integer.parseInt(text.getText().toString(), 10);
+            textString = text.getText().toString();
+            int increment = 1;
+            if (!textString.isEmpty()) {
+                increment = Integer.parseInt(text.getText().toString(), 10);
+            }
+
             text = layoutDice.findViewById(R.id.die_reroll);
             int reRollOn = startAt - 1;
             if (!text.getText().toString().isEmpty()) {
