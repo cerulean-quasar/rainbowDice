@@ -829,6 +829,7 @@ uint32_t const DiceModelDodecahedron::sides = 12;
 void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     float phi = (1+sqrtf(5.0f))/2;
     uint32_t i = 0;
+    float scaleFactor = 2.0f;
 
     // one side
     glm::vec3 a = {-1.0f, 1.0f, 1.0f};
@@ -836,39 +837,39 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     glm::vec3 c = {-phi, -1.0f/phi, 0.0f};
     glm::vec3 d = {-1.0f, -1.0f, 1.0f};
     glm::vec3 e = {-1.0f/phi, 0.0f, phi};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = e;
     c = {1.0/phi, 0.0f, phi};
     d = {1.0f, 1.0f, 1.0f};
     e = {0.0f, phi, 1.0f/phi};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = e;
     c = {0.0f, phi, -1.0f/phi};
     d = {-1.0f, 1.0f, -1.0f};
     e = {-phi, 1.0f/phi, 0.0f};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
-    // the other side (negating x, y, and z)
+    // the other side
     a = {1.0f, -1.0f, -1.0f};
-    b = {phi, -1.0f/phi, 0.0f};
-    c = {phi, 1.0f/phi, 0.0f};
-    d = {1.0f, 1.0f, -1.0f};
-    e = {1.0f/phi, 0.0f, -phi};
-    addVertices(a, e, d, c, b, i++, texAtlas);
-
-    b = e;
-    c = {-1.0/phi, 0.0f, -phi};
-    d = {-1.0f, -1.0f, -1.0f};
-    e = {0.0f, -phi, -1.0f/phi};
-    addVertices(a, e, d, c, b, i++, texAtlas);
-
-    b = e;
-    c = {0.0f, -phi, 1.0f/phi};
-    d = {1.0f, -1.0f, 1.0f};
     e = {phi, -1.0f/phi, 0.0f};
-    addVertices(a, e, d, c, b, i++, texAtlas);
+    d = {phi, 1.0f/phi, 0.0f};
+    c = {1.0f, 1.0f, -1.0f};
+    b = {1.0f/phi, 0.0f, -phi};
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+
+    e = b;
+    d = {-1.0/phi, 0.0f, -phi};
+    c = {-1.0f, -1.0f, -1.0f};
+    b = {0.0f, -phi, -1.0f/phi};
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+
+    e = b;
+    d = {0.0f, -phi, 1.0f/phi};
+    c = {1.0f, -1.0f, 1.0f};
+    b = {phi, -1.0f/phi, 0.0f};
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     // the middle
     a = {-phi, 1.0f/phi, 0.0f};
@@ -876,42 +877,42 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     c = {-1.0f/phi, 0.0f, -phi};
     d = {-1.0f, -1.0f, -1.0f};
     e = {-phi, -1.0f/phi, 0.0f};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = e;
     c = d;
     a = {-1.0f, -1.0f, 1.0f};
     d = {0.0f, -phi, -1.0f/phi};
     e = {0.0f, -phi, 1.0f/phi};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = a;
     c = e;
     a = {-1.0f/phi, 0.0f, phi};
     d = {1.0f, -1.0f, 1.0f};
     e = {1.0f/phi, 0.0f, phi};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = e;
     c = d;
     a = {1.0f, 1.0f, 1.0f};
     d = {phi, -1.0f/phi, 0.0f};
     e = {phi, 1.0f/phi, 0.0f};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = a;
     c = e;
     a = {0.0f, phi, 1.0f/phi};
     d = {1.0f, 1.0f, -1.0f};
     e = {0.0f, phi, -1.0f/phi};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     b = e;
     c = d;
     a = {-1.0f, 1.0f, -1.0f};
     d = {1.0/phi, 0.0f, -phi};
     e = {-1.0/phi, 0.0f, -phi};
-    addVertices(a, b, c, d, e, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     // indices - not really using these
     for (i = 0; i < sides*3*3; i ++) {
@@ -920,8 +921,8 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
 }
 
 std::string DiceModelDodecahedron::calculateUpFace() {
-    const float pi = glm::acos(-1.0f);
-    const uint32_t nbrVerticesPerFace = vertices.size()/sides;
+    float const pi = glm::acos(-1.0f);
+    uint32_t const nbrVerticesPerFace = vertices.size()/sides;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
     glm::vec3 upPerpendicular;
 
@@ -935,7 +936,7 @@ std::string DiceModelDodecahedron::calculateUpFace() {
         glm::vec3 a = glm::vec3(a4.x, a4.y, a4.z);
         glm::vec3 b = glm::vec3(b4.x, b4.y, b4.z);
         glm::vec3 c = glm::vec3(c4.x, c4.y, c4.z);
-        glm::vec3 perpendicularFaceVec = glm::normalize(glm::cross(b-a, b-c));
+        glm::vec3 perpendicularFaceVec = glm::normalize(glm::cross(c-b, a-b));
         angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
         if (angleMin > angle) {
             upPerpendicular = perpendicularFaceVec;
