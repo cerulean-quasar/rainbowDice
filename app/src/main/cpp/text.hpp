@@ -50,7 +50,7 @@ public:
     bool hasSymbol(std::string symbol);
     TextureImage getImage(std::string symbol);
     size_t nbrSymbols();
-    int getArrayIndex(std::string symbol);
+    uint32_t getArrayIndex(std::string symbol);
     std::vector<VkDescriptorImageInfo> getImageInfosForDescriptorSet();
 };
 #endif

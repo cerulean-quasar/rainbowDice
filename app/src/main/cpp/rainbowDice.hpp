@@ -139,6 +139,8 @@ private:
             long nbrSides = symbols.size();
             if (nbrSides == 4) {
                 die = new DiceModelTetrahedron(symbols, position);
+            } else if (nbrSides == 12) {
+                die = new DiceModelDodecahedron(symbols, position);
             } else if (nbrSides == 20) {
                 die = new DiceModelIcosahedron(symbols, position);
             } else if (6 % nbrSides == 0) {

@@ -118,8 +118,6 @@ public:
 
     void setView();
     void updatePerspectiveMatrix(int surfaceWidth, int surfaceHeight);
-    void updateAngularVelocity(glm::vec3 &vToDrag);
-    void updateVelocity(float totalX, float totalY);
     void updateAcceleration(float x, float y, float z);
     void updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
@@ -150,8 +148,9 @@ public:
 };
 
 
-// For the dice that look like octahedron but have more sides and other polyhedra that
-// have triangular faces.
+// For the dice that look like octahedron but have more sides.  Other polyhedra that
+// have triangular faces can inherit from this class and use as is for the most part.
+// loadModel will have to be changed of course.
 class DiceModelHedron : public DicePhysicsModel {
 protected:
     uint32_t sides;
@@ -203,5 +202,26 @@ public:
 
     void loadModel(TextureAtlas &texAtlas);
     int getUpFaceIndex(int i);
+};
+
+class DiceModelDodecahedron : public DicePhysicsModel {
+private:
+    static uint32_t const sides;
+
+    void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i, TextureAtlas &texAtlas);
+
+public:
+    DiceModelDodecahedron(std::vector<std::string> &inSymbols)
+    : DicePhysicsModel(inSymbols)
+            {
+            }
+
+    DiceModelDodecahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
+    : DicePhysicsModel(inSymbols, inPosition)
+    {
+    }
+
+    virtual void loadModel(TextureAtlas &texAtlas);
+    virtual std::string calculateUpFace();
 };
 #endif

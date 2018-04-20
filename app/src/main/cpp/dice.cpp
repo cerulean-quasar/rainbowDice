@@ -461,7 +461,7 @@ void DiceModelHedron::loadModel(TextureAtlas &texAtlas) {
 
 void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i, TextureAtlas &texAtlas) {
     TextureImage tex = texAtlas.getImage(symbols[i%symbols.size()]);
-    int textureToUse = texAtlas.getArrayIndex(symbols[i%symbols.size()]);
+    uint32_t textureToUse = texAtlas.getArrayIndex(symbols[i%symbols.size()]);
     float a = tex.width/(float)tex.height;
 
     Vertex vertex = {};
@@ -758,4 +758,194 @@ void DiceModelIcosahedron::loadModel(TextureAtlas &texAtlas) {
 
 int DiceModelIcosahedron::getUpFaceIndex(int i) {
     return i;
+}
+
+void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i, TextureAtlas &texAtlas) {
+    uint32_t textureToUse = texAtlas.getArrayIndex(symbols[i % symbols.size()]);
+
+    Vertex vertex = {};
+
+    // Top triangle
+    // not really using textures for this triangle
+    vertex.pos = a;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[i % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    vertex.pos = b;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    vertex.pos = e;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    // bottom texture triangle
+    vertex.pos = b;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = textureToUse;
+    vertices.push_back(vertex);
+
+    vertex.pos = c;
+    vertex.texCoord = {0.0f, 1.0f};
+    vertex.color = colors[(i + 2) % colors.size()];
+    vertex.textureToUse = textureToUse;
+    vertices.push_back(vertex);
+
+    vertex.pos = d;
+    vertex.texCoord = {1.0f, 1.0f};
+    vertex.color = colors[(i + 2) % colors.size()];
+    vertex.textureToUse = textureToUse;
+    vertices.push_back(vertex);
+
+    // top texture triangle
+    vertex.pos = b;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = textureToUse;
+    vertices.push_back(vertex);
+
+    vertex.pos = d;
+    vertex.texCoord = {1.0f, 1.0f};
+    vertex.color = colors[(i + 2) % colors.size()];
+    vertex.textureToUse = textureToUse;
+    vertices.push_back(vertex);
+
+    vertex.pos = e;
+    vertex.texCoord = {1.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = textureToUse;
+    vertices.push_back(vertex);
+}
+
+uint32_t const DiceModelDodecahedron::sides = 12;
+
+void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
+    float phi = (1+sqrtf(5.0f))/2;
+    uint32_t i = 0;
+
+    // one side
+    glm::vec3 a = {-1.0f, 1.0f, 1.0f};
+    glm::vec3 b = {-phi, 1.0f/phi, 0.0f};
+    glm::vec3 c = {-phi, -1.0f/phi, 0.0f};
+    glm::vec3 d = {-1.0f, -1.0f, 1.0f};
+    glm::vec3 e = {-1.0f/phi, 0.0f, phi};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = e;
+    c = {1.0/phi, 0.0f, phi};
+    d = {1.0f, 1.0f, 1.0f};
+    e = {0.0f, phi, 1.0f/phi};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = e;
+    c = {0.0f, phi, -1.0f/phi};
+    d = {-1.0f, 1.0f, -1.0f};
+    e = {-phi, 1.0f/phi, 0.0f};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    // the other side (negating x, y, and z)
+    a = {1.0f, -1.0f, -1.0f};
+    b = {phi, -1.0f/phi, 0.0f};
+    c = {phi, 1.0f/phi, 0.0f};
+    d = {1.0f, 1.0f, -1.0f};
+    e = {1.0f/phi, 0.0f, -phi};
+    addVertices(a, e, d, c, b, i++, texAtlas);
+
+    b = e;
+    c = {-1.0/phi, 0.0f, -phi};
+    d = {-1.0f, -1.0f, -1.0f};
+    e = {0.0f, -phi, -1.0f/phi};
+    addVertices(a, e, d, c, b, i++, texAtlas);
+
+    b = e;
+    c = {0.0f, -phi, 1.0f/phi};
+    d = {1.0f, -1.0f, 1.0f};
+    e = {phi, -1.0f/phi, 0.0f};
+    addVertices(a, e, d, c, b, i++, texAtlas);
+
+    // the middle
+    a = {-phi, 1.0f/phi, 0.0f};
+    b = {-1.0f, 1.0f, -1.0f};
+    c = {-1.0f/phi, 0.0f, -phi};
+    d = {-1.0f, -1.0f, -1.0f};
+    e = {-phi, -1.0f/phi, 0.0f};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = e;
+    c = d;
+    a = {-1.0f, -1.0f, 1.0f};
+    d = {0.0f, -phi, -1.0f/phi};
+    e = {0.0f, -phi, 1.0f/phi};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = a;
+    c = e;
+    a = {-1.0f/phi, 0.0f, phi};
+    d = {1.0f, -1.0f, 1.0f};
+    e = {1.0f/phi, 0.0f, phi};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = e;
+    c = d;
+    a = {1.0f, 1.0f, 1.0f};
+    d = {phi, -1.0f/phi, 0.0f};
+    e = {phi, 1.0f/phi, 0.0f};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = a;
+    c = e;
+    a = {0.0f, phi, 1.0f/phi};
+    d = {1.0f, 1.0f, -1.0f};
+    e = {0.0f, phi, -1.0f/phi};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    b = e;
+    c = d;
+    a = {-1.0f, 1.0f, -1.0f};
+    d = {1.0/phi, 0.0f, -phi};
+    e = {-1.0/phi, 0.0f, -phi};
+    addVertices(a, b, c, d, e, i++, texAtlas);
+
+    // indices - not really using these
+    for (i = 0; i < sides*3*3; i ++) {
+        indices.push_back(i);
+    }
+}
+
+std::string DiceModelDodecahedron::calculateUpFace() {
+    const float pi = glm::acos(-1.0f);
+    const uint32_t nbrVerticesPerFace = vertices.size()/sides;
+    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 upPerpendicular;
+
+    float angleMin = pi;
+    float angle;
+    uint32_t upFace = 0;
+    for (uint32_t i = 0; i < sides; i++) {
+        glm::vec4 a4 = ubo.model * glm::vec4(vertices[i * nbrVerticesPerFace].pos, 1.0f);
+        glm::vec4 b4 = ubo.model * glm::vec4(vertices[1 + i * nbrVerticesPerFace].pos, 1.0f);
+        glm::vec4 c4 = ubo.model * glm::vec4(vertices[4 + i * nbrVerticesPerFace].pos, 1.0f);
+        glm::vec3 a = glm::vec3(a4.x, a4.y, a4.z);
+        glm::vec3 b = glm::vec3(b4.x, b4.y, b4.z);
+        glm::vec3 c = glm::vec3(c4.x, c4.y, c4.z);
+        glm::vec3 perpendicularFaceVec = glm::normalize(glm::cross(b-a, b-c));
+        angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
+        if (angleMin > angle) {
+            upPerpendicular = perpendicularFaceVec;
+            upFace = i;
+            angleMin = angle;
+        }
+    }
+
+    glm::quat quaternian = glm::angleAxis(angleMin, glm::normalize(glm::cross(upPerpendicular, zaxis)));
+    qTotalRotated = glm::normalize(quaternian * qTotalRotated);
+
+    return symbols[upFace%symbols.size()];
 }

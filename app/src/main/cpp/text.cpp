@@ -95,7 +95,7 @@ size_t TextureAtlas::nbrSymbols() {
     return textureImages.size();
 }
 
-int TextureAtlas::getArrayIndex(std::string symbol) {
+uint32_t TextureAtlas::getArrayIndex(std::string symbol) {
     int i=0;
     for (auto it = textureImages.begin(); it != textureImages.end(); it++) {
         if (it->first == symbol) {
