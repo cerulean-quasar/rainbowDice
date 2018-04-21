@@ -765,6 +765,9 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
 
     Vertex vertex = {};
 
+    glm::vec3 p1 = 1.0f/2.0f * (e+b-d+c);
+    glm::vec3 p2 = 1.0f/2.0f * (e+b+d-c);
+
     // Top triangle
     // not really using textures for this triangle
     vertex.pos = a;
@@ -785,8 +788,48 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
-    // bottom texture triangle
+    // right bottom triangle
+    // not really using textures for this triangle
     vertex.pos = b;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    vertex.pos = c;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 2) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    vertex.pos = p1;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    // left bottom triangle
+    // not really using textures for this triangle
+    vertex.pos = e;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    vertex.pos = p2;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 1) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    vertex.pos = d;
+    vertex.texCoord = {0.0f, 0.0f};
+    vertex.color = colors[(i + 2) % colors.size()];
+    vertex.textureToUse = 0;
+    vertices.push_back(vertex);
+
+    // bottom texture triangle
+    vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertex.textureToUse = textureToUse;
@@ -805,7 +848,7 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertices.push_back(vertex);
 
     // top texture triangle
-    vertex.pos = b;
+    vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertex.textureToUse = textureToUse;
@@ -817,7 +860,7 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
-    vertex.pos = e;
+    vertex.pos = p2;
     vertex.texCoord = {1.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertex.textureToUse = textureToUse;
@@ -915,7 +958,7 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
 
     // indices - not really using these
-    for (i = 0; i < sides*3*3; i ++) {
+    for (i = 0; i < sides*5*3; i ++) {
         indices.push_back(i);
     }
 }
