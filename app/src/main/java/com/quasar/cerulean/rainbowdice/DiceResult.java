@@ -57,7 +57,7 @@ public class DiceResult {
                 if (value == reRollOn) {
                     needsReRoll = true;
                 }
-                DieResult dieResult = new DieResult(value, needsReRoll, isAddOperationPrevious);
+                DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation);
                 dieResults.add(dieResult);
                 diceResults.add(dieResults);
                 i++;

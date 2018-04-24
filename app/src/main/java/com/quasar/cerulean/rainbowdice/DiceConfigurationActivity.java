@@ -21,7 +21,6 @@ package com.quasar.cerulean.rainbowdice;
 
 import android.content.Context;
 import android.content.Intent;
-import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -30,13 +29,14 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.BaseAdapter;
-import android.widget.EditText;
+import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -45,41 +45,106 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Locale;
 
 public class DiceConfigurationActivity extends AppCompatActivity {
+
+    private static final int NBR_FAVORITES = 3;
+    public static final String favoritesFile = "diceConfigurationFavoritesFile";
+    public static final String favorite1 = "favorite1";
+    public static final String favorite2 = "favorite2";
+    public static final String favorite3 = "favorite3";
+    public static final int DICE_CUSTOMIZATION_ACTIVITY = 2;
+    public static final String DICE_FILENAME = "DiceFileName";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dice_configuration);
 
-        Spinner spinner = findViewById(R.id.filename);
-        FileAdapter spinAdapter = new FileAdapter();
-        spinner.setAdapter(spinAdapter);
+        resetFileList();
+        resetFavoriteSpinners();
+    }
 
-        Intent intent = getIntent();
-        String filename = intent.getStringExtra(MainActivity.DICE_FILENAME);
-        if (filename != null) {
-            int position = spinAdapter.getPosition(filename);
-            if (position >= 0) {
-                // the file exists, load it.
-                loadFromFile(filename);
-                EditText text = findViewById(R.id.newFilename);
-                text.setText(filename);
-                spinner.setSelection(position);
-            }
-        } else {
-            Parcelable[] dice = intent.getParcelableArrayExtra(MainActivity.DICE_CONFIGURATION);
-            LinearLayout layout = findViewById(R.id.dice_layout);
-            int index = 0;
-            for (Parcelable dieParcel : dice) {
-                DieConfiguration die = (DieConfiguration) dieParcel;
-                addDiceConfigToLayout(die, layout, index, index==dice.length-1);
-                index++;
+    private void resetFileList() {
+        LinearLayout diceLayout = findViewById(R.id.dice_layout);
+        diceLayout.removeAllViews();
+        LayoutInflater inflater = getLayoutInflater();
+        File[] filearr = getFilesDir().listFiles();
+        for (File file : filearr) {
+            if (!file.getName().equals(favoritesFile)) {
+                LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
+                TextView text = layout.findViewById(R.id.filename);
+                text.setText(file.getName());
+                diceLayout.addView(layout);
             }
         }
+    }
 
+    private void resetFavoriteSpinners() {
+        String[] excludeFiles = new String[1];
+        excludeFiles[0] = favoritesFile;
+        Spinner spinner1 = findViewById(R.id.favorite1);
+        FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
+        spinner1.setAdapter(spinAdapter1);
+
+        Spinner spinner2 = findViewById(R.id.favorite2);
+        FileAdapter spinAdapter2 = new FileAdapter(this, excludeFiles);
+        spinner2.setAdapter(spinAdapter2);
+
+        Spinner spinner3 = findViewById(R.id.favorite3);
+        FileAdapter spinAdapter3 = new FileAdapter(this, excludeFiles);
+        spinner3.setAdapter(spinAdapter3);
+
+        StringBuffer json = new StringBuffer();
+
+        try {
+            byte[] bytes = new byte[1024];
+            int len;
+            FileInputStream inputStream = openFileInput(favoritesFile);
+            while ((len = inputStream.read(bytes)) >= 0) {
+                if (len > 0) {
+                    json.append(new String(bytes, 0, len, "UTF-8"));
+                }
+            }
+            inputStream.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Could not find file on opening: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        } catch (IOException e) {
+            System.out.println("Exception on reading from file: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        }
+
+        try {
+            JSONObject obj = new JSONObject(json.toString());
+            String fav1File = obj.getString(favorite1);
+            String fav2File = obj.getString(favorite2);
+            String fav3File = obj.getString(favorite3);
+
+            if (!fav1File.isEmpty()) {
+                int pos = spinAdapter1.getPosition(fav1File);
+                if (pos != -1) {
+                    spinner1.setSelection(pos);
+                }
+            }
+
+            if (!fav2File.isEmpty()) {
+                int pos = spinAdapter2.getPosition(fav2File);
+                if (pos != -1) {
+                    spinner2.setSelection(pos);
+                }
+            }
+
+            if (!fav3File.isEmpty()) {
+                int pos = spinAdapter3.getPosition(fav3File);
+                if (pos != -1) {
+                    spinner3.setSelection(pos);
+                }
+            }
+        } catch (JSONException e) {
+            System.out.println("Exception on reading JSON from file: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        }
     }
 
     @Override
@@ -89,274 +154,119 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         return true;
     }
 
-    public void onSave(View view) {
-        DieConfiguration[] dice = getDiceConfigFromScreen();
-        EditText text = findViewById(R.id.newFilename);
-        String filename = text.getText().toString();
-        if (!filename.isEmpty()) {
-            String json;
-            try {
-                JSONArray jsonArray = new JSONArray();
-                for (DieConfiguration die : dice) {
-                    JSONObject obj = die.toJSON();
-                    jsonArray.put(obj);
-                }
-                json = jsonArray.toString();
-            } catch (JSONException e) {
-                System.out.println("Exception in writing out JSON: " + e.getMessage());
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == DICE_CUSTOMIZATION_ACTIVITY) {
+            if (resultCode == RESULT_CANCELED) {
+                // The user cancelled editing
                 return;
             }
 
-            try {
-                FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                outputStream.write(json.getBytes());
-                outputStream.close();
-            } catch (FileNotFoundException e) {
-                System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-                return;
-            } catch (IOException e) {
-                System.out.println("Exception on writing to file: " + filename + " message: " + e.getMessage());
-                return;
-            }
+            resetFavoriteSpinners();
+            resetFileList();
         }
-
-        Spinner spinner = findViewById(R.id.filename);
-        spinner.setAdapter(new FileAdapter());
     }
 
     public void onDeleteFile(View view) {
-        Spinner spinner = findViewById(R.id.filename);
-        TextView text = (TextView)spinner.getSelectedView();
-        if (text != null) {
-            String filename = text.getText().toString();
-            if (!filename.isEmpty()) {
-                deleteFile(filename);
-                spinner.setAdapter(new FileAdapter());
+        // find the list item that created the delete event
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        for (int i=0; i < layout.getChildCount(); i++) {
+            View item = layout.getChildAt(i);
+            ImageButton delete = item.findViewById(R.id.trash);
+            if (delete == view) {
+                // this is the row that caused the delete event
+                TextView text = item.findViewById(R.id.filename);
+                String filename = text.getText().toString();
+
+                // delete the file
+                if (!filename.isEmpty()) {
+                    deleteFile(filename);
+                    layout.removeViewAt(i);
+                    resetFavoriteSpinners();
+                }
             }
         }
+
     }
 
-    public void onLoad(View view) {
-        Spinner spinner = findViewById(R.id.filename);
-        TextView text = (TextView)spinner.getSelectedView();
-        if (text != null) {
-            String filename = text.getText().toString();
-            if (!filename.isEmpty()) {
-                loadFromFile(filename);
+    public void onEdit(View view) {
+        // find the list item that created the edit event
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        ViewParent parent = view.getParent();
+        for (int i=0; i < layout.getChildCount(); i++) {
+            LinearLayout item = (LinearLayout)layout.getChildAt(i);
+            ImageButton edit = item.findViewById(R.id.editDice);
+            if (edit == view) {
+                // this is the row that caused the edit event
+                TextView text = item.findViewById(R.id.filename);
+                String filename = text.getText().toString();
+
+                // start the customization app with the file
+                if (!filename.isEmpty()) {
+                    Intent intent = new Intent(this, DiceCustomizationActivity.class);
+                    intent.putExtra(DICE_FILENAME, filename);
+                    startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
+                }
             }
         }
+
     }
 
     public void onDone(MenuItem item) {
-        DieConfiguration[] dice = getDiceConfigFromScreen();
-        Intent result = new Intent();
-        result.putExtra(MainActivity.DICE_CONFIGURATION, dice);
-        TextView filenameView = findViewById(R.id.newFilename);
-        Spinner spinner = findViewById(R.id.filename);
-        int pos = ((FileAdapter)(spinner.getAdapter())).getPosition(filenameView.getText().toString());
-        if (pos >= 0) {
-            result.putExtra(MainActivity.DICE_FILENAME, filenameView.getText().toString());
+        String[] favorite = new String[NBR_FAVORITES];
+
+        Spinner spinner = findViewById(R.id.favorite1);
+        TextView text = (TextView)spinner.getSelectedView();
+        if (text != null) {
+            String filename = text.getText().toString();
+            favorite[0] = filename;
         }
-        setResult(RESULT_OK, result);
+
+        spinner = findViewById(R.id.favorite2);
+        text = (TextView)spinner.getSelectedView();
+        if (text != null) {
+            String filename = text.getText().toString();
+            favorite[1] = filename;
+        }
+
+        spinner = findViewById(R.id.favorite3);
+        text = (TextView)spinner.getSelectedView();
+        if (text != null) {
+            String filename = text.getText().toString();
+            favorite[2] = filename;
+        }
+
+        String json;
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("favorite1", favorite[0]);
+            obj.put("favorite2", favorite[1]);
+            obj.put("favorite3", favorite[2]);
+            json = obj.toString();
+        } catch (JSONException e) {
+            System.out.println("Exception in writing out JSON: " + e.getMessage());
+            return;
+        }
+
+        try {
+            FileOutputStream outputStream = openFileOutput(favoritesFile, Context.MODE_PRIVATE);
+            outputStream.write(json.getBytes());
+            outputStream.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Could not find file on opening: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        } catch (IOException e) {
+            System.out.println("Exception on writing to file: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        }
+
+        setResult(RESULT_OK, null);
         finish();
     }
 
-    public void onDelete(View view) {
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        int nbrDice = layout.getChildCount();
-        if (nbrDice == 1) {
-            // Don't delete the dice if there is only one row!
-            return;
-        }
-        LinearLayout prev = (LinearLayout)layout.getChildAt(0);
-        for (int i = 0; i < nbrDice; i++) {
-            LinearLayout layoutDice = (LinearLayout)layout.getChildAt(i);
-            View delete_button = layoutDice.findViewById(R.id.delete_button);
-            if (view == delete_button) {
-                // delete this row.
-                layout.removeView(layoutDice);
-                if (i == nbrDice-1) {
-                    // we removed the last row.  Remove the operation spinner from the new last row
-                    LinearLayout item = prev.findViewById(R.id.item_dice_configuration);
-                    item.removeViewAt(item.getChildCount()-1);
-                }
-                return;
-            }
-            prev = layoutDice;
-        }
-        TextView filename = findViewById(R.id.newFilename);
-        filename.setText("");
-    }
-
-    public void onAddRow(View view) {
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        int nbrDice = layout.getChildCount();
-        for (int i = 0; i < nbrDice; i++) {
-            LinearLayout layoutDice = (LinearLayout)layout.getChildAt(i);
-            View addRow = layoutDice.findViewById(R.id.add_row);
-            if (view == addRow) {
-                LayoutInflater layoutInflater = getLayoutInflater();
-                LinearLayout layoutDiceAdded = (LinearLayout) layoutInflater.inflate(
-                        R.layout.row_dice_configuration, layout, false);
-                layout.addView(layoutDiceAdded, i+1);
-                Spinner operatorSpinner = (Spinner)layoutInflater.inflate(
-                        R.layout.operator_view, layoutDice, false);
-                StringArrayAdapter adapter = new StringArrayAdapter(R.array.operationArray);
-                operatorSpinner.setAdapter(adapter);
-                if (i == nbrDice - 1) {
-                    // we are on the last row, we need to add an operator spinner on the end row.
-                    LinearLayout item = layoutDice.findViewById(R.id.item_dice_configuration);
-                    item.addView(operatorSpinner);
-                } else {
-                    // we are not on the last row, the spinner needs to be added to the layout
-                    // we just added.
-                    LinearLayout item = layoutDiceAdded.findViewById(R.id.item_dice_configuration);
-                    item.addView(operatorSpinner);
-                }
-
-                TextView filename = findViewById(R.id.newFilename);
-                filename.setText("");
-                return;
-            }
-        }
-    }
-
-    private void loadFromFile(String filename) {
-        StringBuffer json = new StringBuffer();
-
-        try {
-            byte[] bytes = new byte[1024];
-            int len;
-            FileInputStream inputStream = openFileInput(filename);
-            while ((len = inputStream.read(bytes)) >= 0) {
-                if (len > 0) {
-                    json.append(new String(bytes, 0, len, "UTF-8"));
-                }
-            }
-            inputStream.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-            return;
-        } catch (IOException e) {
-            System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
-            return;
-        }
-
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        layout.removeViews(0, layout.getChildCount());
-        try {
-            JSONArray jsonArray = new JSONArray(json.toString());
-            int length = jsonArray.length();
-            for (int i = 0; i < length; i++) {
-                JSONObject jsonDieConfig = jsonArray.getJSONObject(i);
-                DieConfiguration dieConfig = DieConfiguration.fromJson(jsonDieConfig);
-                addDiceConfigToLayout(dieConfig, layout, i, i==length-1);
-            }
-        } catch (JSONException e) {
-            System.out.println("Exception on reading JSON from file: " + filename + " message: " + e.getMessage());
-            return;
-        }
-
-        TextView saveFile = findViewById(R.id.newFilename);
-        saveFile.setText(filename);
-    }
-
-    private DieConfiguration[] getDiceConfigFromScreen() {
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        int nbrDice = layout.getChildCount();
-        DieConfiguration[] dice = new DieConfiguration[nbrDice];
-        for (int i=0; i < nbrDice; i++) {
-            LinearLayout layoutDice = (LinearLayout)layout.getChildAt(i);
-
-            EditText text = layoutDice.findViewById(R.id.number_of_dice);
-            String textString = text.getText().toString();
-            int nbrDiceOfThisType = 1;
-            if (!textString.isEmpty()) {
-                nbrDiceOfThisType = Integer.parseInt(textString, 10);
-            }
-
-            text = layoutDice.findViewById(R.id.die_sides);
-            textString = text.getText().toString();
-            int nbrSides = 6;
-            if (!textString.isEmpty()) {
-                nbrSides = Integer.parseInt(textString, 10);
-            }
-
-            text = layoutDice.findViewById(R.id.die_start);
-            textString = text.getText().toString();
-            int startAt = 1;
-            if (!textString.isEmpty()) {
-                startAt = Integer.parseInt(textString, 10);
-            }
-
-            text = layoutDice.findViewById(R.id.die_increment);
-            textString = text.getText().toString();
-            int increment = 1;
-            if (!textString.isEmpty()) {
-                increment = Integer.parseInt(text.getText().toString(), 10);
-            }
-
-            text = layoutDice.findViewById(R.id.die_reroll);
-            int reRollOn = startAt - 1;
-            if (!text.getText().toString().isEmpty()) {
-                reRollOn = Integer.parseInt(text.getText().toString(), 10);
-            }
-            boolean isAdd = false;
-            Spinner operationSpinner = layoutDice.findViewById(R.id.operator_view);
-            if (operationSpinner==null) {
-                isAdd = true;
-            } else {
-                TextView operation = (TextView)operationSpinner.getSelectedView();
-                if (operation.getText().toString().equals(getString(R.string.addition))) {
-                    isAdd = true;
-                }
-            }
-            dice[i] = new DieConfiguration(
-                    nbrDiceOfThisType, nbrSides, startAt, increment, reRollOn, isAdd);
-        }
-
-        return dice;
-    }
-
-    private void addDiceConfigToLayout(DieConfiguration die, LinearLayout layout, int index, boolean isEnd) {
-        LayoutInflater layoutInflater = getLayoutInflater();
-        LinearLayout layoutDiceAdded = (LinearLayout) layoutInflater.inflate(
-                R.layout.row_dice_configuration, layout, false);
-        EditText text = layoutDiceAdded.findViewById(R.id.number_of_dice);
-        text.setText(String.format(Locale.getDefault(), "%d", die.getNumberOfDice()));
-        text = layoutDiceAdded.findViewById(R.id.die_sides);
-        text.setText(String.format(Locale.getDefault(), "%d", die.getNumberOfSides()));
-        text = layoutDiceAdded.findViewById(R.id.die_start);
-        int startAt = die.getStartAt();
-        text.setText(String.format(Locale.getDefault(), "%d", startAt));
-        text = layoutDiceAdded.findViewById(R.id.die_increment);
-        text.setText(String.format(Locale.getDefault(), "%d", die.getIncrement()));
-        text = layoutDiceAdded.findViewById(R.id.die_reroll);
-        int reRoll = die.getReRollOn();
-        if (reRoll >= startAt) {
-            text.setText(String.format(Locale.getDefault(), "%d", reRoll));
-        } else {
-            text.setText("");
-        }
-        if (!isEnd) {
-            StringArrayAdapter spinAdapter = new StringArrayAdapter(R.array.operationArray);
-            Spinner spinner = (Spinner) layoutInflater.inflate(R.layout.operator_view, layoutDiceAdded, false);
-            spinner.setAdapter(spinAdapter);
-            if (die.isAddOperation()) {
-                int position = spinAdapter.getPosition(getString(R.string.addition));
-                if (position >= 0) {
-                    spinner.setSelection(position);
-                }
-            } else {
-                int position = spinAdapter.getPosition(getString(R.string.subtraction));
-                if (position >= 0) {
-                    spinner.setSelection(position);
-                }
-            }
-            LinearLayout item = layoutDiceAdded.findViewById(R.id.item_dice_configuration);
-            item.addView(spinner);
-        }
-        layout.addView(layoutDiceAdded, index);
+    public void onNewDiceConfiguration(MenuItem item) {
+        Intent intent = new Intent(this, DiceCustomizationActivity.class);
+        startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
     }
 
     private class StringArrayAdapter extends BaseAdapter {
@@ -405,53 +315,4 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
     }
 
-    private class FileAdapter extends BaseAdapter {
-        private String[] filelist;
-        public FileAdapter() {
-            File[] filearr = getFilesDir().listFiles();
-            filelist = new String[filearr.length];
-            int i = 0;
-            for (File file : filearr) {
-                filelist[i++] = file.getName();
-            }
-        }
-
-        public int getPosition(String filename) {
-            int i = 0;
-            for (String file : filelist) {
-                if (filename.equals(file)) {
-                    return i;
-                }
-                i++;
-            }
-            return -1;
-        }
-
-        @Override
-        public int getCount() {
-            return filelist.length;
-        }
-
-        @Override
-        public String getItem(int position) {
-            return filelist[position];
-        }
-
-        @Override
-        public long getItemId(int position) {
-            return filelist[position].hashCode();
-        }
-
-        @Override
-        public View getView(int position, View convertView, ViewGroup container) {
-            if (convertView == null) {
-                convertView = getLayoutInflater().inflate(R.layout.list_item_dice_configuration, container, false);
-            }
-
-            TextView text = convertView.findViewById(R.id.list_item);
-            text.setText(getItem(position));
-
-            return text;
-        }
-    }
 }

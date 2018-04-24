@@ -4,20 +4,36 @@
     <string name="subtraction">-</string>
     <string name="done">Done</string>
     <string name="roll">Roll</string>
-    <string name="save">Save</string>
+    <string name="save">Save As</string>
+    <string name="cancel">Cancel</string>
     <string name="load">Load</string>
     <string name="delete">Delete</string>
-    <string name="addRow">Add Row</string>
+    <string name="new_item">New</string>
+    <string name="favorites">Favorites:</string>
     <string name="configureDice">Configure Dice</string>
     <string name="diceMessageRolling">Rolling...</string>
     <string name="diceMessageResult">result: %s = %d</string>
     <string name="diceMessageToStartRolling">Shake while rolling</string>
     <string name="diceMessageReRoll">Shake while re-rolling required dice</string>
-    <string name="diceConfigNbrDice">Number of Dice</string>
+    <string name="diceConfigNbrDice"># Dice</string>
     <string name="diceConfigNbrSides">Number of Sides</string>
-    <string name="diceConfigStart">Number dice Start with</string>
-    <string name="diceConfigIncrement">Number to Increase By</string>
-    <string name="diceConfigReRoll">Re-roll and Add if the Dice Roll</string>
+    <string name="diceConfigStart">start</string>
+    <string name="diceConfigIncrement">next</string>
+    <string name="diceConfigReRoll">reroll on</string>
+    <string name="D2">D2</string>
+    <string name="D3">D3</string>
+    <string name="D4">D4</string>
+    <string name="D6">D6</string>
+    <string name="D8">D8</string>
+    <string name="D10">D10</string>
+    <string name="D12">D12</string>
+    <string name="D20">D20</string>
+    <string name="D30">D30</string>
+    <string name="D100">D100</string>
+    <string name="diceNumberOfSidesOther">Other</string>
+    <string name="diceNumbersString">%d,%d,&#8230;,%d</string>
+    <string name="diceConfigStringRepresentation">%dD%d</string>
+    <string name="rerollText">re-roll on: %d</string>
     <string-array name="operationArray">
         <item>@string/addition</item>
         <item>@string/subtraction</item>

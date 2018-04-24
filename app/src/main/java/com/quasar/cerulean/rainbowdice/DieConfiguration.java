@@ -22,7 +22,12 @@ package com.quasar.cerulean.rainbowdice;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.io.FileInputStream;
+import java.io.IOException;
 
 public class DieConfiguration implements Parcelable {
     private int numberOfDice;
@@ -33,6 +38,37 @@ public class DieConfiguration implements Parcelable {
 
     // This operator applies to the next dice set.
     private boolean isAdditionOperation;
+
+    public static DieConfiguration[] loadFromFile(FileInputStream inputStream) {
+        StringBuffer json = new StringBuffer();
+
+        try {
+            byte[] bytes = new byte[1024];
+            int len;
+            while ((len = inputStream.read(bytes)) >= 0) {
+                if (len > 0) {
+                    json.append(new String(bytes, 0, len, "UTF-8"));
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Exception on reading from file: " + e.getMessage());
+            return null;
+        }
+
+        try {
+            JSONArray jsonArray = new JSONArray(json.toString());
+            int length = jsonArray.length();
+            DieConfiguration[] configs = new DieConfiguration[length];
+            for (int i = 0; i < length; i++) {
+                JSONObject jsonDieConfig = jsonArray.getJSONObject(i);
+                configs[i] = DieConfiguration.fromJson(jsonDieConfig);
+            }
+            return configs;
+        } catch (JSONException e) {
+            System.out.println("Exception on reading JSON from file: " + e.getMessage());
+            return null;
+        }
+    }
 
     public static DieConfiguration fromJson(JSONObject obj) throws org.json.JSONException {
         int inNumberOfDice = obj.getInt("NumberOfDice");
@@ -126,5 +162,29 @@ public class DieConfiguration implements Parcelable {
 
     public boolean isAddOperation() {
         return isAdditionOperation;
+    }
+
+    public void setNumberOfDice(int in) {
+        numberOfDice = in;
+    }
+
+    public void setNumberOfSides(int in) {
+        numberOfSides = in;
+    }
+
+    public void setStartAt(int in) {
+        startAt = in;
+    }
+
+    public void setIncrement(int in) {
+        increment = in;
+    }
+
+    public void setReRollOn(int in) {
+        reRollOn = in;
+    }
+
+    public void setIsAddOperation(boolean in) {
+        isAdditionOperation = in;
     }
 }

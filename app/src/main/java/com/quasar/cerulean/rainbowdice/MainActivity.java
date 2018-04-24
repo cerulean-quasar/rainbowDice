@@ -35,8 +35,19 @@ import android.view.MenuItem;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -44,8 +55,12 @@ import java.util.Locale;
 import java.util.TreeSet;
 
 import static android.graphics.Bitmap.Config.ALPHA_8;
+import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favorite1;
+import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favorite2;
+import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favorite3;
+import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favoritesFile;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity  implements AdapterView.OnItemSelectedListener {
 
     // Used to load the 'native-lib' library on application startup.
     static {
@@ -53,7 +68,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public static final String DICE_CONFIGURATION = "DiceConfiguration";
-    public static final String DICE_FILENAME = "DiceFileName";
     private static final String NATIVE = "Rainbow Dice Native";
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
@@ -74,6 +88,8 @@ public class MainActivity extends AppCompatActivity {
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         drawSurfaceHolder.addCallback(new MySurfaceCallback(this));
+
+        resetFavorites();
     }
 
     @Override
@@ -112,20 +128,62 @@ public class MainActivity extends AppCompatActivity {
         destroySurface();
     }
 
+    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+        // the user selected a dice configuration to roll.  We need to load it and roll the dice
+        TextView item = view.findViewById(R.id.list_item);
+        String filename = item.getText().toString();
+        if (filename.isEmpty()) {
+            return;
+        }
+
+        joinDrawer();
+        /*
+        destroyModels();
+        loadFromFile(filename);
+        loadModelsAndTextures();
+        recreateModels();
+        rollTheDice();
+        */
+        destroySurface();
+        loadFromFile(filename);
+        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        startDrawing(drawSurfaceHolder);
+    }
+
+    public void onNothingSelected(AdapterView<?> parent) {
+    }
+
+    public void onFavoriteClick(View view) {
+        String filename = ((Button)view).getText().toString();
+        if (filename.isEmpty()) {
+            return;
+        }
+
+        joinDrawer();
+        /*
+        destroyModels();
+        loadFromFile(filename);
+        loadModelsAndTextures();
+        recreateModels();
+        rollTheDice();
+        */
+        destroySurface();
+        loadFromFile(filename);
+        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        startDrawing(drawSurfaceHolder);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
-            if (resultCode == RESULT_CANCELED) {
+            if (resultCode != RESULT_OK) {
                 // The user cancelled editing
                 return;
             }
-            diceConfigFilename = data.getStringExtra(DICE_FILENAME);
-            Parcelable[] parcels = data.getParcelableArrayExtra(DICE_CONFIGURATION);
-            diceConfig = new DieConfiguration[parcels.length];
-            int i = 0;
-            for (Parcelable parcel : parcels) {
-                diceConfig[i++] = (DieConfiguration)parcel;
-            }
+
+            resetFavorites();
         }
 
     }
@@ -140,15 +198,101 @@ public class MainActivity extends AppCompatActivity {
     public void onConfigure(MenuItem item) {
         joinDrawer();
         Intent intent = new Intent(this, DiceConfigurationActivity.class);
-        intent.putExtra(DICE_CONFIGURATION, diceConfig);
-        if (diceConfigFilename != null) {
-            intent.putExtra(DICE_FILENAME, diceConfigFilename);
-        }
         startActivityForResult(intent, DICE_CONFIGURATION_ACTIVITY);
     }
 
     public void onRoll(MenuItem item) {
         rollTheDice();
+    }
+
+    private void loadFromFile(String filename) {
+        StringBuffer json = new StringBuffer();
+
+        try {
+            byte[] bytes = new byte[1024];
+            int len;
+            FileInputStream inputStream = openFileInput(filename);
+            while ((len = inputStream.read(bytes)) >= 0) {
+                if (len > 0) {
+                    json.append(new String(bytes, 0, len, "UTF-8"));
+                }
+            }
+            inputStream.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
+            return;
+        } catch (IOException e) {
+            System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
+            return;
+        }
+
+        try {
+            JSONArray jsonArray = new JSONArray(json.toString());
+            int length = jsonArray.length();
+            diceConfig = new DieConfiguration[length];
+            for (int i = 0; i < length; i++) {
+                JSONObject jsonDieConfig = jsonArray.getJSONObject(i);
+                DieConfiguration dieConfig = DieConfiguration.fromJson(jsonDieConfig);
+                diceConfig[i] = dieConfig;
+            }
+        } catch (JSONException e) {
+            System.out.println("Exception on reading JSON from file: " + filename + " message: " + e.getMessage());
+            return;
+        }
+
+    }
+
+    private void resetFavorites() {
+        StringBuffer json = new StringBuffer();
+
+        try {
+            byte[] bytes = new byte[1024];
+            int len;
+            FileInputStream inputStream = openFileInput(favoritesFile);
+            while ((len = inputStream.read(bytes)) >= 0) {
+                if (len > 0) {
+                    json.append(new String(bytes, 0, len, "UTF-8"));
+                }
+            }
+            inputStream.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Could not find file on opening: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        } catch (IOException e) {
+            System.out.println("Exception on reading from file: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        }
+
+        String fav1File;
+        String fav2File;
+        String fav3File;
+
+        try {
+            JSONObject obj = new JSONObject(json.toString());
+            fav1File = obj.getString(favorite1);
+            fav2File = obj.getString(favorite2);
+            fav3File = obj.getString(favorite3);
+        } catch (JSONException e) {
+            System.out.println("Exception on reading JSON from file: " + favoritesFile + " message: " + e.getMessage());
+            return;
+        }
+
+        String[] excludeFiles = new String[4];
+        excludeFiles[0] = favoritesFile;
+        excludeFiles[1] = fav1File;
+        excludeFiles[2] = fav2File;
+        excludeFiles[3] = fav3File;
+        Spinner other = findViewById(R.id.mainOtherSpinner);
+        FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
+        other.setAdapter(spinAdapter1);
+        other.setOnItemSelectedListener(this);
+
+        Button fav = findViewById(R.id.mainFavorite1);
+        fav.setText(fav1File);
+        fav = findViewById(R.id.mainFavorite2);
+        fav.setText(fav2File);
+        fav = findViewById(R.id.mainFavorite3);
+        fav.setText(fav3File);
     }
 
     private void rollTheDice() {
@@ -195,7 +339,7 @@ public class MainActivity extends AppCompatActivity {
         int TEXWIDTH = 50;
         int TEXHEIGHT = 25;
 
-        TreeSet<String> symbolSet = new TreeSet<String>();
+        TreeSet<String> symbolSet = new TreeSet<>();
 
         // First we need to load all the textures in the texture Atlas (in cpp), then
         // we can load the models.  Since the model depends on the size of the textures.
@@ -297,7 +441,6 @@ public class MainActivity extends AppCompatActivity {
 
         surfaceReady = true;
         rollTheDice();
-        startDrawer();
     }
 
     private byte[] readAssetFile(String filename) {
