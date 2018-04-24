@@ -6,6 +6,7 @@
     <ImageButton
         android:id="@+id/trash"
         android:src="@drawable/trash"
+        android:background="@color/colorPrimary"
         android:onClick="onDeleteFile"
         android:maxHeight="10dp"
         android:layout_width="wrap_content"
@@ -13,6 +14,7 @@
     <ImageButton
         android:id="@+id/editDice"
         android:src="@drawable/pencil"
+        android:background="@color/colorPrimary"
         android:onClick="onEdit"
         android:maxHeight="10dp"
         android:layout_width="wrap_content"

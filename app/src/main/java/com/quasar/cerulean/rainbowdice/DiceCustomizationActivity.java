@@ -19,9 +19,11 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -57,7 +59,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     private static final int DEFAULT_NBR_DICE = 1;
     private static final int DEFAULT_NBR_SIDES = 6;
     private String saveFileName = null;
-    private PopupWindow saveAsPopup = null;
+    private Dialog saveDialog = null;
 
     private class DiceGuiConfig {
         public DieConfiguration config;
@@ -435,12 +437,16 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     public void onSaveDiceCustomization(MenuItem item) {
         LinearLayout layout = findViewById(R.id.dice_list);
         LayoutInflater inflater = getLayoutInflater();
-        saveAsPopup = new PopupWindow(inflater.inflate(R.layout.save_as_dialog, layout,false),
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        saveAsPopup.setBackgroundDrawable(getResources().getDrawable(R.drawable.popup_menu_background, null));
-        saveAsPopup.setFocusable(true);
 
-        saveAsPopup.showAsDropDown(layout);
+        LinearLayout saveDialogView = (LinearLayout) inflater.inflate(R.layout.save_as_dialog, layout, false);
+
+        if (saveFileName != null) {
+            EditText text = saveDialogView.findViewById(R.id.filename);
+            text.setText(saveFileName);
+        }
+
+
+        saveDialog = new AlertDialog.Builder(this).setTitle(R.string.save).setView(saveDialogView).show();
     }
 
     public void onDoneDiceCustomization(MenuItem item) {
@@ -449,13 +455,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     public void onCancel(View view) {
-        saveAsPopup.dismiss();
-        saveAsPopup = null;
+        saveDialog.dismiss();
+        saveDialog = null;
     }
 
     public void onSaveFile(View view) {
-        View layout = saveAsPopup.getContentView();
-        EditText text = layout.findViewById(R.id.filename);
+        EditText text = saveDialog.findViewById(R.id.filename);
 
         String filename = text.getText().toString();
         if (filename.isEmpty()) {
@@ -487,8 +492,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             return;
         }
 
-        saveAsPopup.dismiss();
-        saveAsPopup = null;
+        saveDialog.dismiss();
+        saveDialog = null;
     }
 
     private void configsToView(DieConfiguration[] configs) {
