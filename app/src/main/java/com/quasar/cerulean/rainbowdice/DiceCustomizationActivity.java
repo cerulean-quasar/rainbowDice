@@ -26,6 +26,7 @@ import android.graphics.Color;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.Layout;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -120,7 +121,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         configsToView(configs);
-        diceConfigs.get(0).button.setBackgroundColor(Color.GRAY);
+        ((LinearLayout)diceConfigs.get(0).button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
 
         TextView text = findViewById(R.id.die_start);
         text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
@@ -274,7 +275,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         int i=0;
         for (Button button : diceSidesButtons) {
             if (view == button) {
-                button.setBackgroundColor(Color.GRAY);
+                button.setBackground(getResources().getDrawable(R.drawable.rounded_button_dark,null));
 
                 if (configBeingEdited < 0) {
                     // shouldn't happen
@@ -307,7 +308,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                         cfg.config.getStartAt() + cfg.config.getIncrement()*(nbrSidesPressed-1)));
 
             } else {
-                button.setBackgroundColor(Color.LTGRAY);
+                button.setBackground(getResources().getDrawable(R.drawable.rounded_button_light,null));
             }
             i++;
         }
@@ -317,11 +318,11 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         int i = 0;
         for (DiceGuiConfig cfg : diceConfigs) {
             if (cfg.button == view) {
-                cfg.button.setBackgroundColor(Color.GRAY);
+                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
                 configBeingEdited = i;
                 editConfig(i);
             } else {
-                cfg.button.setBackgroundColor(Color.LTGRAY);
+                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_light,null));
             }
             i++;
         }
@@ -351,7 +352,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         configBeingEdited = 0;
         editConfig(configBeingEdited);
-        diceConfigs.get(configBeingEdited).button.setBackgroundColor(Color.GRAY);
+        ((LinearLayout)diceConfigs.get(configBeingEdited).button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
     }
 
     public void onNew(View view) {
@@ -359,9 +360,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         LayoutInflater inflater = getLayoutInflater();
 
         // Unset the currently highlighted item so that it is not shown as being edited any longer
-        for (int i=0; i < layoutDiceList.getChildCount(); i++) {
-            Button diceStringRepresentation = layoutDiceList.findViewById(R.id.die_config_button);
-            diceStringRepresentation.setBackgroundColor(Color.LTGRAY);
+        for (int i=0; i < layoutDiceList.getChildCount(); i+=2) {
+            //Button diceStringRepresentation = layoutDiceList.getChildAt(i).findViewById(R.id.die_config_button);
+            //diceStringRepresentation.setBackground(getResources().getDrawable(R.drawable.rounded_button_light,null));
+            layoutDiceList.getChildAt(i).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_light,null));
         }
 
         // first add the divider (which contains the operation...
@@ -380,8 +382,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         // then add the new dice item and set up the fields
         layoutNew = (LinearLayout)inflater.inflate(R.layout.dice_list_item, layoutDiceList, false);
+        layoutNew.setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
         Button button = layoutNew.findViewById(R.id.die_config_button);
-        button.setBackgroundColor(Color.GRAY);
+        //button.setBackground(getResources().getDrawable(R.drawable.rounded_button_dark,null));
+
 
         DieConfiguration config = new DieConfiguration(DEFAULT_NBR_DICE, DEFAULT_NBR_SIDES,
                 DEFAULT_START, DEFAULT_INCREMENT, DEFAULT_START - 1, true);
@@ -558,7 +562,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         configBeingEdited = i;
         DieConfiguration config = diceConfigs.get(i).config;
         for (Button button : diceSidesButtons) {
-            button.setBackgroundColor(Color.LTGRAY);
+            button.setBackground(getResources().getDrawable(R.drawable.rounded_button_light,null));
         }
 
         Button button = getButtonForDieSides(config.getNumberOfSides());
@@ -571,7 +575,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         } else {
             other.setEnabled(false);
         }
-        button.setBackgroundColor(Color.GRAY);
+        button.setBackground(getResources().getDrawable(R.drawable.rounded_button_dark,null));
 
         EditText edit = findViewById(R.id.number_of_dice);
         edit.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfDice()));

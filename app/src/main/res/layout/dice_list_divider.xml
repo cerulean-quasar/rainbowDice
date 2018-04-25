@@ -5,7 +5,7 @@
     <Button
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_width="10dp"
+        android:layout_width="1dp"
         android:background="@drawable/vertical_divider"/>
     <Spinner
         android:id="@+id/operation"

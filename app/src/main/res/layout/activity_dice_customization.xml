@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/row_dice_configuration"
-    android:layout_gravity="center"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:layout_width="match_parent"
-    android:showDividers="middle"
     android:divider="@drawable/horizontal_divider"
+    android:showDividers="middle"
+    android:layout_width="match_parent"
     android:layout_height="match_parent">
     <HorizontalScrollView
         android:id="@+id/scrollViewDice"
@@ -18,53 +17,18 @@
             android:layout_height="wrap_content">
         </LinearLayout>
     </HorizontalScrollView>
-    <GridLayout
-        android:orientation="vertical"
-        android:rowCount="5"
-        android:columnCount="3"
+    <android.support.constraint.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-        <Button
-            android:id="@+id/d2Button"
-            android:onClick="dxClicked"
+        <LinearLayout
+            android:id="@+id/edit_panel"
+            android:orientation="vertical"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/D2" />
-        <Button
-            android:id="@+id/d3Button"
-            android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/D3" />
-        <Button
-            android:id="@+id/d4Button"
-            android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/D4"
-            />
-        <Button
-            android:id="@+id/d6Button"
-            android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/D6"
-            />
-        <Button
-            android:id="@+id/d8Button"
-            android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/D8"
-            />
-
-        <Button
-            android:id="@+id/d10Button"
-            android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/D10"
-            />
+            android:layout_height="wrap_content">
             <LinearLayout
                 android:orientation="horizontal"
                 android:layout_width="wrap_content"
@@ -129,37 +93,123 @@
                     android:inputType="number"
                     android:text="" />
             </LinearLayout>
+        </LinearLayout>
+        <Button
+            android:id="@+id/d2Button"
+            android:onClick="dxClicked"
+            android:background="@drawable/rounded_button_light"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="30"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:text="@string/D2" />
+        <Button
+            android:id="@+id/d3Button"
+            android:onClick="dxClicked"
+            android:background="@drawable/rounded_button_light"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="60"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:text="@string/D3" />
+        <Button
+            android:id="@+id/d4Button"
+            android:onClick="dxClicked"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="90"
+            android:text="@string/D4"
+            />
+        <Button
+            android:id="@+id/d6Button"
+            android:onClick="dxClicked"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="120"
+            android:text="@string/D6"
+            />
+        <Button
+            android:id="@+id/d8Button"
+            android:onClick="dxClicked"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="150"
+            android:text="@string/D8"
+            />
+
+        <Button
+            android:id="@+id/d10Button"
+            android:onClick="dxClicked"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="210"
+            android:text="@string/D10"
+            />
         <Button
             android:id="@+id/d12Button"
             android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="240"
             android:text="@string/D12" />
         <Button
             android:id="@+id/d20Button"
             android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="270"
             android:text="@string/D20" />
         <Button
             android:id="@+id/d30Button"
             android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="300"
             android:text="@string/D30" />
         <Button
             android:id="@+id/d100Button"
             android:onClick="dxClicked"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:background="@drawable/rounded_button_light"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="130dp"
+            app:layout_constraintCircleAngle="330"
             android:text="@string/D100" />
         <LinearLayout
             android:orientation="horizontal"
-            android:layout_width="match_parent"
+            app:layout_constraintCircle="@id/edit_panel"
+            app:layout_constraintCircleRadius="180dp"
+            app:layout_constraintCircleAngle="180"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content">
             <Button
                 android:id="@+id/otherButton"
                 android:onClick="dxClicked"
+                android:background="@drawable/rounded_button_light"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/diceNumberOfSidesOther" />
@@ -171,14 +221,11 @@
                 android:enabled="false"/>
         </LinearLayout>
 
-    </GridLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
         <Button
             android:id="@+id/add_item"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            app:layout_constraintLeft_toLeftOf="parent"
             android:text="@string/new_item"
             android:layout_gravity="bottom"
             android:onClick="onNew">
@@ -189,7 +236,8 @@
             android:layout_height="wrap_content"
             android:text="@string/delete"
             android:layout_gravity="bottom"
+            app:layout_constraintRight_toRightOf="parent"
             android:onClick="onDelete">
         </Button>
-    </LinearLayout>
+    </android.support.constraint.ConstraintLayout>
 </LinearLayout>
