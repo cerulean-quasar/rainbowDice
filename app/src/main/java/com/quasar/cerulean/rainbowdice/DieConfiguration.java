@@ -36,7 +36,7 @@ public class DieConfiguration implements Parcelable {
     private int increment;
     private int reRollOn;
 
-    // This operator applies to the next dice set.
+    // This operator applies to the current dice set.
     private boolean isAdditionOperation;
 
     public static DieConfiguration[] loadFromFile(FileInputStream inputStream) {

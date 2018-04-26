@@ -535,8 +535,19 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         LayoutInflater inflater = getLayoutInflater();
 
         int i = 0;
+        Spinner operation = null;
         // by default, the first config selected for editing when the new config is loaded
         for (DieConfiguration config : configs) {
+            // Set the operation of the previously added operator to what it says in the current
+            // die config.
+            if (operation != null) {
+                if (config.isAddOperation()) {
+                    operation.setSelection(0);
+                } else {
+                    operation.setSelection(1);
+                }
+            }
+
             LinearLayout layoutDiceListItem = (LinearLayout) inflater.inflate(R.layout.dice_list_item, layout, false);
             TextView diceNumbers = layoutDiceListItem.findViewById(R.id.numbers_on_die);
             Button diceButton = layoutDiceListItem.findViewById(R.id.die_config_button);
@@ -562,16 +573,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             if (i <= configs.length - 2) {
                 // there is at least one more dice config to come, add a divider
                 LinearLayout layoutDivider = (LinearLayout) inflater.inflate(R.layout.dice_list_divider, layout, false);
-                Spinner operation = layoutDivider.findViewById(R.id.operation);
+                operation = layoutDivider.findViewById(R.id.operation);
                 ArrayAdapter<CharSequence> spinAdapter = ArrayAdapter.createFromResource(this,
                         R.array.operationArray, android.R.layout.simple_spinner_item);
                 spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 operation.setAdapter(spinAdapter);
-                if (config.isAddOperation()) {
-                    operation.setSelection(0);
-                } else {
-                    operation.setSelection(1);
-                }
+                operation.setOnItemSelectedListener(this);
                 layout.addView(layoutDivider);
             }
             i++;
