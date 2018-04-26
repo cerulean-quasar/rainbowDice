@@ -12,7 +12,6 @@
             <TextView
                 style="@android:style/TextAppearance.Large"
                 android:id="@+id/rollResult"
-                android:textColor="#ffffff"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/diceMessageToStartRolling"/>
@@ -25,21 +24,18 @@
             <Button
                 android:id="@+id/mainFavorite1"
                 android:onClick="onFavoriteClick"
-                android:textColor="#ffffff"
                 android:background="#20000000"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Button
                 android:id="@+id/mainFavorite2"
                 android:onClick="onFavoriteClick"
-                android:textColor="#ffffff"
                 android:background="#20000000"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Button
                 android:id="@+id/mainFavorite3"
                 android:onClick="onFavoriteClick"
-                android:textColor="#ffffff"
                 android:background="#20000000"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
