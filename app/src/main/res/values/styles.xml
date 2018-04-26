@@ -1,11 +1,26 @@
 <resources>
 
+    <attr name="round_button_clicked" format="reference"/>
+    <attr name="round_button_unclicked" format="reference"/>
+    <attr name="rounded_rectangle_clicked" format="reference"/>
+    <attr name="rounded_rectangle_unclicked" format="reference"/>
+
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="Space" parent="Theme.AppCompat">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowBackground">@drawable/space</item>
+        <item name="round_button_clicked">@drawable/rounded_button_dark</item>
+        <item name="round_button_unclicked">@drawable/rounded_button_light</item>
+        <item name="rounded_rectangle_clicked">@drawable/rounded_rectangle_dark</item>
+        <item name="rounded_rectangle_unclicked">@drawable/rounded_rectangle_light</item>
     </style>
 
 </resources>

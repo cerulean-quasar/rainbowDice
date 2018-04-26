@@ -6,6 +6,8 @@
     <TextView
         style="@android:style/TextAppearance.Large"
         android:id="@+id/list_item"
+        android:textColor="#ffffff"
+        android:background="#20000000"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
  </LinearLayout>

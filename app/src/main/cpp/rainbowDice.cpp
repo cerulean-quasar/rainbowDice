@@ -1235,10 +1235,10 @@ void RainbowDice::createCommandBuffers() {
         renderPassInfo.renderArea.extent = swapChainExtent;
 
         /* the color value to use when clearing the image with VK_ATTACHMENT_LOAD_OP_CLEAR,
-         * using black with 100% opacity
+         * using black with 0% opacity
          */
         std::array<VkClearValue, 2> clearValues = {};
-        clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+        clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.0f};
         clearValues[1].depthStencil = {1.0, 0};
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
@@ -1625,7 +1625,7 @@ void RainbowDice::createTextureSampler(VkSampler &textureSampler) {
     samplerInfo.maxAnisotropy = 16;
 
     /* color to return when sampling beyond the image border and clamp to border is used.
-     * Only black, white, or transparent can be spedified in float or int formats, no other
+     * Only black, white, or transparent can be specified in float or int formats, no other
      * colors.
      */
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;

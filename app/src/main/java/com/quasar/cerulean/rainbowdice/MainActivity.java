@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
@@ -86,7 +87,9 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         setContentView(R.layout.activity_main);
 
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        drawSurfaceView.setZOrderOnTop(true);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        drawSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
         drawSurfaceHolder.addCallback(new MySurfaceCallback(this));
 
         resetFavorites();

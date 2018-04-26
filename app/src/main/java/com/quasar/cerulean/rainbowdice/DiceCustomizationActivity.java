@@ -27,6 +27,7 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.Layout;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -121,7 +122,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         configsToView(configs);
-        ((LinearLayout)diceConfigs.get(0).button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
+        TypedValue value = new TypedValue();
+        getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
+        ((LinearLayout)diceConfigs.get(0).button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
 
         TextView text = findViewById(R.id.die_start);
         text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
@@ -132,12 +135,21 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
                     TextView text = (TextView) v;
                     String string = text.getText().toString();
+                    boolean reroll = true;
+                    if (cfg.getStartAt() > cfg.getReRollOn()) {
+                        reroll = false;
+                    }
+
                     if (string.isEmpty()) {
                         // set to the default!
                         text.setText(String.format(Locale.getDefault(), "%d", DEFAULT_START));
                         cfg.setStartAt(DEFAULT_START);
                     } else {
                         cfg.setStartAt(Integer.decode(string));
+                    }
+
+                    if (!reroll) {
+                        cfg.setReRollOn(cfg.getStartAt() - 1);
                     }
 
                     repopulateCurrentListItemFromConfig();
@@ -275,7 +287,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         int i=0;
         for (Button button : diceSidesButtons) {
             if (view == button) {
-                button.setBackground(getResources().getDrawable(R.drawable.rounded_button_dark,null));
+                TypedValue value = new TypedValue();
+                getTheme().resolveAttribute(R.attr.round_button_clicked, value, true);
+                button.setBackground(getResources().getDrawable(value.resourceId,null));
 
                 if (configBeingEdited < 0) {
                     // shouldn't happen
@@ -308,7 +322,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                         cfg.config.getStartAt() + cfg.config.getIncrement()*(nbrSidesPressed-1)));
 
             } else {
-                button.setBackground(getResources().getDrawable(R.drawable.rounded_button_light,null));
+                TypedValue value = new TypedValue();
+                getTheme().resolveAttribute(R.attr.round_button_unclicked, value, true);
+                button.setBackground(getResources().getDrawable(value.resourceId,null));
             }
             i++;
         }
@@ -318,11 +334,15 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         int i = 0;
         for (DiceGuiConfig cfg : diceConfigs) {
             if (cfg.button == view) {
-                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
+                TypedValue value = new TypedValue();
+                getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
+                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
                 configBeingEdited = i;
                 editConfig(i);
             } else {
-                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_light,null));
+                TypedValue value = new TypedValue();
+                getTheme().resolveAttribute(R.attr.rounded_rectangle_unclicked, value, true);
+                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
             }
             i++;
         }
@@ -352,7 +372,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         configBeingEdited = 0;
         editConfig(configBeingEdited);
-        ((LinearLayout)diceConfigs.get(configBeingEdited).button.getParent()).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
+        TypedValue value = new TypedValue();
+        getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
+        ((LinearLayout)diceConfigs.get(configBeingEdited).button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
     }
 
     public void onNew(View view) {
@@ -361,9 +383,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         // Unset the currently highlighted item so that it is not shown as being edited any longer
         for (int i=0; i < layoutDiceList.getChildCount(); i+=2) {
-            //Button diceStringRepresentation = layoutDiceList.getChildAt(i).findViewById(R.id.die_config_button);
-            //diceStringRepresentation.setBackground(getResources().getDrawable(R.drawable.rounded_button_light,null));
-            layoutDiceList.getChildAt(i).setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_light,null));
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(R.attr.rounded_rectangle_unclicked, value, true);
+            layoutDiceList.getChildAt(i).setBackground(getResources().getDrawable(value.resourceId,null));
         }
 
         // first add the divider (which contains the operation...
@@ -382,11 +404,11 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         // then add the new dice item and set up the fields
         layoutNew = (LinearLayout)inflater.inflate(R.layout.dice_list_item, layoutDiceList, false);
-        layoutNew.setBackground(getResources().getDrawable(R.drawable.rounded_rectangle_dark,null));
+        TypedValue value = new TypedValue();
+        getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
+        layoutNew.setBackground(getResources().getDrawable(value.resourceId,null));
+
         Button button = layoutNew.findViewById(R.id.die_config_button);
-        //button.setBackground(getResources().getDrawable(R.drawable.rounded_button_dark,null));
-
-
         DieConfiguration config = new DieConfiguration(DEFAULT_NBR_DICE, DEFAULT_NBR_SIDES,
                 DEFAULT_START, DEFAULT_INCREMENT, DEFAULT_START - 1, true);
         diceConfigs.add(new DiceGuiConfig(config, button));
@@ -562,7 +584,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         configBeingEdited = i;
         DieConfiguration config = diceConfigs.get(i).config;
         for (Button button : diceSidesButtons) {
-            button.setBackground(getResources().getDrawable(R.drawable.rounded_button_light,null));
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(R.attr.round_button_unclicked, value, true);
+            button.setBackground(getResources().getDrawable(value.resourceId,null));
         }
 
         Button button = getButtonForDieSides(config.getNumberOfSides());
@@ -575,7 +599,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         } else {
             other.setEnabled(false);
         }
-        button.setBackground(getResources().getDrawable(R.drawable.rounded_button_dark,null));
+
+        TypedValue value = new TypedValue();
+        getTheme().resolveAttribute(R.attr.round_button_clicked, value, true);
+        button.setBackground(getResources().getDrawable(value.resourceId,null));
 
         EditText edit = findViewById(R.id.number_of_dice);
         edit.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfDice()));
