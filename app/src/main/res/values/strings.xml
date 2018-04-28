@@ -4,7 +4,7 @@
     <string name="subtraction">-</string>
     <string name="done">Done</string>
     <string name="roll">Roll</string>
-    <string name="save">Save As</string>
+    <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="load">Load</string>
     <string name="delete">Delete</string>
@@ -34,6 +34,12 @@
     <string name="diceNumbersString">%d,%d,&#8230;,%d</string>
     <string name="diceConfigStringRepresentation">%dD%d</string>
     <string name="rerollText">re-roll on: %d</string>
+    <string name="themeTextDisplay">Text for this theme</string>
+    <string name="selectTheme">Select a Theme</string>
+    <string-array name="themeArray">
+        <item>Space</item>
+        <item>Sky</item>
+    </string-array>
     <string-array name="operationArray">
         <item>@string/addition</item>
         <item>@string/subtraction</item>

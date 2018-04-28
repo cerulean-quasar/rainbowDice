@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ActivityThemeSelector">
+    <Spinner
+        android:id="@+id/themeSelector"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <ImageView
+        android:src="?attr/divider"
+        app:layout_constraintTop_toBottomOf="@id/themeSelector"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <TextView
+        android:text="@string/themeTextDisplay"
+        android:id="@+id/themeText"
+        app:layout_constraintTop_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="parent"
+        app:layout_constraintLeft_toRightOf="parent"
+        app:layout_constraintRight_toLeftOf="parent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <ImageView
+        android:src="?attr/round_button_clicked"
+        app:layout_constraintCircle="@id/themeText"
+        app:layout_constraintCircleRadius="100dp"
+        app:layout_constraintCircleAngle="140"
+        android:layout_width="90dp"
+        android:layout_height="50dp" />
+    <ImageView
+        android:src="?attr/round_button_unclicked"
+        app:layout_constraintCircle="@id/themeText"
+        app:layout_constraintCircleRadius="100dp"
+        app:layout_constraintCircleAngle="220"
+        android:layout_width="90dp"
+        android:layout_height="50dp" />
+    <ImageView
+        android:src="?attr/rounded_rectangle_clicked"
+        app:layout_constraintCircle="@id/themeText"
+        app:layout_constraintCircleRadius="100dp"
+        app:layout_constraintCircleAngle="40"
+        android:layout_width="90dp"
+        android:layout_height="90dp" />
+    <ImageView
+        android:src="?attr/rounded_rectangle_unclicked"
+        app:layout_constraintCircle="@id/themeText"
+        app:layout_constraintCircleRadius="100dp"
+        app:layout_constraintCircleAngle="320"
+        android:layout_width="90dp"
+        android:layout_height="90dp" />
+</android.support.constraint.ConstraintLayout>

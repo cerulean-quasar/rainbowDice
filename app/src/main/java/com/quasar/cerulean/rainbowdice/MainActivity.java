@@ -30,6 +30,7 @@ import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -56,10 +57,8 @@ import java.util.Locale;
 import java.util.TreeSet;
 
 import static android.graphics.Bitmap.Config.ALPHA_8;
-import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favorite1;
-import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favorite2;
-import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favorite3;
-import static com.quasar.cerulean.rainbowdice.DiceConfigurationActivity.favoritesFile;
+import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
+import static com.quasar.cerulean.rainbowdice.Constants.themeNameConfigValue;
 
 public class MainActivity extends AppCompatActivity  implements AdapterView.OnItemSelectedListener {
 
@@ -77,13 +76,26 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private DieConfiguration[] diceConfig;
     private DiceResult diceResult = null;
     private String diceConfigFilename = null;
+    private ConfigurationFile configurationFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        configurationFile = new ConfigurationFile(this);
 
         diceConfig = new DieConfiguration[1];
-        diceConfig[0] = new DieConfiguration(4, 6,1, 1,0,true);
+        diceConfig[0] = new DieConfiguration(4, 6, 1, 1, 0, true);
+
+        String themeName = configurationFile.getTheme();
+        if (themeName != null && !themeName.isEmpty()) {
+            int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
+            setTheme(currentThemeId);
+        }
+
+        super.onCreate(savedInstanceState);
+        initGui();
+    }
+
+    void initGui() {
         setContentView(R.layout.activity_main);
 
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
@@ -180,15 +192,23 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
-            if (resultCode != RESULT_OK) {
-                // The user cancelled editing
-                return;
-            }
-
-            resetFavorites();
+        if (resultCode != RESULT_OK) {
+            // The user cancelled editing
+            return;
         }
-
+        if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
+            resetFavorites();
+        } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
+            String themeName = data.getStringExtra(themeNameConfigValue);
+            if (themeName != null && !themeName.isEmpty()) {
+                int resID = getResources().getIdentifier(themeName, "style", getPackageName());
+                setTheme(resID);
+                initGui();
+                TypedValue value = new TypedValue();
+                getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
+                getWindow().setBackgroundDrawableResource(value.resourceId);
+            }
+        }
     }
 
     @Override
@@ -206,6 +226,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     public void onRoll(MenuItem item) {
         rollTheDice();
+    }
+
+    public void onSelectTheme(MenuItem item) {
+        joinDrawer();
+        Intent intent = new Intent(this, ActivityThemeSelector.class);
+        startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
     }
 
     private void loadFromFile(String filename) {
@@ -246,56 +272,24 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     private void resetFavorites() {
-        StringBuffer json = new StringBuffer();
-
-        try {
-            byte[] bytes = new byte[1024];
-            int len;
-            FileInputStream inputStream = openFileInput(favoritesFile);
-            while ((len = inputStream.read(bytes)) >= 0) {
-                if (len > 0) {
-                    json.append(new String(bytes, 0, len, "UTF-8"));
-                }
-            }
-            inputStream.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + favoritesFile + " message: " + e.getMessage());
-            return;
-        } catch (IOException e) {
-            System.out.println("Exception on reading from file: " + favoritesFile + " message: " + e.getMessage());
-            return;
-        }
-
-        String fav1File;
-        String fav2File;
-        String fav3File;
-
-        try {
-            JSONObject obj = new JSONObject(json.toString());
-            fav1File = obj.getString(favorite1);
-            fav2File = obj.getString(favorite2);
-            fav3File = obj.getString(favorite3);
-        } catch (JSONException e) {
-            System.out.println("Exception on reading JSON from file: " + favoritesFile + " message: " + e.getMessage());
-            return;
-        }
+        configurationFile = new ConfigurationFile(this);
 
         String[] excludeFiles = new String[4];
-        excludeFiles[0] = favoritesFile;
-        excludeFiles[1] = fav1File;
-        excludeFiles[2] = fav2File;
-        excludeFiles[3] = fav3File;
+        excludeFiles[0] = ConfigurationFile.configFile;
+        excludeFiles[1] = configurationFile.getFavorite1();
+        excludeFiles[2] = configurationFile.getFavorite2();
+        excludeFiles[3] = configurationFile.getFavorite3();
         Spinner other = findViewById(R.id.mainOtherSpinner);
         FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
         other.setAdapter(spinAdapter1);
         other.setOnItemSelectedListener(this);
 
         Button fav = findViewById(R.id.mainFavorite1);
-        fav.setText(fav1File);
+        fav.setText(configurationFile.getFavorite1());
         fav = findViewById(R.id.mainFavorite2);
-        fav.setText(fav2File);
+        fav.setText(configurationFile.getFavorite2());
         fav = findViewById(R.id.mainFavorite3);
-        fav.setText(fav3File);
+        fav.setText(configurationFile.getFavorite3());
     }
 
     private void rollTheDice() {

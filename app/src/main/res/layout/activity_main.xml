@@ -24,19 +24,19 @@
             <Button
                 android:id="@+id/mainFavorite1"
                 android:onClick="onFavoriteClick"
-                android:background="#20000000"
+                android:background="@null"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Button
                 android:id="@+id/mainFavorite2"
                 android:onClick="onFavoriteClick"
-                android:background="#20000000"
+                android:background="@null"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Button
                 android:id="@+id/mainFavorite3"
                 android:onClick="onFavoriteClick"
-                android:background="#20000000"
+                android:background="@null"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Spinner

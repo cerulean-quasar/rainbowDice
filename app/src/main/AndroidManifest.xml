@@ -23,7 +23,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".DiceConfigurationActivity" />
-        <activity android:name=".DiceCustomizationActivity"></activity>
+        <activity android:name=".DiceCustomizationActivity" />
+        <activity android:name=".ActivityThemeSelector"></activity>
     </application>
 
 </manifest>

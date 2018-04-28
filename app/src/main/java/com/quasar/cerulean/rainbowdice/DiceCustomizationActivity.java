@@ -79,6 +79,13 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ConfigurationFile configurationFile = new ConfigurationFile(this);
+        String theme = configurationFile.getTheme();
+        if (theme != null && !theme.isEmpty()) {
+            int resID = getResources().getIdentifier(theme, "style", getPackageName());
+            setTheme(resID);
+        }
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dice_customization);
 
@@ -98,7 +105,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         DieConfiguration[] configs = null;
         Intent intent = getIntent();
-        String filename = intent.getStringExtra(DiceConfigurationActivity.DICE_FILENAME);
+        String filename = intent.getStringExtra(Constants.DICE_FILENAME);
         if (filename != null && !filename.isEmpty()) {
             try {
                 FileInputStream inputStream = openFileInput(filename);

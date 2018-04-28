@@ -19,7 +19,6 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
-import android.content.Context;
 import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -31,33 +30,28 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+
+import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
+import static com.quasar.cerulean.rainbowdice.Constants.DICE_FILENAME;
 
 public class DiceConfigurationActivity extends AppCompatActivity {
-
-    private static final int NBR_FAVORITES = 3;
-    public static final String favoritesFile = "diceConfigurationFavoritesFile";
-    public static final String favorite1 = "favorite1";
-    public static final String favorite2 = "favorite2";
-    public static final String favorite3 = "favorite3";
-    public static final int DICE_CUSTOMIZATION_ACTIVITY = 2;
-    public static final String DICE_FILENAME = "DiceFileName";
+    ConfigurationFile configurationFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        configurationFile = new ConfigurationFile(this);
+        String theme = configurationFile.getTheme();
+        if (theme != null && !theme.isEmpty()) {
+            int resID = getResources().getIdentifier(theme, "style", getPackageName());
+            setTheme(resID);
+        }
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dice_configuration);
 
@@ -71,7 +65,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         LayoutInflater inflater = getLayoutInflater();
         File[] filearr = getFilesDir().listFiles();
         for (File file : filearr) {
-            if (!file.getName().equals(favoritesFile)) {
+            if (!file.getName().equals(ConfigurationFile.configFile)) {
                 LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
                 TextView text = layout.findViewById(R.id.filename);
                 text.setText(file.getName());
@@ -82,7 +76,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
     private void resetFavoriteSpinners() {
         String[] excludeFiles = new String[1];
-        excludeFiles[0] = favoritesFile;
+        excludeFiles[0] = ConfigurationFile.configFile;
         Spinner spinner1 = findViewById(R.id.favorite1);
         FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
         spinner1.setAdapter(spinAdapter1);
@@ -95,55 +89,29 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         FileAdapter spinAdapter3 = new FileAdapter(this, excludeFiles);
         spinner3.setAdapter(spinAdapter3);
 
-        StringBuffer json = new StringBuffer();
+        String fav1File = configurationFile.getFavorite1();
+        String fav2File = configurationFile.getFavorite2();
+        String fav3File = configurationFile.getFavorite3();
 
-        try {
-            byte[] bytes = new byte[1024];
-            int len;
-            FileInputStream inputStream = openFileInput(favoritesFile);
-            while ((len = inputStream.read(bytes)) >= 0) {
-                if (len > 0) {
-                    json.append(new String(bytes, 0, len, "UTF-8"));
-                }
+        if (fav1File != null && !fav1File.isEmpty()) {
+            int pos = spinAdapter1.getPosition(fav1File);
+            if (pos != -1) {
+                spinner1.setSelection(pos);
             }
-            inputStream.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + favoritesFile + " message: " + e.getMessage());
-            return;
-        } catch (IOException e) {
-            System.out.println("Exception on reading from file: " + favoritesFile + " message: " + e.getMessage());
-            return;
         }
 
-        try {
-            JSONObject obj = new JSONObject(json.toString());
-            String fav1File = obj.getString(favorite1);
-            String fav2File = obj.getString(favorite2);
-            String fav3File = obj.getString(favorite3);
-
-            if (!fav1File.isEmpty()) {
-                int pos = spinAdapter1.getPosition(fav1File);
-                if (pos != -1) {
-                    spinner1.setSelection(pos);
-                }
+        if (fav2File != null && !fav2File.isEmpty()) {
+            int pos = spinAdapter2.getPosition(fav2File);
+            if (pos != -1) {
+                spinner2.setSelection(pos);
             }
+        }
 
-            if (!fav2File.isEmpty()) {
-                int pos = spinAdapter2.getPosition(fav2File);
-                if (pos != -1) {
-                    spinner2.setSelection(pos);
-                }
+        if (fav3File != null && !fav3File.isEmpty()) {
+            int pos = spinAdapter3.getPosition(fav3File);
+            if (pos != -1) {
+                spinner3.setSelection(pos);
             }
-
-            if (!fav3File.isEmpty()) {
-                int pos = spinAdapter3.getPosition(fav3File);
-                if (pos != -1) {
-                    spinner3.setSelection(pos);
-                }
-            }
-        } catch (JSONException e) {
-            System.out.println("Exception on reading JSON from file: " + favoritesFile + " message: " + e.getMessage());
-            return;
         }
     }
 
@@ -213,52 +181,28 @@ public class DiceConfigurationActivity extends AppCompatActivity {
     }
 
     public void onDone(MenuItem item) {
-        String[] favorite = new String[NBR_FAVORITES];
-
         Spinner spinner = findViewById(R.id.favorite1);
         TextView text = (TextView)spinner.getSelectedView();
         if (text != null) {
             String filename = text.getText().toString();
-            favorite[0] = filename;
+            configurationFile.setFavorite1(filename);
         }
 
         spinner = findViewById(R.id.favorite2);
         text = (TextView)spinner.getSelectedView();
         if (text != null) {
             String filename = text.getText().toString();
-            favorite[1] = filename;
+            configurationFile.setFavorite2(filename);
         }
 
         spinner = findViewById(R.id.favorite3);
         text = (TextView)spinner.getSelectedView();
         if (text != null) {
             String filename = text.getText().toString();
-            favorite[2] = filename;
+            configurationFile.setFavorite3(filename);
         }
 
-        String json;
-        try {
-            JSONObject obj = new JSONObject();
-            obj.put("favorite1", favorite[0]);
-            obj.put("favorite2", favorite[1]);
-            obj.put("favorite3", favorite[2]);
-            json = obj.toString();
-        } catch (JSONException e) {
-            System.out.println("Exception in writing out JSON: " + e.getMessage());
-            return;
-        }
-
-        try {
-            FileOutputStream outputStream = openFileOutput(favoritesFile, Context.MODE_PRIVATE);
-            outputStream.write(json.getBytes());
-            outputStream.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + favoritesFile + " message: " + e.getMessage());
-            return;
-        } catch (IOException e) {
-            System.out.println("Exception on writing to file: " + favoritesFile + " message: " + e.getMessage());
-            return;
-        }
+        configurationFile.writeFile();
 
         setResult(RESULT_OK, null);
         finish();
