@@ -24,9 +24,9 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.opengl.GLUtils;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -57,6 +57,8 @@ import java.util.Locale;
 import java.util.TreeSet;
 
 import static android.graphics.Bitmap.Config.ALPHA_8;
+import static android.graphics.Bitmap.Config.ARGB_4444;
+import static android.graphics.Bitmap.Config.ARGB_8888;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.themeNameConfigValue;
 
@@ -64,18 +66,19 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     // Used to load the 'native-lib' library on application startup.
     static {
-        System.loadLibrary("native-lib");
+        try {
+            System.loadLibrary("native-lib");
+        } catch (UnsatisfiedLinkError e) {
+            System.out.println("Could not load library: native-lib");
+        }
     }
 
-    public static final String DICE_CONFIGURATION = "DiceConfiguration";
-    private static final String NATIVE = "Rainbow Dice Native";
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
     private Thread drawer;
     private DieConfiguration[] diceConfig;
     private DiceResult diceResult = null;
-    private String diceConfigFilename = null;
     private ConfigurationFile configurationFile;
 
     @Override
@@ -333,8 +336,8 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     private void loadModelsAndTextures() {
-        int TEXWIDTH = 50;
-        int TEXHEIGHT = 25;
+        //int TEXWIDTH = 128; //50;
+        //int TEXHEIGHT = 128; //25;
 
         TreeSet<String> symbolSet = new TreeSet<>();
 
@@ -351,14 +354,17 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         }
 
         for (String symbol : symbolSet) {
-            Bitmap bitmap = Bitmap.createBitmap(TEXWIDTH, TEXHEIGHT, ALPHA_8);
+            Bitmap bitmap = Bitmap.createBitmap(Utils.TEXWIDTH, Utils.TEXHEIGHT, Utils.FORMAT);
             Canvas canvas = new Canvas(bitmap);
             Paint paint = new Paint();
             paint.setUnderlineText(true);
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(18.0f);
+            canvas.drawARGB(0,0,0,0);
             canvas.drawText(symbol, 20, 15, paint);
             int bitmapSize = bitmap.getAllocationByteCount();
+            int format = GLUtils.getInternalFormat(bitmap);
+            int type = GLUtils.getType(bitmap);
             ByteBuffer imageBuffer = ByteBuffer.allocate(bitmapSize);
             bitmap.copyPixelsToBuffer(imageBuffer);
             byte[] bytes = new byte[bitmapSize];
@@ -369,7 +375,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
                 publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
                 return;
             }
-            String err = addSymbol(symbol, TEXWIDTH, TEXHEIGHT, bytes);
+            String err = addSymbol(symbol, Utils.TEXWIDTH, Utils.TEXHEIGHT, bitmapSize, bytes);
             if (err != null && err.length() != 0) {
                 publishError(err);
                 return;
@@ -401,17 +407,30 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void startDrawing(SurfaceHolder holder) {
-        byte[] vertShader = readAssetFile("shaders/shader.vert.spv");
-        byte[] fragShader = readAssetFile("shaders/shader.frag.spv");
+        boolean usingVulkan = true;
         Surface drawSurface = holder.getSurface();
-        String err = initWindow(drawSurface);
+        String err = initWindow(usingVulkan, drawSurface);
         if (err != null && err.length() != 0) {
-            publishError(err);
-            return;
+            usingVulkan = false;
+            // Vulkan failed, try with OpenGL instead
+            err = initWindow(false, drawSurface);
+            if (err != null && err.length() != 0) {
+                publishError(err);
+                return;
+            }
         }
 
         loadModelsAndTextures();
 
+        byte[] vertShader;
+        byte[] fragShader;
+        if (usingVulkan) {
+            vertShader = readAssetFile(false, "shaders/shader.vert.spv");
+            fragShader = readAssetFile(false, "shaders/shader.frag.spv");
+        } else {
+            vertShader = readAssetFile(true, "shaderGL.vert");
+            fragShader = readAssetFile(true, "shaderGL.frag");
+        }
         err = sendVertexShader(vertShader, vertShader.length);
         if (err != null && err.length() != 0) {
             publishError(err);
@@ -440,11 +459,11 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         rollTheDice();
     }
 
-    private byte[] readAssetFile(String filename) {
+    private byte[] readAssetFile(boolean nullAppend, String filename) {
         try {
             InputStream inputStream = getAssets().open(filename);
             ByteBufferBuilder bytes = new ByteBufferBuilder(1024);
-            bytes.readToBuffer(inputStream);
+            bytes.readToBuffer(inputStream, nullAppend);
             return bytes.getBytes();
         } catch (IOException e) {
             publishError("Error in opening asset file: " + filename + " message: " + e.getMessage());
@@ -491,7 +510,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
      */
     private native String sendVertexShader(byte[] shader, int length);
     private native String sendFragmentShader(byte[] shader, int length);
-    private native String initWindow(Surface surface);
+    private native String initWindow(boolean useVulkan, Surface surface);
     private native String initPipeline();
     private native void destroyVulkan();
     private native void tellDrawerStop();
@@ -499,7 +518,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private native void recreateModels();
     private native void recreateSwapChain();
     private native void loadModel(String[] symbols);
-    private native String addSymbol(String symbol, int width, int height, byte[] bitmap);
+    private native String addSymbol(String symbol, int width, int height, int bitmapSize, byte[] bitmap);
     private native void roll();
     private native void reRoll(int[] indices);
     private native String initSensors();

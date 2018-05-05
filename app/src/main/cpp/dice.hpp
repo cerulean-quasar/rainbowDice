@@ -22,6 +22,10 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
 
 #include <vector>
 #include <string>
@@ -107,12 +111,12 @@ public:
     UniformBufferObject ubo = {};
 
     DicePhysicsModel(std::vector<std::string> &inSymbols)
-        : DiceModel(inSymbols), prevTime(std::chrono::high_resolution_clock::now()), angularSpeed(0), stopped(false)
+        : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()), angularSpeed(0.0f), stopped(false)
     {
     }
 
     DicePhysicsModel(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
-        : DiceModel(inSymbols), prevTime(std::chrono::high_resolution_clock::now()), angularSpeed(0.0f),spinAxis(0.0f,0.0f,0.0f), velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false)
+        : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()), angularSpeed(0.0f),spinAxis(0.0f,0.0f,0.0f), velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false)
     {
     }
 

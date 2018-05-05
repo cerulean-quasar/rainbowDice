@@ -17,6 +17,7 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#include <memory>
 #include "rainbowDiceGlobal.hpp"
 #include "text.hpp"
 
@@ -25,6 +26,5 @@ const std::string SHADER_FRAG_FILE = "fragmentShader";
 
 VkDevice logicalDevice = VK_NULL_HANDLE;
 
-RainbowDice diceGraphics;
 TextureAtlas texAtlas;
 

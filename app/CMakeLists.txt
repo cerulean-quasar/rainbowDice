@@ -18,7 +18,8 @@ add_library( # Sets the name of the library.
 
              # Provides a relative path to your source file(s).
              src/main/cpp/native-lib.cpp
-             src/main/cpp/rainbowDice.cpp
+             src/main/cpp/rainbowDiceVulkan.cpp
+             src/main/cpp/rainbowDiceGL.cpp
              src/main/cpp/rainbowDiceAndroid.cpp
              src/main/cpp/text.cpp
              src/main/cpp/rainbowDiceGlobal.cpp
@@ -40,7 +41,7 @@ find_library( # Sets the name of the path variable.
 include_directories(${ANDROID_NDK}/sysroot/usr/include/android)
 include_directories(${ANDROID_NDK}/sources/third_party/vulkan/src/libs)
 include_directories(APP_GLUE_DIR ${ANDROID_NDK}/sources/android/native_app_glue)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -std=c++11 \
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -std=c++14 \
                      -DVK_USE_PLATFORM_ANDROID_KHR")
 
 
@@ -54,5 +55,7 @@ target_link_libraries( # Specifies the target library.
                        # Links the target library to the log library
                        # included in the NDK.
                        ${log-lib}
+                       EGL
+                       GLESv2
                        android
                        vulkan)

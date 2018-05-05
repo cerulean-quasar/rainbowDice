@@ -25,10 +25,12 @@
 
 void TextureAtlas::destroy() {
     for (auto it = textureImages.begin(); it != textureImages.end(); it++) {
-        vkDestroySampler(logicalDevice, it->second.textureSampler, nullptr);
-        vkDestroyImageView(logicalDevice, it->second.textureImageView, nullptr);
-        vkDestroyImage(logicalDevice, it->second.textureImage, nullptr);
-        vkFreeMemory(logicalDevice, it->second.textureImageMemory, nullptr);
+        if (it->second.hasTexture) {
+            vkDestroySampler(logicalDevice, it->second.textureSampler, nullptr);
+            vkDestroyImageView(logicalDevice, it->second.textureImageView, nullptr);
+            vkDestroyImage(logicalDevice, it->second.textureImage, nullptr);
+            vkFreeMemory(logicalDevice, it->second.textureImageMemory, nullptr);
+        }
         if (it->second.bitmap != nullptr) {
             free(it->second.bitmap);
         }
@@ -43,10 +45,11 @@ void TextureAtlas::addAtlasSymbols(std::vector<std::string> &symbols) {
     }
 }
 
-void TextureAtlas::addSymbol(std::string &symbol, uint32_t width, uint32_t height, void *bitmap) {
+void TextureAtlas::addSymbol(std::string &symbol, uint32_t width, uint32_t height, uint32_t size, void *bitmap) {
     TextureImage image = {};
     image.width = width;
     image.height = height;
+    image.size = size;
     image.bitmap = bitmap;
     textureImages.insert(std::pair<std::string, TextureImage>(symbol, image));
 }
@@ -69,13 +72,12 @@ void TextureAtlas::addTextureImage(std::string symbol, TextureImage &image) {
     textureImages.insert(std::pair<std::string, TextureImage>(symbol, image));
 }
 
-bool TextureAtlas::hasSymbol(std::string symbol) {
+bool TextureAtlas::hasVulkanTexture(std::string symbol) {
     auto it = textureImages.find(symbol);
 
     if (it == textureImages.end()) {
         return false;
     } else if (it->second.hasTexture == false) {
-        // TODO: get rid of the ick
         return false;
     } else {
         return true;
@@ -89,6 +91,14 @@ TextureImage TextureAtlas::getImage(std::string symbol) {
         throw std::runtime_error(std::string("Texture image not found for: ") + symbol);
     }
     return it->second;
+}
+
+texture_iterator TextureAtlas::getIterator() {
+    return textureImages.begin();
+}
+
+texture_iterator TextureAtlas::getEnd() {
+    return textureImages.end();
 }
 
 size_t TextureAtlas::nbrSymbols() {

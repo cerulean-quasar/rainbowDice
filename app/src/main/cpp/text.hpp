@@ -28,6 +28,7 @@
 struct TextureImage {
     uint32_t width;
     uint32_t height;
+    uint32_t size;
     void *bitmap;
     bool hasTexture;
     VkImage textureImage;
@@ -35,6 +36,8 @@ struct TextureImage {
     VkImageView textureImageView;
     VkSampler textureSampler;
 };
+
+typedef std::map<std::string, TextureImage>::iterator texture_iterator;
 
 class TextureAtlas {
 private:
@@ -46,9 +49,11 @@ public:
 
     void addAtlasSymbols(std::vector<std::string> &symbols);
     void addTextureImage(std::string symbol, TextureImage &image);
-    void addSymbol(std::string &symbol, uint32_t width, uint32_t height, void *bitmap);
-    bool hasSymbol(std::string symbol);
+    void addSymbol(std::string &symbol, uint32_t width, uint32_t height, uint32_t size, void *bitmap);
+    bool hasVulkanTexture(std::string symbol);
     TextureImage getImage(std::string symbol);
+    texture_iterator getIterator();
+    texture_iterator getEnd();
     size_t nbrSymbols();
     uint32_t getArrayIndex(std::string symbol);
     std::vector<VkDescriptorImageInfo> getImageInfosForDescriptorSet();

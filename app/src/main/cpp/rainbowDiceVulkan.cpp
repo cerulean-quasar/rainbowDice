@@ -18,7 +18,7 @@
  *
  */
 #include "rainbowDiceGlobal.hpp"
-#include "rainbowDice.hpp"
+#include "rainbowDiceVulkan.hpp"
 
 /**
  * Call used to allocate a debug report callback so that you can get error
@@ -53,57 +53,53 @@ void DestroyDebugReportCallbackEXT(VkInstance instance,
     }
 }
 
-void RainbowDice::initVulkan(InitVulkanState state, void *state_info) {
-    switch (state) {
-        case STATE_1:
-            window = static_cast<WindowType*>(state_info);
-            createInstance();
+void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
+    window = inWindow;
+    createInstance();
 
-            setupDebugCallback();
+    setupDebugCallback();
 
-            createSurface();
-            pickPhysicalDevice();
-            createLogicalDevice();
-            createSwapChain();
-            createImageViews();
-            createRenderPass();
-            break;
-            // The caller must create the textures and the models before going to state 2.
-        case STATE_2:
-            createDescriptorSetLayout();
-            createGraphicsPipeline();
-            createCommandPool();
-            for (size_t i = 0; i < dice.size(); i++) {
-                createTextureImages(dice[i]->die->symbols);
-            }
-            createDescriptorPool();
-            for (size_t i = 0; i < dice.size(); i++) {
-                VkBuffer indexBuffer;
-                VkDeviceMemory indexBufferMemory;
-                VkBuffer vertexBuffer;
-                VkDeviceMemory vertexBufferMemory;
-                VkBuffer uniformBuffer;
-                VkDeviceMemory uniformBufferMemory;
-                VkDescriptorSet descriptorSet;
-
-                dice[i]->loadModel(texAtlas, swapChainExtent.width, swapChainExtent.height);
-                createVertexBuffer(dice[i], vertexBuffer, vertexBufferMemory);
-                createIndexBuffer(dice[i], indexBuffer, indexBufferMemory);
-                createUniformBuffer(uniformBuffer, uniformBufferMemory);
-                createDescriptorSet(uniformBuffer, descriptorSet);
-                dice[i]->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
-                              vertexBufferMemory, uniformBuffer, uniformBufferMemory);
-            }
-            createDepthResources();
-            createFramebuffers();
-
-            createCommandBuffers();
-            createSemaphores();
-            break;
-    }
+    createSurface();
+    pickPhysicalDevice();
+    createLogicalDevice();
+    createSwapChain();
+    createImageViews();
+    createRenderPass();
 }
 
-void RainbowDice::cleanup() {
+void RainbowDiceVulkan::initPipeline() {
+    createDescriptorSetLayout();
+    createGraphicsPipeline();
+    createCommandPool();
+    for (size_t i = 0; i < dice.size(); i++) {
+        createTextureImages(dice[i]->die->symbols);
+    }
+    createDescriptorPool();
+    for (size_t i = 0; i < dice.size(); i++) {
+        VkBuffer indexBuffer;
+        VkDeviceMemory indexBufferMemory;
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexBufferMemory;
+        VkBuffer uniformBuffer;
+        VkDeviceMemory uniformBufferMemory;
+        VkDescriptorSet descriptorSet;
+
+        dice[i]->loadModel(texAtlas, swapChainExtent.width, swapChainExtent.height);
+        createVertexBuffer(dice[i], vertexBuffer, vertexBufferMemory);
+        createIndexBuffer(dice[i], indexBuffer, indexBufferMemory);
+        createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        createDescriptorSet(uniformBuffer, descriptorSet);
+        dice[i]->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
+                      vertexBufferMemory, uniformBuffer, uniformBufferMemory);
+    }
+    createDepthResources();
+    createFramebuffers();
+
+    createCommandBuffers();
+    createSemaphores();
+}
+
+void RainbowDiceVulkan::cleanup() {
     cleanupSwapChain();
 
     for (auto die : dice) {
@@ -112,13 +108,17 @@ void RainbowDice::cleanup() {
     dice.clear();
 
     texAtlas.destroy();
-    vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
 
-    vkDestroySemaphore(logicalDevice, renderFinishedSemaphore, nullptr);
-    vkDestroySemaphore(logicalDevice, imageAvailableSemaphore, nullptr);
-    vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
-    vkDestroyDevice(logicalDevice, nullptr);
+    if (logicalDevice != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
+
+        vkDestroySemaphore(logicalDevice, renderFinishedSemaphore, nullptr);
+        vkDestroySemaphore(logicalDevice, imageAvailableSemaphore, nullptr);
+        vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+        vkDestroyDevice(logicalDevice, nullptr);
+    }
+
     DestroyDebugReportCallbackEXT(instance, callback, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
@@ -126,7 +126,7 @@ void RainbowDice::cleanup() {
     destroyWindow();
 }
 
-void RainbowDice::recreateSwapChain() {
+void RainbowDiceVulkan::recreateSwapChain() {
     vkDeviceWaitIdle(logicalDevice);
 
     cleanupSwapChain();
@@ -143,7 +143,7 @@ void RainbowDice::recreateSwapChain() {
 // call to finish loading the new models and their associated resources.
 // it is assumed that the caller will first destroy the old models with destroyModels, then
 // create the new ones, then call this function to recreate all the associated Vulkan resources.
-void RainbowDice::recreateModels() {
+void RainbowDiceVulkan::recreateModels() {
     createDescriptorSetLayout();
     createCommandPool();
     for (size_t i = 0; i < dice.size(); i++) {
@@ -171,7 +171,7 @@ void RainbowDice::recreateModels() {
     createCommandBuffers();
 }
 
-void RainbowDice::destroyModels() {
+void RainbowDiceVulkan::destroyModels() {
     for (auto die : dice) {
         delete die;
     }
@@ -185,12 +185,12 @@ void RainbowDice::destroyModels() {
 }
 
 /* buffer for the MVP matrix - updated every frame so don't copy in the data here */
-void RainbowDice::createUniformBuffer(VkBuffer &uniformBuffer, VkDeviceMemory &uniformBufferMemory) {
+void RainbowDiceVulkan::createUniformBuffer(VkBuffer &uniformBuffer, VkDeviceMemory &uniformBufferMemory) {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
     createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
 }
 
-void RainbowDice::createVertexBuffer(Dice *die, VkBuffer &vertexBuffer, VkDeviceMemory &vertexBufferMemory) {
+void RainbowDiceVulkan::createVertexBuffer(Dice *die, VkBuffer &vertexBuffer, VkDeviceMemory &vertexBufferMemory) {
     VkDeviceSize bufferSize = sizeof(die->die->vertices[0]) * die->die->vertices.size();
 
     /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
@@ -217,7 +217,7 @@ void RainbowDice::createVertexBuffer(Dice *die, VkBuffer &vertexBuffer, VkDevice
  * draw.  This way normally duplicated vertices would not need to be specified twice.
  * Only one index buffer per pipeline is allowed.  Put all dice in the same index buffer.
  */
-void RainbowDice::createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDeviceMemory &indexBufferMemory) {
+void RainbowDiceVulkan::createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDeviceMemory &indexBufferMemory) {
     VkDeviceSize bufferSize = sizeof(die->die->indices[0]) * die->die->indices.size();
 
     VkBuffer stagingBuffer;
@@ -237,31 +237,53 @@ void RainbowDice::createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDeviceMe
     vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
 }
 
-void RainbowDice::updatePerspectiveMatrix() {
+void RainbowDiceVulkan::updatePerspectiveMatrix() {
     for (auto die : dice) {
         die->die->updatePerspectiveMatrix(swapChainExtent.width, swapChainExtent.height);
     }
 }
 
-void RainbowDice::cleanupSwapChain() {
+void RainbowDiceVulkan::cleanupSwapChain() {
+    if (logicalDevice == VK_NULL_HANDLE) {
+        return;
+    }
     for (auto framebuffer : swapChainFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     }
-    vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
-    vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
+    if (graphicsPipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
+    }
 
-    vkDestroyImageView(logicalDevice, depthImageView, nullptr);
-    vkDestroyImage(logicalDevice, depthImage, nullptr);
-    vkFreeMemory(logicalDevice, depthImageMemory, nullptr);
+    if (pipelineLayout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
+    }
+
+    if (renderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
+    }
+
+    if (depthImageView != VK_NULL_HANDLE) {
+        vkDestroyImageView(logicalDevice, depthImageView, nullptr);
+    }
+
+    if (depthImage != VK_NULL_HANDLE) {
+        vkDestroyImage(logicalDevice, depthImage, nullptr);
+    }
+
+    if (depthImageMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(logicalDevice, depthImageMemory, nullptr);
+    }
 
     for (auto imageView : swapChainImageViews) {
         vkDestroyImageView(logicalDevice, imageView, nullptr);
     }
-    vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
+
+    if (swapChain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
+    }
 }
 
-std::vector<const char *> RainbowDice::getRequiredExtensions() {
+std::vector<const char *> RainbowDiceVulkan::getRequiredExtensions() {
     std::vector<const char *> extensions;
 
     extensions.push_back("VK_KHR_surface");
@@ -275,7 +297,7 @@ std::vector<const char *> RainbowDice::getRequiredExtensions() {
     return extensions;
 }
 
-void RainbowDice::createInstance() {
+void RainbowDiceVulkan::createInstance() {
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "RainbowDice";
@@ -311,7 +333,7 @@ void RainbowDice::createInstance() {
     }
 }
 
-void RainbowDice::setupDebugCallback() {
+void RainbowDiceVulkan::setupDebugCallback() {
     if (!enableValidationLayers) return;
 
     VkDebugReportCallbackCreateInfoEXT createInfo = {};
@@ -326,7 +348,7 @@ void RainbowDice::setupDebugCallback() {
     }
 }
 
-bool RainbowDice::checkExtensionSupport() {
+bool RainbowDiceVulkan::checkExtensionSupport() {
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
     std::vector<VkExtensionProperties> extensions(extensionCount);
@@ -354,7 +376,7 @@ bool RainbowDice::checkExtensionSupport() {
     return true;
 }
 
-bool RainbowDice::checkValidationLayerSupport() {
+bool RainbowDiceVulkan::checkValidationLayerSupport() {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
@@ -385,7 +407,7 @@ bool RainbowDice::checkValidationLayerSupport() {
     return true;
 }
 
-void RainbowDice::pickPhysicalDevice() {
+void RainbowDiceVulkan::pickPhysicalDevice() {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
     if (deviceCount == 0) {
@@ -414,7 +436,7 @@ void RainbowDice::pickPhysicalDevice() {
     }
 }
 
-bool RainbowDice::isDeviceSuitable(VkPhysicalDevice device) {
+bool RainbowDiceVulkan::isDeviceSuitable(VkPhysicalDevice device) {
     QueueFamilyIndices indices = findQueueFamilies(device);
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
@@ -425,7 +447,7 @@ bool RainbowDice::isDeviceSuitable(VkPhysicalDevice device) {
 
     bool swapChainAdequate = false;
     if (extensionsSupported) {
-        RainbowDice::SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+        RainbowDiceVulkan::SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
 
@@ -441,7 +463,7 @@ bool RainbowDice::isDeviceSuitable(VkPhysicalDevice device) {
     }
 }
 
-bool RainbowDice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
+bool RainbowDiceVulkan::checkDeviceExtensionSupport(VkPhysicalDevice device) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
@@ -457,7 +479,7 @@ bool RainbowDice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
     return requiredExtensions.empty();
 }
 
-RainbowDice::QueueFamilyIndices RainbowDice::findQueueFamilies(VkPhysicalDevice device) {
+RainbowDiceVulkan::QueueFamilyIndices RainbowDiceVulkan::findQueueFamilies(VkPhysicalDevice device) {
     QueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
@@ -493,7 +515,7 @@ RainbowDice::QueueFamilyIndices RainbowDice::findQueueFamilies(VkPhysicalDevice 
 /**
  * Choose the image format.  We want SRGB color space and RGB format.
  */
-VkSurfaceFormatKHR RainbowDice::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+VkSurfaceFormatKHR RainbowDiceVulkan::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
         return {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
     }
@@ -517,7 +539,7 @@ VkSurfaceFormatKHR RainbowDice::chooseSwapSurfaceFormat(const std::vector<VkSurf
  * VK_PRESENT_MODE_FIFO_KHR is guaranteed to be available, not all video
  * cards implement it correctly.
  */
-VkPresentModeKHR RainbowDice::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
+VkPresentModeKHR RainbowDiceVulkan::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
     VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
 
     for (const auto& availablePresentMode : availablePresentModes) {
@@ -531,8 +553,8 @@ VkPresentModeKHR RainbowDice::chooseSwapPresentMode(const std::vector<VkPresentM
     return bestMode;
 }
 
-RainbowDice::SwapChainSupportDetails RainbowDice::querySwapChainSupport(VkPhysicalDevice device) {
-    RainbowDice::SwapChainSupportDetails details;
+RainbowDiceVulkan::SwapChainSupportDetails RainbowDiceVulkan::querySwapChainSupport(VkPhysicalDevice device) {
+    RainbowDiceVulkan::SwapChainSupportDetails details;
 
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
@@ -553,7 +575,7 @@ RainbowDice::SwapChainSupportDetails RainbowDice::querySwapChainSupport(VkPhysic
     return details;
 }
 
-void RainbowDice::createLogicalDevice() {
+void RainbowDiceVulkan::createLogicalDevice() {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<int> uniqueQueueFamilies = {indices.graphicsFamily, indices.presentFamily};
@@ -601,9 +623,9 @@ void RainbowDice::createLogicalDevice() {
 /**
  * create the swap chain.
  */
-void RainbowDice::createSwapChain() {
+void RainbowDiceVulkan::createSwapChain() {
     /* chose details of the swap chain and get information about what is supported */
-    RainbowDice::SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+    RainbowDiceVulkan::SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
@@ -687,7 +709,7 @@ void RainbowDice::createSwapChain() {
     swapChainExtent = extent;
 }
 
-void RainbowDice::createImageViews() {
+void RainbowDiceVulkan::createImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
 
     for (size_t i=0; i < swapChainImages.size(); i++) {
@@ -695,7 +717,7 @@ void RainbowDice::createImageViews() {
     }
 }
 
-VkShaderModule RainbowDice::createShaderModule(const std::vector<char>& code) {
+VkShaderModule RainbowDiceVulkan::createShaderModule(const std::vector<char>& code) {
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
@@ -711,7 +733,7 @@ VkShaderModule RainbowDice::createShaderModule(const std::vector<char>& code) {
     return shaderModule;
 }
 
-void RainbowDice::createRenderPass() {
+void RainbowDiceVulkan::createRenderPass() {
     /* color buffer attachment descriptions: use a single attachment represented by
      * one of the images from the swap chain.
      */
@@ -818,7 +840,7 @@ void RainbowDice::createRenderPass() {
     }
 }
 
-void RainbowDice::createGraphicsPipeline() {
+void RainbowDiceVulkan::createGraphicsPipeline() {
     auto vertShaderCode = readFile(std::string(SHADER_VERT_FILE));
     auto fragShaderCode = readFile(std::string(SHADER_FRAG_FILE));
 
@@ -1054,7 +1076,7 @@ void RainbowDice::createGraphicsPipeline() {
     vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
 }
 
-void RainbowDice::createFramebuffers() {
+void RainbowDiceVulkan::createFramebuffers() {
     swapChainFramebuffers.resize(swapChainImageViews.size());
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
         std::array<VkImageView, 2> attachments = {
@@ -1077,7 +1099,7 @@ void RainbowDice::createFramebuffers() {
     }
 }
 
-void RainbowDice::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+void RainbowDiceVulkan::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
@@ -1108,7 +1130,7 @@ void RainbowDice::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMe
 }
 
 /* copy the data from CPU readable memory in the graphics card to non-CPU readable memory */
-void RainbowDice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+void RainbowDiceVulkan::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
     VkBufferCopy copyRegion = {};
@@ -1118,7 +1140,7 @@ void RainbowDice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSiz
     endSingleTimeCommands(commandBuffer);
 }
 
-VkCommandBuffer RainbowDice::beginSingleTimeCommands() {
+VkCommandBuffer RainbowDiceVulkan::beginSingleTimeCommands() {
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1137,7 +1159,7 @@ VkCommandBuffer RainbowDice::beginSingleTimeCommands() {
     return commandBuffer;
 }
 
-void RainbowDice::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+void RainbowDiceVulkan::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkEndCommandBuffer(commandBuffer);
 
     VkSubmitInfo submitInfo = {};
@@ -1152,7 +1174,7 @@ void RainbowDice::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkFreeCommandBuffers(logicalDevice, commandPool, 1, &commandBuffer);
 }
 
-uint32_t RainbowDice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t RainbowDiceVulkan::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
@@ -1168,7 +1190,7 @@ uint32_t RainbowDice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags 
 /* command pools are used to retrieve command buffers.  Command buffers is where the drawing
  * commands are written.
  */
-void RainbowDice::createCommandPool() {
+void RainbowDiceVulkan::createCommandPool() {
     QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
     VkCommandPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1192,7 +1214,7 @@ void RainbowDice::createCommandPool() {
 }
 
 /* Allocate and record commands for each swap chain immage */
-void RainbowDice::createCommandBuffers() {
+void RainbowDiceVulkan::createCommandBuffers() {
     commandBuffers.resize(swapChainFramebuffers.size());
 
     /* allocate the command buffer from the command pool, freed by Vulkan when the command
@@ -1290,7 +1312,7 @@ void RainbowDice::createCommandBuffers() {
     }
 }
 
-void RainbowDice::createSemaphores() {
+void RainbowDiceVulkan::createSemaphores() {
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     if (vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
@@ -1300,7 +1322,7 @@ void RainbowDice::createSemaphores() {
     }
 }
 
-void RainbowDice::drawFrame() {
+void RainbowDiceVulkan::drawFrame() {
     /* update the app state here */
 
     /* wait for presentation to finish before drawing the next frame.  Avoids a memory leak */
@@ -1395,7 +1417,7 @@ void RainbowDice::drawFrame() {
 }
 
 
-void RainbowDice::createDepthResources() {
+void RainbowDiceVulkan::createDepthResources() {
     VkFormat depthFormat = findDepthFormat();
 
     createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
@@ -1404,7 +1426,7 @@ void RainbowDice::createDepthResources() {
     transitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
-VkFormat RainbowDice::findDepthFormat() {
+VkFormat RainbowDiceVulkan::findDepthFormat() {
     return findSupportedFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
         VK_IMAGE_TILING_OPTIMAL,
@@ -1413,7 +1435,7 @@ VkFormat RainbowDice::findDepthFormat() {
 }
 
 /* find supported image formats for depth buffering */
-VkFormat RainbowDice::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+VkFormat RainbowDiceVulkan::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
         VkFormatProperties props;
         vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
@@ -1428,12 +1450,12 @@ VkFormat RainbowDice::findSupportedFormat(const std::vector<VkFormat>& candidate
     throw std::runtime_error("failed to find supported format!");
 }
 
-bool RainbowDice::hasStencilComponent(VkFormat format) {
+bool RainbowDiceVulkan::hasStencilComponent(VkFormat format) {
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 /* descriptor set for the MVP matrix and texture samplers */
-void RainbowDice::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet) {
+void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet) {
     VkDescriptorSetLayout layouts[] = {descriptorSetLayout};
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1491,7 +1513,7 @@ void RainbowDice::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &d
 
 
 /* descriptor pool for the MVP matrix and image sampler */
-void RainbowDice::createDescriptorPool() {
+void RainbowDiceVulkan::createDescriptorPool() {
     std::array<VkDescriptorPoolSize, 2> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = dice.size();
@@ -1509,7 +1531,7 @@ void RainbowDice::createDescriptorPool() {
 }
 
 /* for accessing data other than the vertices from the shaders */
-void RainbowDice::createDescriptorSetLayout() {
+void RainbowDiceVulkan::createDescriptorSetLayout() {
     /* MVP matrix */
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
     uboLayoutBinding.binding = 0;
@@ -1540,9 +1562,9 @@ void RainbowDice::createDescriptorSetLayout() {
     }
 }
 
-void RainbowDice::createTextureImages(std::vector<std::string> &symbols) {
+void RainbowDiceVulkan::createTextureImages(std::vector<std::string> &symbols) {
     for (auto symbol : symbols) {
-        if (!texAtlas.hasSymbol(symbol)) {
+        if (!texAtlas.hasVulkanTexture(symbol)) {
             TextureImage image;
             createTextureImage(image.width, image.height, image.textureImage, image.textureImageMemory, symbol);
             image.textureImageView = createImageView(image.textureImage, VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -1552,13 +1574,13 @@ void RainbowDice::createTextureImages(std::vector<std::string> &symbols) {
     }
 }
 
-void RainbowDice::createTextureImage(uint32_t &texWidth, uint32_t &texHeight, VkImage &textureImage, VkDeviceMemory &textureImageMemory, std::string &symbol) {
+void RainbowDiceVulkan::createTextureImage(uint32_t &texWidth, uint32_t &texHeight, VkImage &textureImage, VkDeviceMemory &textureImageMemory, std::string &symbol) {
     unsigned char *buffer;
     TextureImage img = texAtlas.getImage(symbol);
     texHeight = img.height;
     texWidth = img.width;
     buffer = static_cast<unsigned char *>(img.bitmap);
-    VkDeviceSize imageSize = texWidth * texHeight;
+    VkDeviceSize imageSize = img.size;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1573,26 +1595,27 @@ void RainbowDice::createTextureImage(uint32_t &texWidth, uint32_t &texHeight, Vk
     memcpy(data, buffer, static_cast<size_t>(imageSize));
     vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
-    createImage(texWidth, texHeight, VK_FORMAT_R8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+    VkFormat format = VK_FORMAT_R8_UNORM;
+    createImage(texWidth, texHeight, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
     /* transition the image to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL. The image was created with
      * layout: VK_IMAGE_LAYOUT_UNDEFINED, so we use that to specify the old layout.
      */
-    transitionImageLayout(textureImage, VK_FORMAT_R8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    transitionImageLayout(textureImage,  format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 
     /* transition the image to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL so that the
      * shader can read from it.
      */
-    transitionImageLayout(textureImage, VK_FORMAT_R8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transitionImageLayout(textureImage,  format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     /* free staging buffer */
     vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
     vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
 }
 
-void RainbowDice::createTextureSampler(VkSampler &textureSampler) {
+void RainbowDiceVulkan::createTextureSampler(VkSampler &textureSampler) {
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
@@ -1654,7 +1677,7 @@ void RainbowDice::createTextureSampler(VkSampler &textureSampler) {
 
 }
 
-VkImageView RainbowDice::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
+VkImageView RainbowDiceVulkan::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
     VkImageViewCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     createInfo.image = image;
@@ -1692,7 +1715,7 @@ VkImageView RainbowDice::createImageView(VkImage image, VkFormat format, VkImage
     return imageView;
 }
 
-void RainbowDice::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
+void RainbowDiceVulkan::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
 
     /* copy the data to an image object because it will be easier and faster to access the
      * image from the shader.  One advantage of using an image object is that using one will
@@ -1757,7 +1780,7 @@ void RainbowDice::createImage(uint32_t width, uint32_t height, VkFormat format, 
 }
 
 /* get the image in the right layout before we execute a copy command */
-void RainbowDice::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+void RainbowDiceVulkan::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
     /* use an image barrier to transition the layout */
@@ -1836,7 +1859,7 @@ void RainbowDice::transitionImageLayout(VkImage image, VkFormat format, VkImageL
     endSingleTimeCommands(commandBuffer);
 }
 
-void RainbowDice::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+void RainbowDiceVulkan::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
     VkBufferImageCopy region = {};
@@ -1876,12 +1899,12 @@ void RainbowDice::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t wid
     endSingleTimeCommands(commandBuffer);
 }
 
-void RainbowDice::loadObject(std::vector<std::string> &symbols) {
+void RainbowDiceVulkan::loadObject(std::vector<std::string> &symbols) {
     Dice *o = new Dice(symbols, glm::vec3(0.0f, 0.0f, -1.0f));
     dice.push_back(o);
 }
 
-void RainbowDice::updateUniformBuffer() {
+void RainbowDiceVulkan::updateUniformBuffer() {
     for (int i = 0; i < dice.size(); i++) {
         for (int j = i+1; j < dice.size(); j++) {
             dice[i]->die->calculateBounce(dice[j]->die);
@@ -1893,25 +1916,25 @@ void RainbowDice::updateUniformBuffer() {
     }
 }
 
-void RainbowDice::updateAcceleration(float x, float y, float z) {
+void RainbowDiceVulkan::updateAcceleration(float x, float y, float z) {
     for (auto die : dice) {
         die->die->updateAcceleration(x, y, z);
     }
 }
 
-void RainbowDice::resetPositions() {
+void RainbowDiceVulkan::resetPositions() {
     for (auto die: dice) {
         die->die->resetPosition();
     }
 }
 
-void RainbowDice::resetPositions(std::set<int> &diceIndices) {
+void RainbowDiceVulkan::resetPositions(std::set<int> &diceIndices) {
     for (auto i : diceIndices) {
         dice[i]->die->resetPosition();
     }
 }
 
-bool RainbowDice::allStopped() {
+bool RainbowDiceVulkan::allStopped() {
     for (auto die : dice) {
         if (!die->die->isStopped()) {
             return false;
@@ -1920,7 +1943,7 @@ bool RainbowDice::allStopped() {
     return true;
 }
 
-std::vector<std::string> RainbowDice::getDiceResults() {
+std::vector<std::string> RainbowDiceVulkan::getDiceResults() {
     std::vector<std::string> results;
     for (auto die : dice) {
         if (!die->die->isStopped()) {

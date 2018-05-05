@@ -17,11 +17,11 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include "rainbowDice.hpp"
+#include "rainbowDiceVulkan.hpp"
 #include "android_native_app_glue.h"
 
 /* read the shader byte code files */
-std::vector<char> RainbowDice::readFile(const std::string &filename) {
+std::vector<char> RainbowDiceVulkan::readFile(const std::string &filename) {
     if (filename == SHADER_VERT_FILE) {
         return vertexShader;
     } else if (filename == SHADER_FRAG_FILE) {
@@ -35,11 +35,11 @@ std::vector<char> RainbowDice::readFile(const std::string &filename) {
  * Choose the resolution of the swap images in the frame buffer.  Just return
  * the current extent (same resolution as the window).
  */
-VkExtent2D RainbowDice::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+VkExtent2D RainbowDiceVulkan::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
     return capabilities.currentExtent;
 }
 
-void RainbowDice::createSurface() {
+void RainbowDiceVulkan::createSurface() {
     VkAndroidSurfaceCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
     createInfo.window = window;
@@ -48,7 +48,11 @@ void RainbowDice::createSurface() {
     }
 }
 
-void RainbowDice::destroyWindow() {
+void RainbowDiceVulkan::destroyWindow() {
     /* release the java window object */
     ANativeWindow_release(window);
 }
+
+void RainbowDiceVulkan::initThread() {}
+
+void RainbowDiceVulkan::cleanupThread() {}

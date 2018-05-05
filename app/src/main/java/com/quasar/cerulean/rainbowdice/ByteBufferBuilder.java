@@ -40,7 +40,7 @@ public class ByteBufferBuilder {
         }
     }
 
-    public void readToBuffer(InputStream in) throws IOException {
+    public void readToBuffer(InputStream in, boolean nullAppend) throws IOException {
         int len = 0;
         do {
             if (bytes.length - sizeOfData > 0) {
@@ -54,5 +54,15 @@ public class ByteBufferBuilder {
                 bytes = newBytes;
             }
         } while (len >= 0);
+        if (nullAppend) {
+            if (bytes.length - sizeOfData > 0) {
+                bytes[sizeOfData] = '\0';
+            } else {
+                byte[] newBytes = new byte[bytes.length * 2];
+                System.arraycopy(bytes, 0, newBytes, 0, bytes.length);
+                bytes = newBytes;
+                bytes[sizeOfData] = '\0';
+            }
+        }
     }
 }

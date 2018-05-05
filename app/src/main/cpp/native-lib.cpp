@@ -24,6 +24,8 @@
 #include <native_window_jni.h>
 #include <sensor.h>
 #include "rainbowDice.hpp"
+#include "rainbowDiceVulkan.hpp"
+#include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
 
 // microseconds
@@ -39,6 +41,8 @@ ASensorManager *sensorManager = nullptr;
 ASensor const *sensor = nullptr;
 ASensorEventQueue *eventQueue = nullptr;
 ALooper *looper = nullptr;
+std::unique_ptr<RainbowDice> diceGraphics(nullptr);
+JNIEnv *sEnv = nullptr;
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_initSensors(
@@ -74,16 +78,26 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
         JNIEnv *env,
         jobject jthis,
+        jboolean useVulkan,
         jobject surface) {
     ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
     if (window == nullptr) {
         return env->NewStringUTF("Unable to acquire window from surface.");
     }
-    int32_t w = ANativeWindow_getWidth(window);
-    int32_t h = ANativeWindow_getHeight(window);
+
     try {
-        diceGraphics.initVulkan(diceGraphics.STATE_1, window);
+#ifdef RAINBOWDICE_GLONLY
+        diceGraphics.reset(new RainbowDiceGl());
+#else
+        if (useVulkan) {
+            diceGraphics.reset(new RainbowDiceVulkan());
+        } else {
+            diceGraphics.reset(new RainbowDiceGL());
+        }
+#endif
+        diceGraphics->initWindow(window);
     } catch (std::runtime_error &e) {
+        diceGraphics->cleanup();
         return env->NewStringUTF(e.what());
     }
     return env->NewStringUTF("");
@@ -94,9 +108,15 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initPipeline(
         JNIEnv *env,
         jobject jthis) {
     try {
-        diceGraphics.initVulkan(diceGraphics.STATE_2, nullptr);
+        sEnv = env;
+        diceGraphics->initPipeline();
     } catch (std::runtime_error &e) {
-        return env->NewStringUTF(e.what());
+        diceGraphics->cleanup();
+        if (strlen(e.what()) > 0) {
+            return env->NewStringUTF(e.what());
+        } else {
+            return env->NewStringUTF("Error in initializing OpenGL.");
+        }
     }
     return env->NewStringUTF("");
 }
@@ -108,17 +128,19 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbol(
         jstring jsymbol,
         jint width,
         jint height,
+        jint size,
         jbyteArray jbitmap) {
     const char *csymbol = env->GetStringUTFChars(jsymbol, 0);
     std::string symbol(csymbol);
     env->ReleaseStringUTFChars(jsymbol, csymbol);
     jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
-    void *bitmap = malloc(static_cast<size_t>(width*height));
-    memcpy(bitmap, bytes, static_cast<size_t>(width*height));
+    void *bitmap = malloc(static_cast<size_t>(size));
+    memcpy(bitmap, bytes, static_cast<size_t>(size));
     env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
     try {
-        texAtlas.addSymbol(symbol, static_cast<uint32_t>(width), static_cast<uint32_t>(height), bitmap);
+        texAtlas.addSymbol(symbol, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t> (size), bitmap);
     } catch (std::runtime_error &e) {
+        diceGraphics->cleanup();
         return env->NewStringUTF(e.what());
     }
     return env->NewStringUTF("");
@@ -137,7 +159,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_sendVertexShader(
     env->ReleaseByteArrayElements(jShader, bytes, JNI_ABORT);
 
     try {
-        diceGraphics.addVertexShader(shader);
+        diceGraphics->addVertexShader(shader);
     } catch (std::runtime_error &e) {
         return env->NewStringUTF(e.what());
     }
@@ -157,7 +179,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_sendFragmentShader(
     env->ReleaseByteArrayElements(jShader, bytes, JNI_ABORT);
 
     try {
-        diceGraphics.addFragmentShader(shader);
+        diceGraphics->addFragmentShader(shader);
     } catch (std::runtime_error &e) {
         return env->NewStringUTF(e.what());
     }
@@ -170,6 +192,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
         jobject jthis)
 {
     try {
+        diceGraphics->initThread();
         reported = false;
         if (rolling) {
             int rc = ASensorEventQueue_enableSensor(eventQueue, sensor);
@@ -181,6 +204,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
 
             rc = ASensorEventQueue_setEventRate(eventQueue, sensor, minDelay);
             if (rc < 0) {
+                diceGraphics->cleanupThread();
                 return env->NewStringUTF("error: Could not set event rate");
             }
         }
@@ -196,6 +220,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
                 ssize_t nbrEvents = ASensorEventQueue_getEvents(eventQueue, events.data(), events.size());
                 if (nbrEvents < 0) {
                     // an error has occurred
+                    diceGraphics->cleanupThread();
                     return env->NewStringUTF("error: Error on retrieving sensor events.");
                 }
 
@@ -208,12 +233,12 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
                     z += events[i].acceleration.z;
                 }
 
-                diceGraphics.updateAcceleration(x, y, z);
+                diceGraphics->updateAcceleration(x, y, z);
             }
-            diceGraphics.updateUniformBuffer();
-            diceGraphics.drawFrame();
-            if (diceGraphics.allStopped() && !reported) {
-                results = diceGraphics.getDiceResults();
+            diceGraphics->updateUniformBuffer();
+            diceGraphics->drawFrame();
+            if (diceGraphics->allStopped() && !reported) {
+                results = diceGraphics->getDiceResults();
                 std::string totalResult;
                 for (auto result : results) {
                     totalResult += result + "\n";
@@ -221,6 +246,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
                 totalResult[totalResult.length()-1] = '\0';
                 reported = true;
                 ASensorEventQueue_disableSensor(eventQueue, sensor);
+                diceGraphics->cleanupThread();
                 return env->NewStringUTF(totalResult.c_str());
             }
         }
@@ -228,9 +254,11 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
         // no need to draw another frame - we are failing.
         stopDrawing = true;
         ASensorEventQueue_disableSensor(eventQueue, sensor);
+        diceGraphics->cleanupThread();
         return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
     }
 
+    diceGraphics->cleanupThread();
     ASensorEventQueue_disableSensor(eventQueue, sensor);
     return env->NewStringUTF("");
 }
@@ -248,7 +276,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyVulkan(
         jobject jthis) {
     // If this function is being called, it is assumed that the caller already stopped
     // and joined the draw thread.
-    diceGraphics.cleanup();
+    diceGraphics->cleanup();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -265,21 +293,21 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_loadModel(
         env->ReleaseStringUTFChars(jsymbol, csymbol);
         symbols.push_back(symbol);
     }
-    diceGraphics.loadObject(symbols);
+    diceGraphics->loadObject(symbols);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyModels(
         JNIEnv *env,
         jobject jthis) {
-    diceGraphics.destroyModels();
+    diceGraphics->destroyModels();
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateModels(
         JNIEnv *env,
         jobject jthis) {
-    diceGraphics.recreateModels();
+    diceGraphics->recreateModels();
     stopDrawing = false;
 }
 
@@ -287,7 +315,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateSwapChain(
         JNIEnv *env,
         jobject jthis) {
-    diceGraphics.recreateSwapChain();
+    diceGraphics->recreateSwapChain();
     stopDrawing = false;
 }
 
@@ -297,7 +325,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_roll(
         jobject jthis) {
     stopDrawing = false;
     rolling = true;
-    diceGraphics.resetPositions();
+    diceGraphics->resetPositions();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -315,5 +343,19 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
     env->ReleaseIntArrayElements(jIndices, cIndices, JNI_COMMIT);
     stopDrawing = false;
     rolling = true;
-    diceGraphics.resetPositions(indices);
+    diceGraphics->resetPositions(indices);
+}
+
+GLuint loadTexture(uint32_t width, uint32_t height, uint32_t size, void *data) {
+    jclass utils = sEnv->FindClass("com/quasar/cerulean/rainbowdice/Utils");
+    jmethodID loadTexture = sEnv->GetStaticMethodID(utils, "loadTexture", "(III[B)I");
+    if (loadTexture == NULL) {
+        throw std::runtime_error("Couldn't find loadTexture method");
+    }
+
+    jbyteArray imageBytes = sEnv->NewByteArray(size);
+    sEnv->SetByteArrayRegion(imageBytes, 0, size, (jbyte*) data);
+    GLuint textureId = (GLuint) sEnv->CallStaticIntMethod(utils, loadTexture, (int)width, (int)height, (int)size, imageBytes);
+    sEnv->DeleteLocalRef(imageBytes);
+    return textureId;
 }
