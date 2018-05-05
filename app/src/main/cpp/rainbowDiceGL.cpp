@@ -200,11 +200,11 @@ void RainbowDiceGL::initPipeline() {
 
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    /*
+#if 0
     texture_iterator it = texAtlas.getIterator();
     it++;
     texturetest = loadTexture(it->second.width, it->second.height, it->second.size, it->second.bitmap);
-    */
+#endif
 
     // needed because we are going to switch to another thread now
     if (!eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
@@ -254,24 +254,24 @@ void RainbowDiceGL::drawFrame() {
         glBindBuffer(GL_ARRAY_BUFFER, dice[i].vertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, dice[i].indexBuffer);
         glVertexAttribPointer(
-                colorID,                            // The position of the attribute in the shader.
+                colorID,                          // The position of the attribute in the shader.
                 3,                                // size
                 GL_FLOAT,                         // type
                 GL_FALSE,                         // normalized?
-                sizeof(Vertex),                                // stride
-                (void *) (offsetof(Vertex, color))                        // array buffer offset
+                sizeof(Vertex),                   // stride
+                (void *) (offsetof(Vertex, color))// array buffer offset
         );
         glEnableVertexAttribArray(colorID);
 
         // attribute buffer : vertices for die
         GLint position = glGetAttribLocation(programID, "inPosition");
         glVertexAttribPointer(
-                position,           // The position of the attribute in the shader.
-                3,                  // size
-                GL_FLOAT,           // type
-                GL_FALSE,           // normalized?
+                position,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
                 sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, pos))            // array buffer offset
+                (void *) (offsetof(Vertex, pos)) // array buffer offset
         );
         glEnableVertexAttribArray(position);
 
@@ -279,7 +279,7 @@ void RainbowDiceGL::drawFrame() {
         // Send in the texture coordinates
         GLint texCoordID = glGetAttribLocation(programID, "inTexCoord");
         glVertexAttribPointer(
-            texCoordID,                       // attribute. No particular reason for 2, but must match the layout in the shader.
+            texCoordID,                       // The position of the attribute in the shader
             2,                                // size
             GL_FLOAT,                         // type
             GL_FALSE,                         // normalized?
@@ -323,7 +323,7 @@ GLuint RainbowDiceGL::loadShaders() {
             if (VertexShaderErrorMessage[0] == '\0') {
                 throw std::runtime_error("vertex shader compile error");
             } else {
-                throw std::runtime_error(VertexShaderErrorMessage.data());
+                throw std::runtime_error(std::string("vertex shader compile error: ") + VertexShaderErrorMessage.data());
             }
         } else {
             throw std::runtime_error("vertex shader compile error");
@@ -346,7 +346,7 @@ GLuint RainbowDiceGL::loadShaders() {
             if (FragmentShaderErrorMessage[0] == '\0') {
                 throw std::runtime_error("Fragment shader compile error.");
             } else {
-                throw std::runtime_error(FragmentShaderErrorMessage.data());
+                throw std::runtime_error(std::string("Fragment shader compile error: ") + FragmentShaderErrorMessage.data());
             }
         } else {
             throw std::runtime_error("Fragment shader compile error.");

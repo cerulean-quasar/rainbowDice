@@ -359,9 +359,9 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             Paint paint = new Paint();
             paint.setUnderlineText(true);
             paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(18.0f);
+            paint.setTextSize(25.0f);
             canvas.drawARGB(0,0,0,0);
-            canvas.drawText(symbol, 20, 15, paint);
+            canvas.drawText(symbol, 40, 40, paint);
             int bitmapSize = bitmap.getAllocationByteCount();
             int format = GLUtils.getInternalFormat(bitmap);
             int type = GLUtils.getType(bitmap);

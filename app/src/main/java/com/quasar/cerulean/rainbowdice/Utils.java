@@ -29,8 +29,8 @@ import static android.graphics.Bitmap.Config.ALPHA_8;
 import static android.graphics.Bitmap.Config.ARGB_8888;
 
 public class Utils {
-    public static final int TEXWIDTH = 50;
-    public static final int TEXHEIGHT = 25;
+    public static final int TEXWIDTH = 64;//50;
+    public static final int TEXHEIGHT = 64;//25;
     public static final Bitmap.Config FORMAT = ALPHA_8;
 
     public static int loadTexture(int width, int height, int size, byte[] data) {
