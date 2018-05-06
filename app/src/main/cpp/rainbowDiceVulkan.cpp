@@ -19,6 +19,7 @@
  */
 #include "rainbowDiceGlobal.hpp"
 #include "rainbowDiceVulkan.hpp"
+#include "TextureAtlasVulkan.h"
 
 /**
  * Call used to allocate a debug report callback so that you can get error
@@ -106,7 +107,7 @@ void RainbowDiceVulkan::cleanup() {
     dice.clear();
 
     if (texAtlas.get() != nullptr) {
-        texAtlas->destroy();
+        ((TextureAtlasVulkan*)texAtlas.get())->destroy();
     }
 
     if (logicalDevice != VK_NULL_HANDLE) {
@@ -175,7 +176,7 @@ void RainbowDiceVulkan::destroyModels() {
     }
     dice.clear();
 
-    texAtlas->destroy();
+    ((TextureAtlasVulkan*)texAtlas.get())->destroy();
     vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
 
@@ -1496,7 +1497,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptor
     descriptorWrites[0].pImageInfo = nullptr; // Optional
     descriptorWrites[0].pTexelBufferView = nullptr; // Optional
 
-    std::vector<VkDescriptorImageInfo> imageInfos = texAtlas->getImageInfosForDescriptorSet();
+    std::vector<VkDescriptorImageInfo> imageInfos = ((TextureAtlasVulkan*)texAtlas.get())->getImageInfosForDescriptorSet();
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[1].dstSet = descriptorSet;
@@ -1569,7 +1570,7 @@ void RainbowDiceVulkan::createTextureImages() {
     createTextureImage(textureImage, textureImageMemory);
     textureImageView = createImageView(textureImage, VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
     createTextureSampler(textureSampler);
-    texAtlas->addTextureImage(textureImage, textureImageMemory, textureImageView, textureSampler);
+    ((TextureAtlasVulkan*)texAtlas.get())->addTextureImage(textureImage, textureImageMemory, textureImageView, textureSampler);
 }
 
 void RainbowDiceVulkan::createTextureImage(VkImage &textureImage, VkDeviceMemory &textureImageMemory) {

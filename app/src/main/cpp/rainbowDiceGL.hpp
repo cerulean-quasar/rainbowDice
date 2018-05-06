@@ -22,6 +22,7 @@
 #include <GLES2/gl2.h>
 #include "rainbowDice.hpp"
 #include "dice.hpp"
+#include "rainbowDiceGlobal.hpp"
 
 class RainbowDiceGL : public RainbowDice {
 public:

@@ -66,10 +66,19 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     // Used to load the 'native-lib' library on application startup.
     static {
+        boolean loadedLibrary = false;
         try {
             System.loadLibrary("native-lib");
+            loadedLibrary = true;
         } catch (UnsatisfiedLinkError e) {
             System.out.println("Could not load library: native-lib");
+        }
+        if (!loadedLibrary) {
+            try {
+                System.loadLibrary("native-lib-glonly");
+            } catch (UnsatisfiedLinkError e) {
+                System.out.println("Could not load library: native-lib-glonly");
+            }
         }
     }
 
@@ -408,7 +417,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void startDrawing(SurfaceHolder holder) {
-        boolean usingVulkan = false;
+        boolean usingVulkan = true;
         Surface drawSurface = holder.getSurface();
         String err = initWindow(usingVulkan, drawSurface);
         if (err != null && err.length() != 0) {

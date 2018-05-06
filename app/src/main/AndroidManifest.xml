@@ -6,6 +6,8 @@
         android:name="android.hardware.sensor.accelerometer"
         android:required="true" />
 
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -24,7 +26,7 @@
         </activity>
         <activity android:name=".DiceConfigurationActivity" />
         <activity android:name=".DiceCustomizationActivity" />
-        <activity android:name=".ActivityThemeSelector"></activity>
+        <activity android:name=".ActivityThemeSelector"/>
     </application>
 
 </manifest>

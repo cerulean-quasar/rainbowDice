@@ -19,14 +19,21 @@
  */
 #include <jni.h>
 #include <string>
+#include "string.h"
 #include <looper.h>
 #include <native_window.h>
 #include <native_window_jni.h>
 #include <sensor.h>
 #include "rainbowDice.hpp"
-#include "rainbowDiceVulkan.hpp"
 #include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
+
+#ifdef RAINBOWDICE_GLONLY
+#include "text.hpp"
+#else
+#include "rainbowDiceVulkan.hpp"
+#include "TextureAtlasVulkan.h"
+#endif
 
 // microseconds
 int const MAX_EVENT_REPORT_TIME = 100000;
@@ -87,7 +94,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
 
     try {
 #ifdef RAINBOWDICE_GLONLY
-        diceGraphics.reset(new RainbowDiceGl());
+        diceGraphics.reset(new RainbowDiceGL());
 #else
         if (useVulkan) {
             diceGraphics.reset(new RainbowDiceVulkan());
@@ -145,7 +152,11 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
     }
 
     try {
+#ifdef RAINBOWDICE_GLONLY
+        texAtlas.reset(new TextureAtlas(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight), bitmap));
+#else
         texAtlas.reset(new TextureAtlasVulkan(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight), bitmap));
+#endif
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
         return env->NewStringUTF(e.what());

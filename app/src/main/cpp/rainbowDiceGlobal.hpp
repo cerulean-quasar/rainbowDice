@@ -21,7 +21,7 @@
 #define RAINBOWDICE_GLOBAL_HPP
 
 #include <string>
-#include <vulkan/vulkan.h>
+#include <native_window.h>
 
 typedef ANativeWindow WindowType;
 
@@ -33,16 +33,19 @@ extern const std::string SHADER_VERT_FILE;
 extern const std::string SHADER_FRAG_FILE;
 
 /* logical device we are using */
+#ifndef RAINBOWDICE_GLONLY
+#include <vulkan/vulkan.h>
 extern VkDevice logicalDevice;
+#endif
 
 #include "text.hpp"
 #include "rainbowDice.hpp"
-#include "TextureAtlasVulkan.h"
+#include "text.hpp"
 #include <memory>
 #include <GLES2/gl2.h>
 
 //extern std::unique_ptr<RainbowDice> diceGraphics;
-extern std::unique_ptr<TextureAtlasVulkan> texAtlas;
+extern std::unique_ptr<TextureAtlas> texAtlas;
 
 GLuint loadTexture(uint32_t width, uint32_t height, uint32_t size, void *data);
 
