@@ -128,7 +128,7 @@ public:
     bool isStopped() { return stopped; }
     std::string getResult() { return result; }
     void resetPosition();
-    virtual void loadModel(TextureAtlas &texAtlas) = 0;
+    virtual void loadModel() = 0;
     virtual std::string calculateUpFace() = 0;
 };
 
@@ -147,8 +147,8 @@ public:
     {
     }
 
-    void loadModel(TextureAtlas &texAtlas);
-    std::string calculateUpFace();
+    virtual void loadModel();
+    virtual std::string calculateUpFace();
 };
 
 
@@ -159,7 +159,7 @@ class DiceModelHedron : public DicePhysicsModel {
 protected:
     uint32_t sides;
 
-    void addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i, TextureAtlas &texAtlas);
+    void addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i);
 public:
     DiceModelHedron(std::vector<std::string> &inSymbols)
         : DicePhysicsModel(inSymbols)
@@ -171,7 +171,7 @@ public:
     {
     }
 
-    virtual void loadModel(TextureAtlas &texAtlas);
+    virtual void loadModel();
     virtual std::string calculateUpFace();
     virtual int getUpFaceIndex(int i);
 };
@@ -188,8 +188,8 @@ public:
     {
     }
 
-    void loadModel(TextureAtlas &texAtlas);
-    int getUpFaceIndex(int i);
+    virtual void loadModel();
+    virtual int getUpFaceIndex(int i);
 };
 
 class DiceModelIcosahedron : public DiceModelHedron {
@@ -204,15 +204,15 @@ public:
     {
     }
 
-    void loadModel(TextureAtlas &texAtlas);
-    int getUpFaceIndex(int i);
+    virtual void loadModel();
+    virtual int getUpFaceIndex(int i);
 };
 
 class DiceModelDodecahedron : public DicePhysicsModel {
 private:
     static uint32_t const sides;
 
-    void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i, TextureAtlas &texAtlas);
+    void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i);
 
 public:
     DiceModelDodecahedron(std::vector<std::string> &inSymbols)
@@ -225,7 +225,7 @@ public:
     {
     }
 
-    virtual void loadModel(TextureAtlas &texAtlas);
+    virtual void loadModel();
     virtual std::string calculateUpFace();
 };
 #endif

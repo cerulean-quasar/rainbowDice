@@ -21,41 +21,48 @@
 #define TEXT_HPP
 #include <string>
 #include <map>
-#include <vulkan/vulkan.h>
-
 #include <vector>
-/* texture image */
+
 struct TextureImage {
-    uint32_t width;
-    uint32_t height;
-    uint32_t size;
-    void *bitmap;
-    bool hasTexture;
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
+    uint32_t imageIndex;
 };
 
+/* texture image */
 typedef std::map<std::string, TextureImage>::iterator texture_iterator;
 
 class TextureAtlas {
 private:
+    uint32_t heightImage;
+    uint32_t width;
+    uint32_t heightTexture;
+    std::vector<char> bitmap;
     std::map<std::string, TextureImage> textureImages;
 
 public:
-    TextureAtlas() {}
-    void destroy();
+    std::vector<char> &getImage() { return bitmap; }
+    uint32_t getImageHeight() { return heightImage; }
+    uint32_t getImageWidth() { return width; }
+    uint32_t getTextureHeight() {return heightTexture; }
+    uint32_t getImageIndex(std::string &symbol) {
+        std::map<std::string, TextureImage>::iterator it = textureImages.find(symbol);
+        if (it == textureImages.end()) {
+            // shouldn't happen
+            throw std::runtime_error(std::string("Texture not found for symbol: ") + symbol);
+        }
 
-    void addAtlasSymbols(std::vector<std::string> &symbols);
-    void addTextureImage(std::string symbol, TextureImage &image);
-    void addSymbol(std::string &symbol, uint32_t width, uint32_t height, uint32_t size, void *bitmap);
-    bool hasVulkanTexture(std::string symbol);
-    TextureImage getImage(std::string symbol);
-    texture_iterator getIterator();
-    texture_iterator getEnd();
-    size_t nbrSymbols();
-    uint32_t getArrayIndex(std::string symbol);
-    std::vector<VkDescriptorImageInfo> getImageInfosForDescriptorSet();
+        return it->second.imageIndex;
+    }
+    uint32_t getNbrImages() {
+        return (uint32_t)textureImages.size();
+    }
+
+    TextureAtlas(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture, uint32_t inHeightImage,  std::vector<char> &inBitmap)
+        :heightImage(inHeightImage), width(inWidth), heightTexture(inHeightTexture), bitmap(inBitmap), textureImages()
+    {
+        for (uint32_t i=0; i < symbols.size(); i++) {
+            TextureImage tex = { i };
+            textureImages.insert(std::make_pair(symbols[i], tex));
+        }
+    }
 };
 #endif

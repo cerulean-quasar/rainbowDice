@@ -126,7 +126,7 @@ void RainbowDiceGL::initPipeline() {
     int32_t w = ANativeWindow_getWidth(window);
     int32_t h = ANativeWindow_getHeight(window);
     for (auto die : dice) {
-        die.loadModel(texAtlas, w, h);
+        die.loadModel(w, h);
     }
 
     // Get a handle for our "MVP" uniform
@@ -147,40 +147,10 @@ void RainbowDiceGL::initPipeline() {
                      dice[i].die->indices.data(), GL_STATIC_DRAW);
     }
 
+    // set the shader to use
+    glUseProgram(programID);
+
     // load the textures
-/*
-    texture.resize(texAtlas.nbrSymbols());
-    glGenTextures(texture.size(), texture.data());
-    texture_iterator it = texAtlas.getIterator();
-    for (int i = 0; it != texAtlas.getEnd(); it++, i++) {
-        glBindTexture(GL_TEXTURE_2D, texture[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, it->second.width, it->second.height, 0, GL_R8_SNORM, GL_UNSIGNED_BYTE, it->second.bitmap);
-    }
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    // set the shader to use
-    glUseProgram(programID);
-
-    // activate and bind the texture
-    int i = 0;
-    for (auto tex : texture) {
-        glActiveTexture(GL_TEXTURE0 + i++);
-        glBindTexture(GL_TEXTURE_2D, tex);
-    }
-
-    // set the textures
-    GLint values[texture.size()];
-    i = 0;
-    for (auto value : values) {
-        value = i++;
-    }
-    GLint textureID = glGetUniformLocation(programID, "texSampler");
-    glUniform1iv(textureID, texture.size(), values);
-*/
-
-    // set the shader to use
-    glUseProgram(programID);
-
     glGenTextures(1, &texturetest);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texturetest);
@@ -193,18 +163,10 @@ void RainbowDiceGL::initPipeline() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, /*GL_LINEAR_MIPMAP_LINEAR*/GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, /*GL_LINEAR*/ GL_NEAREST);
 
-    texture_iterator it = texAtlas.getIterator();
-    it++;
-    unsigned char *buffer = (unsigned char *) it->second.bitmap;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, it->second.width, it->second.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, buffer);
+    std::vector<char> &texture = texAtlas->getImage();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, texAtlas->getImageWidth(), texAtlas->getTextureHeight(), 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture.data());
 
     glGenerateMipmap(GL_TEXTURE_2D);
-
-#if 0
-    texture_iterator it = texAtlas.getIterator();
-    it++;
-    texturetest = loadTexture(it->second.width, it->second.height, it->second.size, it->second.bitmap);
-#endif
 
     // needed because we are going to switch to another thread now
     if (!eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
@@ -439,8 +401,6 @@ void RainbowDiceGL::loadObject(std::vector<std::string> &symbols) {
 
 void RainbowDiceGL::destroyModels() {
     dice.clear();
-
-    texAtlas.destroy();
 }
 
 void RainbowDiceGL::recreateModels() {

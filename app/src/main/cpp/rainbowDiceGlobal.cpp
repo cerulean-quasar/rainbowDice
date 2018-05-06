@@ -20,11 +20,12 @@
 #include <memory>
 #include "rainbowDiceGlobal.hpp"
 #include "text.hpp"
+#include "TextureAtlasVulkan.h"
 
 const std::string SHADER_VERT_FILE = "vertexShader";
 const std::string SHADER_FRAG_FILE = "fragmentShader";
 
 VkDevice logicalDevice = VK_NULL_HANDLE;
 
-TextureAtlas texAtlas;
+std::unique_ptr<TextureAtlasVulkan> texAtlas;
 

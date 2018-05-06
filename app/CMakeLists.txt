@@ -21,7 +21,6 @@ add_library( # Sets the name of the library.
              src/main/cpp/rainbowDiceVulkan.cpp
              src/main/cpp/rainbowDiceGL.cpp
              src/main/cpp/rainbowDiceAndroid.cpp
-             src/main/cpp/text.cpp
              src/main/cpp/rainbowDiceGlobal.cpp
              src/main/cpp/dice.cpp)
 

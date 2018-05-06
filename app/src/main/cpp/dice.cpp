@@ -27,6 +27,7 @@
 
 #include "text.hpp"
 #include "dice.hpp"
+#include "rainbowDiceGlobal.hpp"
 
 const float DicePhysicsModel::errorVal = 0.15f;
 const float DicePhysicsModel::viscosity = 0.002f;
@@ -261,47 +262,49 @@ void DicePhysicsModel::updateModelMatrix() {
     ubo.model = translate * rotate * scale;
 }
 
-void DiceModelCube::loadModel(TextureAtlas &texAtlas) {
+void DiceModelCube::loadModel() {
     Vertex vertex = {};
+
+    uint32_t totalNbrImages = texAtlas->getNbrImages();
 
     // vertices
     for (uint32_t i = 0; i < 4; i ++) {
         // top
+        vertex.textureToUse = texAtlas->getImageIndex(symbols[0]);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, 1};
+            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
             break;
         case 1:
-            vertex.texCoord = {0, 0};
+            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse)};
             break;
         case 2:
-            vertex.texCoord = {1, 0};
+            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse)};
             break;
         case 3:
-            vertex.texCoord = {1, 1};
+            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
             break;
         }
-        vertex.textureToUse = texAtlas.getArrayIndex(symbols[0]);
         vertex.color = colors[i%colors.size()];
         cubeTop(vertex, i);
         vertices.push_back(vertex);
 
         //bottom
+        vertex.textureToUse = texAtlas->getImageIndex(symbols[1]);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, 0};
+            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse)};
             break;
         case 1:
-            vertex.texCoord = {0, 1};
+            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
             break;
         case 2:
-            vertex.texCoord = {1, 1};
+            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
             break;
         case 3:
-            vertex.texCoord = {1, 0};
+            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse)};
             break;
         }
-        vertex.textureToUse = texAtlas.getArrayIndex(symbols[1]);
         vertex.color = colors[(i+3) %colors.size()];
         cubeBottom(vertex, i);
         vertices.push_back(vertex);
@@ -329,22 +332,22 @@ void DiceModelCube::loadModel(TextureAtlas &texAtlas) {
     // sides
     for (uint32_t i = 0; i < 4; i ++) {
         vertex.color = colors[i%colors.size()];
-        vertex.textureToUse = texAtlas.getArrayIndex(symbols[(i+2)%symbols.size()]);
+        vertex.textureToUse = texAtlas->getImageIndex(symbols[(i+2)%symbols.size()]);
 
         cubeTop(vertex, i);
-        vertex.texCoord = {0,0};
+        vertex.texCoord = {0,(1.0f/totalNbrImages)*(vertex.textureToUse)};
         vertices.push_back(vertex);
 
         cubeTop(vertex, (i+1)%4);
-        vertex.texCoord = {0,1};
+        vertex.texCoord = {0,(1.0f/totalNbrImages)*(vertex.textureToUse+1)};
         vertices.push_back(vertex);
 
         cubeBottom(vertex, i);
-        vertex.texCoord = {1,0};
+        vertex.texCoord = {1,(1.0f/totalNbrImages)*(vertex.textureToUse)};
         vertices.push_back(vertex);
 
         cubeBottom(vertex, (i+1)%4);
-        vertex.texCoord = {1,1};
+        vertex.texCoord = {1,(1.0f/totalNbrImages)*(vertex.textureToUse+1)};
         vertices.push_back(vertex);
 
         indices.push_back(9+4*i);
@@ -430,7 +433,7 @@ std::string DiceModelCube::calculateUpFace() {
     return symbols[upFace%symbols.size()];
 }
 
-void DiceModelHedron::loadModel(TextureAtlas &texAtlas) {
+void DiceModelHedron::loadModel() {
     sides = symbols.size();
     while (sides < 6 || sides % 2 != 0) {
         sides *= 2;
@@ -444,13 +447,13 @@ void DiceModelHedron::loadModel(TextureAtlas &texAtlas) {
         glm::vec3 p0 = {0.0f, -1.0f, 0.0f};
         glm::vec3 q = {glm::cos(4*i*pi/sides), 0.0f, glm::sin(4*i*pi/sides)};
         glm::vec3 r = {glm::cos(4.0f*((i+1)%(sides/2))*pi/sides), 0.0f, glm::sin(4*((i+1)%(sides/2))*pi/sides)};
-        addVertices(p0, q, r, i, texAtlas);
+        addVertices(p0, q, r, i);
 
         // top
         p0 = {0.0f, 1.0f, 0.0f};
         q = {glm::cos(4.0f*((i+1)%(sides/2))*pi/sides), 0.0f, glm::sin(4*((i+1)%(sides/2))*pi/sides)};
         r = {glm::cos(4*i*pi/sides), 0.0f, glm::sin(4*i*pi/sides)};
-        addVertices(p0, q, r, i+sides/2, texAtlas);
+        addVertices(p0, q, r, i+sides/2);
     }
 
     // indices - not really using these
@@ -459,10 +462,10 @@ void DiceModelHedron::loadModel(TextureAtlas &texAtlas) {
     }
 }
 
-void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i, TextureAtlas &texAtlas) {
-    TextureImage tex = texAtlas.getImage(symbols[i%symbols.size()]);
-    uint32_t textureToUse = texAtlas.getArrayIndex(symbols[i%symbols.size()]);
-    float a = tex.width/(float)tex.height;
+void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i) {
+    uint32_t textureToUse = texAtlas->getImageIndex(symbols[i%symbols.size()]);
+    uint32_t totalNbrImages = texAtlas->getNbrImages();
+    float a = (float)texAtlas->getImageWidth()/(float)texAtlas->getImageHeight();
 
     Vertex vertex = {};
 
@@ -535,38 +538,38 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
 
     // bottom text triangle
     vertex.pos = p1prime;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p3;
-    vertex.texCoord = {0.0f, 1.0f};
+    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
-    vertex.texCoord = {1.0f, 1.0f};
+    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     // top text triangle
     vertex.pos = p1prime;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
-    vertex.texCoord = {1.0f, 1.0f};
+    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i+2)%colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p1;
-    vertex.texCoord = {1.0f, 0.0f};
+    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i+1)%colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
@@ -611,26 +614,26 @@ int DiceModelHedron::getUpFaceIndex(int i) {
     }
 }
 
-void DiceModelTetrahedron::loadModel(TextureAtlas &texAtlas) {
+void DiceModelTetrahedron::loadModel() {
     sides = 4;
 
     glm::vec3 p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
     glm::vec3 q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
     glm::vec3 r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 0, texAtlas);
+    addVertices(p0, q, r, 0);
 
     q = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
     r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 1, texAtlas);
+    addVertices(p0, q, r, 1);
 
     q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
     r = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 2, texAtlas);
+    addVertices(p0, q, r, 2);
 
     p0 = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
     q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
     r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 3, texAtlas);
+    addVertices(p0, q, r, 3);
 
     // indices - not really using these
     for (uint32_t i = 0; i < sides*15; i ++) {
@@ -642,7 +645,7 @@ int DiceModelTetrahedron::getUpFaceIndex(int i) {
     return i;
 }
 
-void DiceModelIcosahedron::loadModel(TextureAtlas &texAtlas) {
+void DiceModelIcosahedron::loadModel() {
     sides = 20;
     float phi = (1+sqrtf(5.0f))/2;
     float scaleFactor = 2;
@@ -652,103 +655,103 @@ void DiceModelIcosahedron::loadModel(TextureAtlas &texAtlas) {
     glm::vec3 p0 = {0.0f, 1.0f/scaleFactor, phi/scaleFactor};
     glm::vec3 q = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
     glm::vec3 r = {-1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     // now for the bottom
     p0 = {0.0f, -1.0f/scaleFactor, -phi/scaleFactor};
     q = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
     r = {-1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     // now the middle
     p0 = {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
     q = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
     r = {-1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = p0;
     p0 = q;
     q = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     r = q;
     q = p0;
     p0 = r;
     r = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     p0 = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
     q =  {phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
     r = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     r = q;
     q = p0;
     p0 = r;
     r = {phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = p0;
     p0 = q;
     q =  {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     r = q;
     q = p0;
     p0 = r;
     r = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     p0 = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
     r = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
     q =  {-1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     r = q;
     q = p0;
     p0 = r;
     r = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     q = r;
     r = p0;
     p0 = q;
     q =  {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    addVertices(p0, q, r, i++, texAtlas);
+    addVertices(p0, q, r, i++);
 
     // indices - not really using these
     for (i = 0; i < sides*15; i ++) {
@@ -760,8 +763,9 @@ int DiceModelIcosahedron::getUpFaceIndex(int i) {
     return i;
 }
 
-void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i, TextureAtlas &texAtlas) {
-    uint32_t textureToUse = texAtlas.getArrayIndex(symbols[i % symbols.size()]);
+void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i) {
+    uint32_t textureToUse = texAtlas->getImageIndex(symbols[i % symbols.size()]);
+    uint32_t totalNbrImages = texAtlas->getNbrImages();
 
     Vertex vertex = {};
 
@@ -830,38 +834,38 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
 
     // bottom texture triangle
     vertex.pos = p1;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i + 1) % colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = c;
-    vertex.texCoord = {0.0f, 1.0f};
+    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i + 2) % colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = d;
-    vertex.texCoord = {1.0f, 1.0f};
+    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i + 2) % colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     // top texture triangle
     vertex.pos = p1;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i + 1) % colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = d;
-    vertex.texCoord = {1.0f, 1.0f};
+    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i + 2) % colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
-    vertex.texCoord = {1.0f, 0.0f};
+    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i + 1) % colors.size()];
     vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
@@ -869,7 +873,7 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
 
 uint32_t const DiceModelDodecahedron::sides = 12;
 
-void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
+void DiceModelDodecahedron::loadModel() {
     float phi = (1+sqrtf(5.0f))/2;
     uint32_t i = 0;
     float scaleFactor = 2.0f;
@@ -880,19 +884,19 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     glm::vec3 c = {-phi, -1.0f/phi, 0.0f};
     glm::vec3 d = {-1.0f, -1.0f, 1.0f};
     glm::vec3 e = {-1.0f/phi, 0.0f, phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = e;
     c = {1.0/phi, 0.0f, phi};
     d = {1.0f, 1.0f, 1.0f};
     e = {0.0f, phi, 1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = e;
     c = {0.0f, phi, -1.0f/phi};
     d = {-1.0f, 1.0f, -1.0f};
     e = {-phi, 1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     // the other side
     a = {1.0f, -1.0f, -1.0f};
@@ -900,19 +904,19 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     d = {phi, 1.0f/phi, 0.0f};
     c = {1.0f, 1.0f, -1.0f};
     b = {1.0f/phi, 0.0f, -phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     e = b;
     d = {-1.0/phi, 0.0f, -phi};
     c = {-1.0f, -1.0f, -1.0f};
     b = {0.0f, -phi, -1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     e = b;
     d = {0.0f, -phi, 1.0f/phi};
     c = {1.0f, -1.0f, 1.0f};
     b = {phi, -1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     // the middle
     a = {-phi, 1.0f/phi, 0.0f};
@@ -920,42 +924,42 @@ void DiceModelDodecahedron::loadModel(TextureAtlas &texAtlas) {
     c = {-1.0f/phi, 0.0f, -phi};
     d = {-1.0f, -1.0f, -1.0f};
     e = {-phi, -1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = e;
     c = d;
     a = {-1.0f, -1.0f, 1.0f};
     d = {0.0f, -phi, -1.0f/phi};
     e = {0.0f, -phi, 1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = a;
     c = e;
     a = {-1.0f/phi, 0.0f, phi};
     d = {1.0f, -1.0f, 1.0f};
     e = {1.0f/phi, 0.0f, phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = e;
     c = d;
     a = {1.0f, 1.0f, 1.0f};
     d = {phi, -1.0f/phi, 0.0f};
     e = {phi, 1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = a;
     c = e;
     a = {0.0f, phi, 1.0f/phi};
     d = {1.0f, 1.0f, -1.0f};
     e = {0.0f, phi, -1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     b = e;
     c = d;
     a = {-1.0f, 1.0f, -1.0f};
     d = {1.0/phi, 0.0f, -phi};
     e = {-1.0/phi, 0.0f, -phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++, texAtlas);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     // indices - not really using these
     for (i = 0; i < sides*5*3; i ++) {

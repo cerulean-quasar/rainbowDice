@@ -122,23 +122,30 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initPipeline(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbol(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
         JNIEnv *env,
         jobject jthis,
-        jstring jsymbol,
+        jobjectArray jSymbols,
+        jint nbrSymbols,
         jint width,
         jint height,
-        jint size,
+        jint imageHeight,
+        jint bitmapSize,
         jbyteArray jbitmap) {
-    const char *csymbol = env->GetStringUTFChars(jsymbol, 0);
-    std::string symbol(csymbol);
-    env->ReleaseStringUTFChars(jsymbol, csymbol);
     jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
-    void *bitmap = malloc(static_cast<size_t>(size));
-    memcpy(bitmap, bytes, static_cast<size_t>(size));
+    std::vector<char> bitmap(static_cast<size_t>(bitmapSize));
+    memcpy(bitmap.data(), bytes, bitmap.size());
     env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
+
+    std::vector<std::string> symbols;
+    for (int i = 0; i < nbrSymbols; i++) {
+        jstring obj = (jstring)env->GetObjectArrayElement(jSymbols, i);
+        std::string symbol(env->GetStringUTFChars(obj, 0));
+        symbols.push_back(symbol);
+    }
+
     try {
-        texAtlas.addSymbol(symbol, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t> (size), bitmap);
+        texAtlas.reset(new TextureAtlasVulkan(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight), bitmap));
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
         return env->NewStringUTF(e.what());

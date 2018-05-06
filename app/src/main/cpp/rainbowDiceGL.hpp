@@ -90,8 +90,8 @@ private:
             }
         }
 
-        void loadModel(TextureAtlas &texAtlas, int width, int height) {
-            die->loadModel(texAtlas);
+        void loadModel(int width, int height) {
+            die->loadModel();
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }

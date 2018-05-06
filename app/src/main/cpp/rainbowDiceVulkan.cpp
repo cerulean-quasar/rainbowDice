@@ -71,9 +71,7 @@ void RainbowDiceVulkan::initPipeline() {
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createCommandPool();
-    for (size_t i = 0; i < dice.size(); i++) {
-        createTextureImages(dice[i]->die->symbols);
-    }
+    createTextureImages();
     createDescriptorPool();
     for (size_t i = 0; i < dice.size(); i++) {
         VkBuffer indexBuffer;
@@ -84,7 +82,7 @@ void RainbowDiceVulkan::initPipeline() {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        dice[i]->loadModel(texAtlas, swapChainExtent.width, swapChainExtent.height);
+        dice[i]->loadModel(swapChainExtent.width, swapChainExtent.height);
         createVertexBuffer(dice[i], vertexBuffer, vertexBufferMemory);
         createIndexBuffer(dice[i], indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
@@ -107,7 +105,9 @@ void RainbowDiceVulkan::cleanup() {
     }
     dice.clear();
 
-    texAtlas.destroy();
+    if (texAtlas.get() != nullptr) {
+        texAtlas->destroy();
+    }
 
     if (logicalDevice != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
@@ -146,9 +146,7 @@ void RainbowDiceVulkan::recreateSwapChain() {
 void RainbowDiceVulkan::recreateModels() {
     createDescriptorSetLayout();
     createCommandPool();
-    for (size_t i = 0; i < dice.size(); i++) {
-        createTextureImages(dice[i]->die->symbols);
-    }
+    createTextureImages();
     createDescriptorPool();
     for (size_t i = 0; i < dice.size(); i++) {
         VkBuffer indexBuffer;
@@ -159,7 +157,7 @@ void RainbowDiceVulkan::recreateModels() {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        dice[i]->loadModel(texAtlas, swapChainExtent.width, swapChainExtent.height);
+        dice[i]->loadModel(swapChainExtent.width, swapChainExtent.height);
         createVertexBuffer(dice[i], vertexBuffer, vertexBufferMemory);
         createIndexBuffer(dice[i], indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
@@ -177,7 +175,7 @@ void RainbowDiceVulkan::destroyModels() {
     }
     dice.clear();
 
-    texAtlas.destroy();
+    texAtlas->destroy();
     vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
 
@@ -1498,7 +1496,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptor
     descriptorWrites[0].pImageInfo = nullptr; // Optional
     descriptorWrites[0].pTexelBufferView = nullptr; // Optional
 
-    std::vector<VkDescriptorImageInfo> imageInfos = texAtlas.getImageInfosForDescriptorSet();
+    std::vector<VkDescriptorImageInfo> imageInfos = texAtlas->getImageInfosForDescriptorSet();
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[1].dstSet = descriptorSet;
@@ -1518,7 +1516,7 @@ void RainbowDiceVulkan::createDescriptorPool() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = dice.size();
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = texAtlas.nbrSymbols() * dice.size();
+    poolSizes[1].descriptorCount = dice.size();
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -1546,7 +1544,7 @@ void RainbowDiceVulkan::createDescriptorSetLayout() {
     VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
     samplerLayoutBinding.binding = 1;
     samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.descriptorCount = texAtlas.nbrSymbols();
+    samplerLayoutBinding.descriptorCount = 1;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
 
@@ -1562,25 +1560,23 @@ void RainbowDiceVulkan::createDescriptorSetLayout() {
     }
 }
 
-void RainbowDiceVulkan::createTextureImages(std::vector<std::string> &symbols) {
-    for (auto symbol : symbols) {
-        if (!texAtlas.hasVulkanTexture(symbol)) {
-            TextureImage image;
-            createTextureImage(image.width, image.height, image.textureImage, image.textureImageMemory, symbol);
-            image.textureImageView = createImageView(image.textureImage, VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-            createTextureSampler(image.textureSampler);
-            texAtlas.addTextureImage(symbol, image);
-        }
-    }
+void RainbowDiceVulkan::createTextureImages() {
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
+
+    createTextureImage(textureImage, textureImageMemory);
+    textureImageView = createImageView(textureImage, VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+    createTextureSampler(textureSampler);
+    texAtlas->addTextureImage(textureImage, textureImageMemory, textureImageView, textureSampler);
 }
 
-void RainbowDiceVulkan::createTextureImage(uint32_t &texWidth, uint32_t &texHeight, VkImage &textureImage, VkDeviceMemory &textureImageMemory, std::string &symbol) {
-    unsigned char *buffer;
-    TextureImage img = texAtlas.getImage(symbol);
-    texHeight = img.height;
-    texWidth = img.width;
-    buffer = static_cast<unsigned char *>(img.bitmap);
-    VkDeviceSize imageSize = img.size;
+void RainbowDiceVulkan::createTextureImage(VkImage &textureImage, VkDeviceMemory &textureImageMemory) {
+    uint32_t texHeight = texAtlas->getTextureHeight();
+    uint32_t texWidth = texAtlas->getImageWidth();
+    char *buffer = (texAtlas->getImage().data());
+    VkDeviceSize imageSize = texAtlas->getImage().size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;

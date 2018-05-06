@@ -162,8 +162,8 @@ private:
             }
         }
 
-        void loadModel(TextureAtlas &texAtlas, int width, int height) {
-            die->loadModel(texAtlas);
+        void loadModel(int width, int height) {
+            die->loadModel();
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }
@@ -290,8 +290,8 @@ private:
     void createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet);
     void createDescriptorPool();
     void createDescriptorSetLayout();
-    void createTextureImages(std::vector<std::string> &symbols);
-    void createTextureImage(uint32_t &texWidth, uint32_t &texHeight, VkImage &textureImage, VkDeviceMemory &textureImageMemory, std::string &symbol);
+    void createTextureImages();
+    void createTextureImage(VkImage &textureImage, VkDeviceMemory &textureImageMemory);
     void createTextureSampler(VkSampler &textureSampler);
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
     void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);

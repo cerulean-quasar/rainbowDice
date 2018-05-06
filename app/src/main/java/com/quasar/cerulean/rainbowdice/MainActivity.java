@@ -336,8 +336,8 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     private void loadModelsAndTextures() {
-        //int TEXWIDTH = 128; //50;
-        //int TEXHEIGHT = 128; //25;
+        int TEXWIDTH = 64;
+        int TEXHEIGHT = 64;
 
         TreeSet<String> symbolSet = new TreeSet<>();
 
@@ -353,33 +353,34 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             }
         }
 
+        Bitmap bitmap = Bitmap.createBitmap(TEXWIDTH, TEXHEIGHT*symbolSet.size(), ALPHA_8);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setUnderlineText(true);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(25.0f);
+        canvas.drawARGB(0,0,0,0);
+        int i = 0;
         for (String symbol : symbolSet) {
-            Bitmap bitmap = Bitmap.createBitmap(Utils.TEXWIDTH, Utils.TEXHEIGHT, Utils.FORMAT);
-            Canvas canvas = new Canvas(bitmap);
-            Paint paint = new Paint();
-            paint.setUnderlineText(true);
-            paint.setTextAlign(Paint.Align.CENTER);
-            paint.setTextSize(25.0f);
-            canvas.drawARGB(0,0,0,0);
-            canvas.drawText(symbol, 40, 40, paint);
-            int bitmapSize = bitmap.getAllocationByteCount();
-            int format = GLUtils.getInternalFormat(bitmap);
-            int type = GLUtils.getType(bitmap);
-            ByteBuffer imageBuffer = ByteBuffer.allocate(bitmapSize);
-            bitmap.copyPixelsToBuffer(imageBuffer);
-            byte[] bytes = new byte[bitmapSize];
-            try {
-                imageBuffer.position(0);
-                imageBuffer.get(bytes);
-            } catch (Exception e) {
-                publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
-                return;
-            }
-            String err = addSymbol(symbol, Utils.TEXWIDTH, Utils.TEXHEIGHT, bitmapSize, bytes);
-            if (err != null && err.length() != 0) {
-                publishError(err);
-                return;
-            }
+            canvas.drawText(symbol, 40, i*TEXHEIGHT + 40, paint);
+            i++;
+        }
+        int bitmapSize = bitmap.getAllocationByteCount();
+        ByteBuffer imageBuffer = ByteBuffer.allocate(bitmapSize);
+        bitmap.copyPixelsToBuffer(imageBuffer);
+        byte[] bytes = new byte[bitmapSize];
+        try {
+            imageBuffer.position(0);
+            imageBuffer.get(bytes);
+        } catch (Exception e) {
+            publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
+            return;
+        }
+        String err = addSymbols(symbolSet.toArray(new String[symbolSet.size()]), symbolSet.size(),
+                TEXWIDTH, TEXHEIGHT*symbolSet.size(), TEXHEIGHT, bitmapSize, bytes);
+        if (err != null && err.length() != 0) {
+            publishError(err);
+            return;
         }
 
         // now load the models. Some of the vertices depend on the size of the texture image.
@@ -407,7 +408,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void startDrawing(SurfaceHolder holder) {
-        boolean usingVulkan = true;
+        boolean usingVulkan = false;
         Surface drawSurface = holder.getSurface();
         String err = initWindow(usingVulkan, drawSurface);
         if (err != null && err.length() != 0) {
@@ -518,7 +519,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private native void recreateModels();
     private native void recreateSwapChain();
     private native void loadModel(String[] symbols);
-    private native String addSymbol(String symbol, int width, int height, int bitmapSize, byte[] bitmap);
+    private native String addSymbols(String[] symbols, int nbrSymbols, int width, int height, int heightImage, int bitmapSize, byte[] bitmap);
     private native void roll();
     private native void reRoll(int[] indices);
     private native String initSensors();

@@ -37,11 +37,12 @@ extern VkDevice logicalDevice;
 
 #include "text.hpp"
 #include "rainbowDice.hpp"
+#include "TextureAtlasVulkan.h"
 #include <memory>
 #include <GLES2/gl2.h>
 
 //extern std::unique_ptr<RainbowDice> diceGraphics;
-extern TextureAtlas texAtlas;
+extern std::unique_ptr<TextureAtlasVulkan> texAtlas;
 
 GLuint loadTexture(uint32_t width, uint32_t height, uint32_t size, void *data);
 
