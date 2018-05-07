@@ -22,6 +22,7 @@ add_library( # Sets the name of the library.
              src/main/cpp/rainbowDiceGL.cpp
              src/main/cpp/rainbowDiceAndroid.cpp
              src/main/cpp/rainbowDiceGlobal.cpp
+             src/main/cpp/vulkanWrapper.cpp
              src/main/cpp/dice.cpp)
 
 add_library( # Sets the name of the library.
@@ -49,20 +50,13 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
-find_library( # Sets the name of the path variable.
-              vulkan-lib
-
-              # Specifies the name of the NDK library that
-              # you want CMake to locate.
-              vulkan )
-
 include_directories(${ANDROID_NDK}/sysroot/usr/include/android)
 include_directories(${ANDROID_NDK}/sources/third_party/vulkan/src/libs)
 include_directories(APP_GLUE_DIR ${ANDROID_NDK}/sources/android/native_app_glue)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -std=c++14")
 
 target_compile_definitions(native-lib PUBLIC -DVK_USE_PLATFORM_ANDROID_KHR)
-target_compile_definitions(native-lib-glonly PUBLIC -DRAINBOWDICE_GLONLY)
+target_compile_definitions(native-lib-glonly PUBLIC -DRAINBOWDICE_GLONLY -DVK_USE_PLATFORM_ANDROID_KHR)
 
 
 # Specifies libraries CMake should link to your target library. You
@@ -77,8 +71,7 @@ target_link_libraries( # Specifies the target library.
                        ${log-lib}
                        EGL
                        GLESv2
-                       android
-                       ${vulkan-lib})
+                       android)
 
 target_link_libraries( # Specifies the target library.
                        native-lib-glonly

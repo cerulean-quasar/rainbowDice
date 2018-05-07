@@ -71,13 +71,13 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             System.loadLibrary("native-lib");
             loadedLibrary = true;
         } catch (UnsatisfiedLinkError e) {
-            System.out.println("Could not load library: native-lib");
+            System.out.println("Could not load library: native-lib: " + (e.getMessage() != null ? e.getMessage() : "<no error message>"));
         }
         if (!loadedLibrary) {
             try {
                 System.loadLibrary("native-lib-glonly");
             } catch (UnsatisfiedLinkError e) {
-                System.out.println("Could not load library: native-lib-glonly");
+                System.out.println("Could not load library: native-lib-glonly" + (e.getMessage() != null ? e.getMessage() : "<no error message>"));
             }
         }
     }

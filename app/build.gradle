@@ -2,7 +2,6 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 27
-    buildToolsVersion "27.0.3"
     defaultConfig {
         applicationId "com.quasar.cerulean.rainbowdice"
         minSdkVersion 15
@@ -17,7 +16,6 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments "-DANDROID_PLATFORM=android-24"
                 cppFlags "-std=c++14"
             }
         }

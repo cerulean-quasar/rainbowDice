@@ -31,7 +31,7 @@
 #include <string>
 #include <array>
 #include <chrono>
-#include <vulkan/vulkan.h>
+#include "vulkanWrapper.hpp"
 
 struct Vertex {
     glm::vec3 pos;

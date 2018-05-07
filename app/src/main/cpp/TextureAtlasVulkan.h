@@ -5,7 +5,7 @@
 #ifndef RAINBOWDICE_TEXTUREATLASVULKAN_H
 #define RAINBOWDICE_TEXTUREATLASVULKAN_H
 
-#include <vulkan/vulkan.h>
+#include "vulkanWrapper.hpp"
 #include "text.hpp"
 #include "rainbowDiceGlobal.hpp"
 

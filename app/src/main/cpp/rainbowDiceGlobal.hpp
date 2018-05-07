@@ -34,7 +34,7 @@ extern const std::string SHADER_FRAG_FILE;
 
 /* logical device we are using */
 #ifndef RAINBOWDICE_GLONLY
-#include <vulkan/vulkan.h>
+#include "vulkanWrapper.hpp"
 extern VkDevice logicalDevice;
 #endif
 

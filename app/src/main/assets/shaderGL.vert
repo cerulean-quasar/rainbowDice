@@ -10,7 +10,7 @@ varying vec3 fragColor;
 varying vec2 fragTexCoord;
 
 void main() {
-    gl_Position = MVP * vec4(inPosition, 1.0);
     fragColor = inColor;
     fragTexCoord = inTexCoord;
+    gl_Position = MVP * vec4(inPosition, 1.0);
 }

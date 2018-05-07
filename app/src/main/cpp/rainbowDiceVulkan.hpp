@@ -19,7 +19,7 @@
  */
 #ifndef RAINBOWDICE_VULKAN_HPP
 #define RAINBOWDICE_VULKAN_HPP
-#include <vulkan/vulkan.h>
+#include "vulkanWrapper.hpp"
 
 #include <stdexcept>
 #include <functional>

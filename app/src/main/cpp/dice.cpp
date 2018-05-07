@@ -30,11 +30,11 @@
 #include "rainbowDiceGlobal.hpp"
 
 const float DicePhysicsModel::errorVal = 0.15f;
-const float DicePhysicsModel::viscosity = 0.002f;
-const float DicePhysicsModel::maxposx = 0.5f;
-const float DicePhysicsModel::maxposy = 0.5f;
-const float DicePhysicsModel::maxposz = 1.0f;
+const float DicePhysicsModel::viscosity = 2.0f;
 const float DicePhysicsModel::radius = 0.2f;
+const float DicePhysicsModel::maxposx = 0.5f;
+const float DicePhysicsModel::maxposy = 0.8f;
+const float DicePhysicsModel::maxposz = 1.0f;
 const std::vector<glm::vec3> DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
         {1.0f, 0.5f, 0.0f}, // orange
@@ -175,12 +175,12 @@ void DicePhysicsModel::updateModelMatrix() {
     }
     if (position.y < -maxposy) {
         position.y = -maxposy;
-    } else if (position.y > maxposy){
+    } else if (position.y > maxposy) {
         position.y = maxposy;
     }
     if (position.z < -maxposz) {
         position.z = -maxposz;
-    } else if (position.z > maxposz){
+    } else if (position.z > maxposz) {
         position.z = maxposz;
     }
 
@@ -232,10 +232,10 @@ void DicePhysicsModel::updateModelMatrix() {
 
             velocity.z *= -1;
         }
-        velocity -= glm::normalize(velocity) * viscosity * speed * speed;
+        velocity -= velocity * viscosity * time;
     }
 
-    velocity = velocity + acceleration * time;
+    velocity += acceleration * time;
 
     if ((position.z > maxposz || maxposz - position.z < errorVal) && fabs(velocity.z) < errorVal) {
         stopped = true;
@@ -253,7 +253,7 @@ void DicePhysicsModel::updateModelMatrix() {
     if (angularSpeed != 0 && glm::length(spinAxis) > 0) {
         glm::quat q = glm::angleAxis(angularSpeed*time, spinAxis);
         qTotalRotated = glm::normalize(q * qTotalRotated);
-        angularSpeed -= viscosity * angularSpeed * angularSpeed;
+        angularSpeed -= viscosity * angularSpeed * time;
     }
 
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));

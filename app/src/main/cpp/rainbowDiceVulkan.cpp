@@ -56,6 +56,9 @@ void DestroyDebugReportCallbackEXT(VkInstance instance,
 
 void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
     window = inWindow;
+    if (!loadVulkan()) {
+        throw std::runtime_error("Could not find vulkan library.");
+    }
     createInstance();
 
     setupDebugCallback();
@@ -120,9 +123,11 @@ void RainbowDiceVulkan::cleanup() {
         vkDestroyDevice(logicalDevice, nullptr);
     }
 
-    DestroyDebugReportCallbackEXT(instance, callback, nullptr);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
+    if (instance != VK_NULL_HANDLE) {
+        DestroyDebugReportCallbackEXT(instance, callback, nullptr);
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroyInstance(instance, nullptr);
+    }
 
     destroyWindow();
 }
