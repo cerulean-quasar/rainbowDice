@@ -66,19 +66,10 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     // Used to load the 'native-lib' library on application startup.
     static {
-        boolean loadedLibrary = false;
         try {
             System.loadLibrary("native-lib");
-            loadedLibrary = true;
         } catch (UnsatisfiedLinkError e) {
             System.out.println("Could not load library: native-lib: " + (e.getMessage() != null ? e.getMessage() : "<no error message>"));
-        }
-        if (!loadedLibrary) {
-            try {
-                System.loadLibrary("native-lib-glonly");
-            } catch (UnsatisfiedLinkError e) {
-                System.out.println("Could not load library: native-lib-glonly" + (e.getMessage() != null ? e.getMessage() : "<no error message>"));
-            }
         }
     }
 
