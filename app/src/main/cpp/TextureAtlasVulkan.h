@@ -21,7 +21,7 @@ public:
         : TextureAtlas(symbols, inWidth, inHeightTexture, inHeightImage, inBitmap), hasTexture(false){}
 
     bool hasVulkanTexture(std::string symbol) {return hasTexture;}
-    void destroy() {
+    void destroy(VkDevice logicalDevice) {
         if (hasTexture) {
             vkDestroySampler(logicalDevice, textureSampler, nullptr);
             vkDestroyImageView(logicalDevice, textureImageView, nullptr);

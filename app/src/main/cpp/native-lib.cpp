@@ -24,6 +24,7 @@
 #include <native_window.h>
 #include <native_window_jni.h>
 #include <sensor.h>
+#include <atomic>
 #include "rainbowDice.hpp"
 #include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
@@ -35,21 +36,31 @@
 #include "TextureAtlasVulkan.h"
 #endif
 
+/* Used to communicate between the gui thread and the drawing thread.  When the GUI thread wants
+ * the drawer to stop drawing, cleanup, and exit, it sets this value to true.  The GUI will set
+ * this value to false before starting a new drawer.
+ */
+std::atomic<bool> stopDrawing(false);
+
+
+/* The following data are per program data and are to be accessed by one thread at a time.
+ * Note: there are only two threads in this program; the drawer and the GUI.  Some of the data
+ * below are set up by one thread and accessed by another but are guaranteed to not be accessed at
+ * the same time because when the GUI thread sets up the data, the drawer has not started yet, or
+ * has exited and been joined by the GUI.
+ */
 // microseconds
 int const MAX_EVENT_REPORT_TIME = 20000;
 
-// event identifier for identifying an event that occurs during a poll.
+// event identifier for identifying an event that occurs during a poll.  It doesn't matter what this
+// value is, it just has to be unique among all the other sensors the program receives events for.
 int const EVENT_TYPE_ACCELEROMETER = 462;
 
-bool stopDrawing = false;
-bool reported = false;
-bool rolling = false;
 ASensorManager *sensorManager = nullptr;
 ASensor const *sensor = nullptr;
 ASensorEventQueue *eventQueue = nullptr;
 ALooper *looper = nullptr;
-std::unique_ptr<RainbowDice> diceGraphics(nullptr);
-JNIEnv *sEnv = nullptr;
+std::unique_ptr<RainbowDice> diceGraphics;
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_initSensors(
@@ -115,7 +126,6 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initPipeline(
         JNIEnv *env,
         jobject jthis) {
     try {
-        sEnv = env;
         diceGraphics->initPipeline();
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
@@ -210,14 +220,13 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
         JNIEnv *env,
         jobject jthis)
 {
-    if (!rolling || stopDrawing) {
+    if (stopDrawing.load()) {
         // There is nothing to do.  Just return, no results, no error.
         return env->NewStringUTF("");
     }
 
     try {
         diceGraphics->initThread();
-        reported = false;
         int rc = ASensorEventQueue_enableSensor(eventQueue, sensor);
         if (rc < 0) {
             return env->NewStringUTF("error: Could not enable sensor");
@@ -227,11 +236,12 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
 
         rc = ASensorEventQueue_setEventRate(eventQueue, sensor, minDelay);
         if (rc < 0) {
+            ASensorEventQueue_disableSensor(eventQueue, sensor);
             diceGraphics->cleanupThread();
             return env->NewStringUTF("error: Could not set event rate");
         }
         std::vector<std::string> results;
-        while (!stopDrawing) {
+        while (!stopDrawing.load()) {
             rc = ASensorEventQueue_hasEvents(eventQueue);
             if (rc > 0) {
                 std::vector<ASensorEvent> events;
@@ -239,6 +249,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
                 ssize_t nbrEvents = ASensorEventQueue_getEvents(eventQueue, events.data(), events.size());
                 if (nbrEvents < 0) {
                     // an error has occurred
+                    ASensorEventQueue_disableSensor(eventQueue, sensor);
                     diceGraphics->cleanupThread();
                     return env->NewStringUTF("error: Error on retrieving sensor events.");
                 }
@@ -254,27 +265,20 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
             diceGraphics->updateUniformBuffer();
             diceGraphics->drawFrame();
             if (diceGraphics->allStopped()) {
-                rolling = false;
                 ASensorEventQueue_disableSensor(eventQueue, sensor);
-                if (!reported) {
-                    results = diceGraphics->getDiceResults();
-                    std::string totalResult;
-                    for (auto result : results) {
-                        totalResult += result + "\n";
-                    }
-                    totalResult[totalResult.length() - 1] = '\0';
-                    reported = true;
-                    diceGraphics->cleanupThread();
-                    return env->NewStringUTF(totalResult.c_str());
-                } else {
-                    diceGraphics->cleanupThread();
-                    return env->NewStringUTF("");
+                results = diceGraphics->getDiceResults();
+                std::string totalResult;
+                for (auto result : results) {
+                    totalResult += result + "\n";
                 }
+                totalResult[totalResult.length() - 1] = '\0';
+                ASensorEventQueue_disableSensor(eventQueue, sensor);
+                diceGraphics->cleanupThread();
+                return env->NewStringUTF(totalResult.c_str());
             }
         }
     } catch (std::runtime_error &e) {
         // no need to draw another frame - we are failing.
-        stopDrawing = true;
         ASensorEventQueue_disableSensor(eventQueue, sensor);
         diceGraphics->cleanupThread();
         return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
@@ -289,7 +293,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_tellDrawerStop(
         JNIEnv *env,
         jobject jthis) {
-    stopDrawing = true;
+    stopDrawing.store(true);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -330,7 +334,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateModels(
         JNIEnv *env,
         jobject jthis) {
     diceGraphics->recreateModels();
-    stopDrawing = false;
+    stopDrawing.store(false);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -338,15 +342,14 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateSwapChain(
         JNIEnv *env,
         jobject jthis) {
     diceGraphics->recreateSwapChain();
-    stopDrawing = false;
+    stopDrawing.store(false);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_roll(
         JNIEnv *env,
         jobject jthis) {
-    stopDrawing = false;
-    rolling = true;
+    stopDrawing.store(false);
     diceGraphics->resetPositions();
 }
 
@@ -363,7 +366,6 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
         indices.insert(cIndices[i]);
     }
     env->ReleaseIntArrayElements(jIndices, cIndices, JNI_COMMIT);
-    stopDrawing = false;
-    rolling = true;
+    stopDrawing.store(false);
     diceGraphics->resetPositions(indices);
 }

@@ -25,28 +25,14 @@
 
 typedef ANativeWindow WindowType;
 
-extern const int WIDTH;
-extern const int HEIGHT;
-extern const double INVALID_MOUSE_POSITION;
-
 extern const std::string SHADER_VERT_FILE;
 extern const std::string SHADER_FRAG_FILE;
 
-/* logical device we are using */
-#ifndef RAINBOWDICE_GLONLY
-#include "vulkanWrapper.hpp"
-extern VkDevice logicalDevice;
-#endif
-
-#include "text.hpp"
 #include "rainbowDice.hpp"
 #include "text.hpp"
 #include <memory>
 #include <GLES2/gl2.h>
 
-//extern std::unique_ptr<RainbowDice> diceGraphics;
 extern std::unique_ptr<TextureAtlas> texAtlas;
-
-GLuint loadTexture(uint32_t width, uint32_t height, uint32_t size, void *data);
 
 #endif

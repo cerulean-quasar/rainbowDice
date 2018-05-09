@@ -24,9 +24,5 @@
 const std::string SHADER_VERT_FILE = "vertexShader";
 const std::string SHADER_FRAG_FILE = "fragmentShader";
 
-#ifndef RAINBOWDICE_GLONLY
-VkDevice logicalDevice = VK_NULL_HANDLE;
-#endif
-
 std::unique_ptr<TextureAtlas> texAtlas;
 

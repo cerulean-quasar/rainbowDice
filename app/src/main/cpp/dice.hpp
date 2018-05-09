@@ -79,6 +79,68 @@ private:
     glm::vec3 _spinAxis;
 };
 
+/* for applying a high pass filter on the acceleration sample data */
+class Filter {
+private:
+    std::chrono::high_resolution_clock::time_point highPassAccelerationPrevTime;
+    static const unsigned long highPassAccelerationMaxSize;
+    struct high_pass_samples {
+        glm::vec3 output;
+        glm::vec3 input;
+        float dt;
+    };
+    std::deque<high_pass_samples> highPassAcceleration;
+
+public:
+    Filter()
+        :highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()) {
+
+    }
+    glm::vec3 acceleration(glm::vec3 sensorInputs) {
+        float RC = 3.0f;
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
+
+        highPassAccelerationPrevTime = currentTime;
+
+        unsigned long size = highPassAcceleration.size();
+        glm::vec3 acceleration(0.0f, 0.0f, 0.0f);
+
+        if (size == 0) {
+            high_pass_samples sample;
+            acceleration = sample.output = sample.input = sensorInputs;
+            sample.dt = dt;
+            highPassAcceleration.push_back(sample);
+        } else {
+            glm::vec3 nextOut;
+            for (unsigned long i=1; i < size; i++) {
+                high_pass_samples &sample = highPassAcceleration[i];
+                high_pass_samples &prev = highPassAcceleration[i-1];
+                float alpha = RC/(RC+sample.dt);
+                sample.output = alpha*(prev.output + sample.input - prev.input);
+
+            }
+            high_pass_samples sample;
+            float alpha = RC/(RC+dt);
+            high_pass_samples &prev = highPassAcceleration.back();
+            sample.output = alpha*(prev.output + sensorInputs - prev.input);
+            sample.input = sensorInputs;
+            sample.dt = dt;
+            highPassAcceleration.push_back(sample);
+            if (size + 1 > highPassAccelerationMaxSize) {
+                highPassAcceleration.pop_front();
+            }
+
+            if (size < 100) {
+                acceleration = sample.output;
+            } else {
+                acceleration = 20.0f * sample.output + sensorInputs - sample.output;
+            }
+        }
+        return acceleration;
+    }
+};
+
 class DiceModel {
 public:
     std::vector<std::string> symbols;
@@ -123,17 +185,10 @@ private:
     static float const radius;
     static float const angularSpeedScaleFactor;
 
-    std::chrono::high_resolution_clock::time_point prevTime;
+    /* for the accelerometer data.  These data are saved between dice creation and deletion. */
+    static Filter filter;
 
-    /* for applying a high pass filter on the acceleration sample data */
-    std::chrono::high_resolution_clock::time_point highPassAccelerationPrevTime;
-    static const unsigned long highPassAccelerationMaxSize;
-    struct high_pass_samples {
-        glm::vec3 output;
-        glm::vec3 input;
-        float dt;
-    };
-    std::deque<high_pass_samples> highPassAcceleration;
+    std::chrono::high_resolution_clock::time_point prevTime;
 
     /* rotation */
     AngularVelocity angularVelocity;
@@ -152,7 +207,6 @@ public:
 
     DicePhysicsModel(std::vector<std::string> &inSymbols)
         : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()),
-          highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f), stopped(false)
     {
@@ -160,7 +214,6 @@ public:
 
     DicePhysicsModel(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
         : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()),
-          highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false)
     {

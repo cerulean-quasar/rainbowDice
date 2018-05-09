@@ -1,6 +1,7 @@
 #ifndef RAINBOWDICE_HPP
 #define RAINBOWDICE_HPP
 #include <set>
+#include <vector>
 #include "rainbowDiceGlobal.hpp"
 
 class RainbowDice {

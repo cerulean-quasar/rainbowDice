@@ -43,9 +43,10 @@ std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {0.0f, 0.0f, 1.0f}, // blue
         {1.0f, 0.0f, 1.0f}  // purple
 };
-unsigned long const DicePhysicsModel::highPassAccelerationMaxSize = 512;
+unsigned long const Filter::highPassAccelerationMaxSize = 512;
 float const DicePhysicsModel::angularSpeedScaleFactor = 5.0f;
 float const AngularVelocity::maxAngularSpeed = 10.0f;
+Filter DicePhysicsModel::filter;
 
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
     VkVertexInputBindingDescription bindingDescription = {};
@@ -116,7 +117,6 @@ void DicePhysicsModel::updatePerspectiveMatrix(int surfaceWidth, int surfaceHeig
 
 void DicePhysicsModel::resetPosition() {
     prevTime = std::chrono::high_resolution_clock::now();
-    highPassAccelerationPrevTime = std::chrono::high_resolution_clock::now();
     stopped = false;
     position = glm::vec3();
     velocity = glm::vec3();
@@ -127,47 +127,8 @@ void DicePhysicsModel::resetPosition() {
 }
 
 void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
-    float RC = 3.0f;
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
-
-    highPassAccelerationPrevTime = currentTime;
-
     glm::vec3 a = {x,y,z};
-
-    unsigned long size = highPassAcceleration.size();
-
-    if (size == 0) {
-        high_pass_samples sample;
-        acceleration = sample.output = sample.input = a;
-        sample.dt = dt;
-        highPassAcceleration.push_back(sample);
-    } else {
-        glm::vec3 nextOut;
-        for (unsigned long i=1; i < size; i++) {
-            high_pass_samples &sample = highPassAcceleration[i];
-            high_pass_samples &prev = highPassAcceleration[i-1];
-            float alpha = RC/(RC+sample.dt);
-            sample.output = alpha*(prev.output + sample.input - prev.input);
-
-        }
-        high_pass_samples sample;
-        float alpha = RC/(RC+dt);
-        high_pass_samples &prev = highPassAcceleration.back();
-        sample.output = alpha*(prev.output + a - prev.input);
-        sample.input = a;
-        sample.dt = dt;
-        highPassAcceleration.push_back(sample);
-        if (size + 1 > highPassAccelerationMaxSize) {
-            highPassAcceleration.pop_front();
-        }
-
-        if (size < 100) {
-            acceleration = sample.output;
-        } else {
-            acceleration = 20.0f * sample.output + a - sample.output;
-        }
-    }
+    acceleration = filter.acceleration(a);
 }
 
 void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {

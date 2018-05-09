@@ -110,6 +110,7 @@ private:
         std::vector<VkPresentModeKHR> presentModes;
     };
 
+    static VkDevice logicalDevice;
     VkInstance instance = VK_NULL_HANDLE;
     VkDebugReportCallbackEXT callback = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;

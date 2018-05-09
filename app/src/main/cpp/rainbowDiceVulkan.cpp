@@ -21,6 +21,8 @@
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
 
+VkDevice RainbowDiceVulkan::logicalDevice = VK_NULL_HANDLE;
+
 /**
  * Call used to allocate a debug report callback so that you can get error
  * messages from Vulkan. This Vulkan function is from an extension, so you
@@ -109,8 +111,8 @@ void RainbowDiceVulkan::cleanup() {
     }
     dice.clear();
 
-    if (texAtlas.get() != nullptr) {
-        ((TextureAtlasVulkan*)texAtlas.get())->destroy();
+    if (texAtlas.get() != nullptr && logicalDevice != VK_NULL_HANDLE) {
+        ((TextureAtlasVulkan*)texAtlas.get())->destroy(logicalDevice);
     }
 
     if (logicalDevice != VK_NULL_HANDLE) {
@@ -181,7 +183,7 @@ void RainbowDiceVulkan::destroyModels() {
     }
     dice.clear();
 
-    ((TextureAtlasVulkan*)texAtlas.get())->destroy();
+    ((TextureAtlasVulkan*)texAtlas.get())->destroy(logicalDevice);
     vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
 
