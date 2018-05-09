@@ -28,6 +28,7 @@
 #include <glm/gtx/transform.hpp>
 
 #include <vector>
+#include <deque>
 #include <string>
 #include <array>
 #include <chrono>
@@ -48,6 +49,34 @@ struct UniformBufferObject {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+};
+
+class AngularVelocity {
+public:
+    AngularVelocity(float inAngularSpeed, glm::vec3 inSpinAxis) {
+        _spinAxis = inSpinAxis;
+        setAngularSpeed(inAngularSpeed);
+    }
+    float speed() {
+        return _angularSpeed;
+    }
+    glm::vec3 spinAxis() {
+        return _spinAxis;
+    }
+    void setAngularSpeed(float inAngularSpeed) {
+        if (inAngularSpeed > maxAngularSpeed) {
+            _angularSpeed = maxAngularSpeed;
+        } else {
+            _angularSpeed = inAngularSpeed;
+        }
+    }
+    void setSpinAxis(glm::vec3 inSpinAxis) {
+        _spinAxis = inSpinAxis;
+    }
+private:
+    static float const maxAngularSpeed;
+    float _angularSpeed;
+    glm::vec3 _spinAxis;
 };
 
 class DiceModel {
@@ -85,18 +114,29 @@ protected:
     static const std::vector<glm::vec3> colors;
     glm::quat qTotalRotated;
 private:
-    static const float maxposx;
-    static const float maxposy;
-    static const float maxposz;
-    static const float gravity;
-    static const float viscosity;
-    static const float errorVal;
-    static const float radius;
+    static float const maxposx;
+    static float const maxposy;
+    static float const maxposz;
+    static float const gravity;
+    static float const viscosity;
+    static float const errorVal;
+    static float const radius;
+    static float const angularSpeedScaleFactor;
+
     std::chrono::high_resolution_clock::time_point prevTime;
 
+    /* for applying a high pass filter on the acceleration sample data */
+    std::chrono::high_resolution_clock::time_point highPassAccelerationPrevTime;
+    static const unsigned long highPassAccelerationMaxSize;
+    struct high_pass_samples {
+        glm::vec3 output;
+        glm::vec3 input;
+        float dt;
+    };
+    std::deque<high_pass_samples> highPassAcceleration;
+
     /* rotation */
-    float angularSpeed;
-    glm::vec3 spinAxis;
+    AngularVelocity angularVelocity;
 
     /* position */
     glm::vec3 acceleration;
@@ -111,12 +151,18 @@ public:
     UniformBufferObject ubo = {};
 
     DicePhysicsModel(std::vector<std::string> &inSymbols)
-        : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()), angularSpeed(0.0f), stopped(false)
+        : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()),
+          highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()),
+          angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
+          velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f), stopped(false)
     {
     }
 
     DicePhysicsModel(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
-        : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()), angularSpeed(0.0f),spinAxis(0.0f,0.0f,0.0f), velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false)
+        : DiceModel(inSymbols), qTotalRotated(), prevTime(std::chrono::high_resolution_clock::now()),
+          highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()),
+          angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
+          velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false)
     {
     }
 

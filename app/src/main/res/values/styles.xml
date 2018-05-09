@@ -36,4 +36,16 @@
         <item name="divider">@drawable/sky_vine</item>
         <item name="android:textSize">17dp</item>
     </style>
+
+    <style name="Trees" parent="Theme.AppCompat.Light">
+        <item name="android:textColor">#000000</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowBackground">@drawable/trees</item>
+        <item name="round_button_clicked">@drawable/trees_bird_red</item>
+        <item name="round_button_unclicked">@drawable/trees_bird</item>
+        <item name="rounded_rectangle_clicked">@drawable/trees_flower_red</item>
+        <item name="rounded_rectangle_unclicked">@drawable/trees_flower</item>
+        <item name="divider">@drawable/trees_branch</item>
+        <item name="android:textSize">17dp</item>
+    </style>
 </resources>

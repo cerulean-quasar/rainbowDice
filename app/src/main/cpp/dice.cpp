@@ -29,13 +29,13 @@
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
 
-const float DicePhysicsModel::errorVal = 0.15f;
-const float DicePhysicsModel::viscosity = 2.0f;
-const float DicePhysicsModel::radius = 0.2f;
-const float DicePhysicsModel::maxposx = 0.5f;
-const float DicePhysicsModel::maxposy = 0.8f;
-const float DicePhysicsModel::maxposz = 1.0f;
-const std::vector<glm::vec3> DicePhysicsModel::colors = {
+float const DicePhysicsModel::errorVal = 0.15f;
+float const DicePhysicsModel::viscosity = 2.0f;
+float const DicePhysicsModel::radius = 0.2f;
+float const DicePhysicsModel::maxposx = 0.5f;
+float const DicePhysicsModel::maxposy = 0.5f;
+float const DicePhysicsModel::maxposz = 1.0f;
+std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
         {1.0f, 0.5f, 0.0f}, // orange
         {1.0f, 1.0f, 0.0f}, // yellow
@@ -43,6 +43,9 @@ const std::vector<glm::vec3> DicePhysicsModel::colors = {
         {0.0f, 0.0f, 1.0f}, // blue
         {1.0f, 0.0f, 1.0f}  // purple
 };
+unsigned long const DicePhysicsModel::highPassAccelerationMaxSize = 512;
+float const DicePhysicsModel::angularSpeedScaleFactor = 5.0f;
+float const AngularVelocity::maxAngularSpeed = 10.0f;
 
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
     VkVertexInputBindingDescription bindingDescription = {};
@@ -113,19 +116,58 @@ void DicePhysicsModel::updatePerspectiveMatrix(int surfaceWidth, int surfaceHeig
 
 void DicePhysicsModel::resetPosition() {
     prevTime = std::chrono::high_resolution_clock::now();
+    highPassAccelerationPrevTime = std::chrono::high_resolution_clock::now();
     stopped = false;
     position = glm::vec3();
     velocity = glm::vec3();
     qTotalRotated = glm::quat();
     acceleration = glm::vec3();
-    angularSpeed = 0;
-    spinAxis = glm::vec3();
+    angularVelocity.setAngularSpeed(0);
+    angularVelocity.setSpinAxis(glm::vec3());
 }
 
 void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
-    acceleration.x = x;
-    acceleration.y = y;
-    acceleration.z = z;
+    float RC = 3.0f;
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
+
+    highPassAccelerationPrevTime = currentTime;
+
+    glm::vec3 a = {x,y,z};
+
+    unsigned long size = highPassAcceleration.size();
+
+    if (size == 0) {
+        high_pass_samples sample;
+        acceleration = sample.output = sample.input = a;
+        sample.dt = dt;
+        highPassAcceleration.push_back(sample);
+    } else {
+        glm::vec3 nextOut;
+        for (unsigned long i=1; i < size; i++) {
+            high_pass_samples &sample = highPassAcceleration[i];
+            high_pass_samples &prev = highPassAcceleration[i-1];
+            float alpha = RC/(RC+sample.dt);
+            sample.output = alpha*(prev.output + sample.input - prev.input);
+
+        }
+        high_pass_samples sample;
+        float alpha = RC/(RC+dt);
+        high_pass_samples &prev = highPassAcceleration.back();
+        sample.output = alpha*(prev.output + a - prev.input);
+        sample.input = a;
+        sample.dt = dt;
+        highPassAcceleration.push_back(sample);
+        if (size + 1 > highPassAccelerationMaxSize) {
+            highPassAcceleration.pop_front();
+        }
+
+        if (size < 100) {
+            acceleration = sample.output;
+        } else {
+            acceleration = 20.0f * sample.output + a - sample.output;
+        }
+    }
 }
 
 void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
@@ -202,10 +244,13 @@ void DicePhysicsModel::updateModelMatrix() {
         if (position.x > maxposx || position.x < -maxposx) {
             /* the die will start to spin when it hits the wall */
             glm::vec3 spinAxisAdded = glm::cross(velocity,glm::vec3(1.0f, 0.0f, 0.0f));
-            spinAxis = spinAxis + spinAxisAdded;
+            glm::vec3 spinAxis = angularVelocity.spinAxis() + spinAxisAdded;
             if (glm::length(spinAxis) > 0) {
                 spinAxis = glm::normalize(spinAxis);
-                angularSpeed += 10*glm::length(glm::vec3(0.0f, velocity.y, velocity.z));
+                angularVelocity.setSpinAxis(spinAxis);
+                float angularSpeed = angularVelocity.speed();
+                angularSpeed += angularSpeedScaleFactor*glm::length(glm::vec3(0.0f, velocity.y, velocity.z));
+                angularVelocity.setAngularSpeed(angularSpeed);
             }
 
             velocity.x *= -1;
@@ -213,10 +258,13 @@ void DicePhysicsModel::updateModelMatrix() {
         if (position.y > maxposy || position.y < -maxposy) {
             /* the die will start to spin when it hits the wall */
             glm::vec3 spinAxisAdded = glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), velocity);
-            spinAxis = spinAxis + spinAxisAdded;
+            glm::vec3 spinAxis = angularVelocity.spinAxis() + spinAxisAdded;
             if (glm::length(spinAxis) > 0) {
                 spinAxis = glm::normalize(spinAxis);
-                angularSpeed += 10*glm::length(glm::vec3(velocity.x, 0.0f, velocity.z));
+                angularVelocity.setSpinAxis(spinAxis);
+                float angularSpeed = angularVelocity.speed();
+                angularSpeed += angularSpeedScaleFactor*glm::length(glm::vec3(0.0f, velocity.y, velocity.z));
+                angularVelocity.setAngularSpeed(angularSpeed);
             }
 
             velocity.y *= -1;
@@ -224,10 +272,13 @@ void DicePhysicsModel::updateModelMatrix() {
         if (position.z > maxposz || position.z < -maxposz) {
             /* the die will start to spin when it hits the wall */
             glm::vec3 spinAxisAdded = glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), velocity);
-            spinAxis = spinAxis + spinAxisAdded;
+            glm::vec3 spinAxis = angularVelocity.spinAxis() + spinAxisAdded;
             if (glm::length(spinAxis) > 0) {
                 spinAxis = glm::normalize(spinAxis);
-                angularSpeed += 10*glm::length(glm::vec3(velocity.x, velocity.y, 0.0f));
+                angularVelocity.setSpinAxis(spinAxis);
+                float angularSpeed = angularVelocity.speed();
+                angularSpeed += angularSpeedScaleFactor*glm::length(glm::vec3(0.0f, velocity.y, velocity.z));
+                angularVelocity.setAngularSpeed(angularSpeed);
             }
 
             velocity.z *= -1;
@@ -243,17 +294,19 @@ void DicePhysicsModel::updateModelMatrix() {
         std::string upFaceSymbol = calculateUpFace();
         result = upFaceSymbol;
 
-        angularSpeed = 0;
+        angularVelocity.setAngularSpeed(0);
         velocity.x = 0;
         velocity.y = 0;
         velocity.z = 0;
         position.z = maxposz;
     }
 
-    if (angularSpeed != 0 && glm::length(spinAxis) > 0) {
-        glm::quat q = glm::angleAxis(angularSpeed*time, spinAxis);
+    if (angularVelocity.speed() != 0 && glm::length(angularVelocity.spinAxis()) > 0) {
+        glm::quat q = glm::angleAxis(angularVelocity.speed()*time, angularVelocity.spinAxis());
         qTotalRotated = glm::normalize(q * qTotalRotated);
+        float angularSpeed = angularVelocity.speed();
         angularSpeed -= viscosity * angularSpeed * time;
+        angularVelocity.setAngularSpeed(angularSpeed);
     }
 
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));

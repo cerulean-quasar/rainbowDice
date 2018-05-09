@@ -39,6 +39,7 @@
     <string-array name="themeArray">
         <item>Space</item>
         <item>Sky</item>
+        <item>Trees</item>
     </string-array>
     <string-array name="operationArray">
         <item>@string/addition</item>
