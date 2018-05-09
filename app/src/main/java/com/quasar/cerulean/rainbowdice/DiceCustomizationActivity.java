@@ -500,6 +500,54 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             return;
         }
 
+        // Repopulate the dice config from the screen first. In case the user changed something
+        // there and the field has not lost focus yet.
+        if (configBeingEdited >= 0) {
+            DieConfiguration config = diceConfigs.get(configBeingEdited).config;
+
+            EditText diceField = findViewById(R.id.number_of_dice);
+            String stringDiceField = diceField.getText().toString();
+            int nbrDice = config.getNumberOfDice();
+            if (!stringDiceField.isEmpty()) {
+                nbrDice = Integer.valueOf(stringDiceField);
+                config.setNumberOfDice(nbrDice);
+            }
+
+            diceField = findViewById(R.id.die_start);
+            stringDiceField = diceField.getText().toString();
+            int start = config.getStartAt();
+            if (!stringDiceField.isEmpty()) {
+                start = Integer.valueOf(stringDiceField);
+                config.setStartAt(start);
+            }
+
+            diceField = findViewById(R.id.die_next);
+            stringDiceField = diceField.getText().toString();
+            int increment = config.getIncrement();
+            if (!stringDiceField.isEmpty()) {
+                increment = Integer.valueOf(stringDiceField) - start;
+                config.setIncrement(increment);
+            }
+
+            diceField = findViewById(R.id.die_reroll);
+            stringDiceField = diceField.getText().toString();
+            int reroll = config.getReRollOn();
+            if (!stringDiceField.isEmpty()) {
+                reroll = Integer.valueOf(stringDiceField);
+                config.setReRollOn(reroll);
+            }
+
+            diceField = findViewById(R.id.otherText);
+            if (diceField.isEnabled()) {
+                stringDiceField = diceField.getText().toString();
+                int nbrSides = config.getNumberOfSides();
+                if (!stringDiceField.isEmpty()) {
+                    nbrSides = Integer.valueOf(stringDiceField);
+                    config.setNumberOfSides(nbrSides);
+                }
+            }
+        }
+
         String json;
         try {
             JSONArray jsonArray = new JSONArray();

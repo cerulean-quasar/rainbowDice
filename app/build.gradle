@@ -4,7 +4,7 @@ android {
     compileSdkVersion 27
     defaultConfig {
         applicationId "com.quasar.cerulean.rainbowdice"
-        minSdkVersion 15
+        minSdkVersion 21
         targetSdkVersion 27
         versionCode 6
         versionName "1.5"
