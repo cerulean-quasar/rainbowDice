@@ -22,7 +22,9 @@ package com.quasar.cerulean.rainbowdice;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
+import android.os.Parcelable;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -41,6 +43,7 @@ import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -87,7 +90,14 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_dice_customization);
+
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            setContentView(R.layout.activity_dice_customization_landscape);
+            LinearLayout layout = findViewById(R.id.dice_list);
+            layout.setOrientation(LinearLayout.VERTICAL);
+        } else {
+            setContentView(R.layout.activity_dice_customization);
+        }
 
         diceSidesButtons = new Button[11];
         int i = 0;
@@ -104,25 +114,38 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         diceSidesButtons[i++] = findViewById(R.id.otherButton);
 
         DieConfiguration[] configs = null;
-        Intent intent = getIntent();
-        String filename = intent.getStringExtra(Constants.DICE_FILENAME);
-        if (filename != null && !filename.isEmpty()) {
-            try {
-                FileInputStream inputStream = openFileInput(filename);
-                configs = DieConfiguration.loadFromFile(inputStream);
-                inputStream.close();
-                saveFileName = filename;
-            } catch (FileNotFoundException e) {
-                System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-                filename = null;
-            } catch (IOException e) {
-                System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
-                filename = null;
+        Parcelable[] parcelableConfigs = null;
+        if (savedInstanceState != null) {
+            parcelableConfigs = savedInstanceState.getParcelableArray(Constants.DICE_CONFIGURATION);
+        }
+        if (parcelableConfigs != null) {
+            i = 0;
+            configs = new DieConfiguration[parcelableConfigs.length];
+            for (Parcelable parcelableConfig : parcelableConfigs) {
+                configs[i++] = (DieConfiguration) parcelableConfig;
             }
+            saveFileName = savedInstanceState.getString(Constants.DICE_FILENAME);
+        } else {
+            Intent intent = getIntent();
+            String filename = intent.getStringExtra(Constants.DICE_FILENAME);
+            if (filename != null && !filename.isEmpty()) {
+                try {
+                    FileInputStream inputStream = openFileInput(filename);
+                    configs = DieConfiguration.loadFromFile(inputStream);
+                    inputStream.close();
+                    saveFileName = filename;
+                } catch (FileNotFoundException e) {
+                    System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
+                    filename = null;
+                } catch (IOException e) {
+                    System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
+                    filename = null;
+                }
 
+            }
         }
 
-        if (filename == null) {
+        if (configs == null) {
             // load the default configuration
             configs = new DieConfiguration[1];
             configs[0] = new DieConfiguration(1, 6, 1, 1, -1, true);
@@ -254,6 +277,26 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         });
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle instanceState) {
+        super.onSaveInstanceState(instanceState);
+
+        //  First gather up the data on the screen and update the config being edited with it.
+        updateConfigFromScreen();
+
+        // save all the configs to the instance state.
+        DieConfiguration[] dice = new DieConfiguration[diceConfigs.size()];
+        int i=0;
+        for (DiceGuiConfig die : diceConfigs) {
+            dice[i++] = die.config;
+        }
+
+        instanceState.putParcelableArray(Constants.DICE_CONFIGURATION, dice);
+
+        if (saveFileName != null) {
+            instanceState.putString(Constants.DICE_FILENAME, saveFileName);
+        }
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -434,13 +477,24 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         editConfig(diceConfigs.size() - 1);
 
         // Scroll to the end
-        HorizontalScrollView scrollViewDice = findViewById(R.id.scrollViewDice);
-        scrollViewDice.fullScroll(View.FOCUS_RIGHT);
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
+            HorizontalScrollView scrollViewDice = findViewById(R.id.scrollViewDice);
+            scrollViewDice.fullScroll(View.FOCUS_RIGHT);
+        } else {
+            ScrollView scrollViewDice = findViewById(R.id.scrollViewDiceLandscape);
+            scrollViewDice.fullScroll(View.FOCUS_DOWN);
+        }
     }
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
         // the user selected an operation in the operation spinner, we need to update the
         // appropriate DieConfiguration.
+
+        if (view == null) {
+            // I'm not sure why we get null here when the screen rotates...
+            return;
+        }
+
         ViewParent item = parent.getParent();
         LinearLayout layoutDiceList = findViewById(R.id.dice_list);
         int nbrItems = layoutDiceList.getChildCount();
@@ -456,11 +510,11 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             return;
         }
 
-        TextView text = (TextView)view;
+        TextView text = (TextView) view;
         if (text.getText().toString().equals(getString(R.string.addition))) {
-            diceConfigs.get(i/2+1).config.setIsAddOperation(true);
+            diceConfigs.get(i / 2 + 1).config.setIsAddOperation(true);
         } else {
-            diceConfigs.get(i/2+1).config.setIsAddOperation(false);
+            diceConfigs.get(i / 2 + 1).config.setIsAddOperation(false);
         }
     }
 
@@ -500,7 +554,39 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             return;
         }
 
-        // Repopulate the dice config from the screen first. In case the user changed something
+        updateConfigFromScreen();
+
+        String json;
+        try {
+            JSONArray jsonArray = new JSONArray();
+            for (DiceGuiConfig diceConfig : diceConfigs) {
+                JSONObject obj = diceConfig.config.toJSON();
+                jsonArray.put(obj);
+            }
+            json = jsonArray.toString();
+        } catch (JSONException e) {
+            System.out.println("Exception in writing out JSON: " + e.getMessage());
+            return;
+        }
+
+        try {
+            FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+            outputStream.write(json.getBytes());
+            outputStream.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
+            return;
+        } catch (IOException e) {
+            System.out.println("Exception on writing to file: " + filename + " message: " + e.getMessage());
+            return;
+        }
+
+        saveDialog.dismiss();
+        saveDialog = null;
+    }
+
+    private void updateConfigFromScreen() {
+        // Repopulate the dice config from the screen in case the user changed something
         // there and the field has not lost focus yet.
         if (configBeingEdited >= 0) {
             DieConfiguration config = diceConfigs.get(configBeingEdited).config;
@@ -547,34 +633,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 }
             }
         }
-
-        String json;
-        try {
-            JSONArray jsonArray = new JSONArray();
-            for (DiceGuiConfig diceConfig : diceConfigs) {
-                JSONObject obj = diceConfig.config.toJSON();
-                jsonArray.put(obj);
-            }
-            json = jsonArray.toString();
-        } catch (JSONException e) {
-            System.out.println("Exception in writing out JSON: " + e.getMessage());
-            return;
-        }
-
-        try {
-            FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-            outputStream.write(json.getBytes());
-            outputStream.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-            return;
-        } catch (IOException e) {
-            System.out.println("Exception on writing to file: " + filename + " message: " + e.getMessage());
-            return;
-        }
-
-        saveDialog.dismiss();
-        saveDialog = null;
     }
 
     private void configsToView(DieConfiguration[] configs) {

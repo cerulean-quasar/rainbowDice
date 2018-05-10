@@ -21,11 +21,10 @@
 package com.quasar.cerulean.rainbowdice;
 
 public class Constants {
-    public static final int NBR_FAVORITES = 3;
-
     // For starting new activities specifying intents, etc
     public static final int DICE_CUSTOMIZATION_ACTIVITY = 2;
     public static final String DICE_FILENAME = "DiceFileName";
+    public static final String DICE_CONFIGURATION = "DiceConfiguration";
 
     public static final int DICE_THEME_SELECTION_ACTIVITY = 3;
     public static final String themeNameConfigValue = "ThemeName";
