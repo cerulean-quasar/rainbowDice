@@ -23,6 +23,7 @@
         <item name="rounded_rectangle_clicked">@drawable/space_nebula2</item>
         <item name="rounded_rectangle_unclicked">@drawable/space_nebula1</item>
         <item name="divider">@drawable/space_supernova</item>
+        <item name="android:textSize">20sp</item>
     </style>
 
     <style name="Sky" parent="Theme.AppCompat.Light">
@@ -34,7 +35,7 @@
         <item name="rounded_rectangle_clicked">@drawable/sky_butterfly_colorful</item>
         <item name="rounded_rectangle_unclicked">@drawable/sky_butterfly_yellow</item>
         <item name="divider">@drawable/sky_vine</item>
-        <item name="android:textSize">17dp</item>
+        <item name="android:textSize">20sp</item>
     </style>
 
     <style name="Trees" parent="Theme.AppCompat.Light">
@@ -46,6 +47,6 @@
         <item name="rounded_rectangle_clicked">@drawable/trees_flower_red</item>
         <item name="rounded_rectangle_unclicked">@drawable/trees_flower</item>
         <item name="divider">@drawable/trees_branch</item>
-        <item name="android:textSize">17dp</item>
+        <item name="android:textSize">20sp</item>
     </style>
 </resources>

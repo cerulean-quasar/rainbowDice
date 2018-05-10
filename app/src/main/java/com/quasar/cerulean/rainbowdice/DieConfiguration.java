@@ -187,4 +187,6 @@ public class DieConfiguration implements Parcelable {
     public void setIsAddOperation(boolean in) {
         isAdditionOperation = in;
     }
+
+    public boolean isRepresentableByTwoTenSided() { return numberOfSides == 100 && startAt <= 1 && startAt >= 0 && increment == 1;}
 }

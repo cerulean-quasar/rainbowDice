@@ -347,9 +347,24 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             int nbrSides = dieConfig.getNumberOfSides();
             int startOn = dieConfig.getStartAt();
             int increment = dieConfig.getIncrement();
-            for (int j = 0; j < nbrSides; j++) {
-                String symbol = String.format(Locale.getDefault(), "%d", startOn + increment*j);
-                symbolSet.add(symbol);
+            if (dieConfig.isRepresentableByTwoTenSided()) {
+                // special case a d100 die to be represented by two 10 sided dice, one for the ten's
+                // place and one for the one's place.
+                for (int j = 0; j < 10; j++) {
+                    String symbol = String.format(Locale.getDefault(), "%d", startOn + increment * j);
+                    symbolSet.add(symbol);
+                }
+
+                for (int j = 0; j < 10; j++) {
+                    String symbol = String.format(Locale.getDefault(), "%d", 10 * j);
+                    symbolSet.add(symbol);
+                }
+
+            } else {
+                for (int j = 0; j < nbrSides; j++) {
+                    String symbol = String.format(Locale.getDefault(), "%d", startOn + increment * j);
+                    symbolSet.add(symbol);
+                }
             }
         }
 
@@ -389,12 +404,31 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             int nbrSides = dieConfig.getNumberOfSides();
             int startOn = dieConfig.getStartAt();
             int increment = dieConfig.getIncrement();
-            String[] symbols = new String[nbrSides];
-            for (int j = 0; j < nbrSides; j++) {
-                symbols[j] = String.format(Locale.getDefault(), "%d", startOn + increment*j);
-            }
-            for (int j = 0; j < nbrDice; j++){
-                loadModel(symbols);
+            if (dieConfig.isRepresentableByTwoTenSided()) {
+                // special case a d100 die to be represented by two 10 sided dice, one for the ten's
+                // place and one for the one's place.
+                String[] symbolsOnes = new String[10];
+                String[] symbolsTens = new String[10];
+                for (int j = 0; j < 10; j++) {
+                    symbolsOnes[j] = String.format(Locale.getDefault(), "%d", startOn + increment * j);
+                }
+
+                for (int j = 0; j < 10; j++) {
+                    symbolsTens[j] = String.format(Locale.getDefault(), "%d", 10 * j);
+                }
+
+                for (int j = 0; j < nbrDice; j++) {
+                    loadModel(symbolsTens);
+                    loadModel(symbolsOnes);
+                }
+            } else {
+                String[] symbols = new String[nbrSides];
+                for (int j = 0; j < nbrSides; j++) {
+                    symbols[j] = String.format(Locale.getDefault(), "%d", startOn + increment * j);
+                }
+                for (int j = 0; j < nbrDice; j++){
+                    loadModel(symbols);
+                }
             }
         }
 

@@ -45,24 +45,38 @@ public class DiceResult {
         diceResults = new ArrayList<>();
         String[] values = result.split("\n");
         int i=0;
-        boolean isAddOperationPrevious = true;
         for (DieConfiguration die: diceConfigurations) {
             int numberOfDice = die.getNumberOfDice();
             boolean isAddOperation = die.isAddOperation();
             int reRollOn = die.getReRollOn();
             for (int j = 0; j < numberOfDice; j++) {
-                ArrayList<DieResult> dieResults = new ArrayList<>();
                 boolean needsReRoll = false;
-                int value = Integer.valueOf(values[i]);
-                if (value == reRollOn) {
-                    needsReRoll = true;
+                if (die.isRepresentableByTwoTenSided()) {
+                    ArrayList<DieResult> dieResults = new ArrayList<>();
+                    ArrayList<DieResult> dieResults2 = new ArrayList<>();
+                    int value = Integer.valueOf(values[i++]);
+                    int value2 = Integer.valueOf(values[i]);
+                    if (value + value2 == reRollOn) {
+                        needsReRoll = true;
+                    }
+                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation);
+                    dieResults.add(dieResult);
+                    diceResults.add(dieResults);
+                    dieResult = new DieResult(value2, needsReRoll, isAddOperation);
+                    dieResults2.add(dieResult);
+                    diceResults.add(dieResults2);
+                } else {
+                    ArrayList<DieResult> dieResults = new ArrayList<>();
+                    int value = Integer.valueOf(values[i]);
+                    if (value == reRollOn) {
+                        needsReRoll = true;
+                    }
+                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation);
+                    dieResults.add(dieResult);
+                    diceResults.add(dieResults);
                 }
-                DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation);
-                dieResults.add(dieResult);
-                diceResults.add(dieResults);
                 i++;
             }
-            isAddOperationPrevious = isAddOperation;
         }
     }
 
