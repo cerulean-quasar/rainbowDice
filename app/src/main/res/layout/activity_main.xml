@@ -16,34 +16,46 @@
                 android:layout_height="wrap_content"
                 android:text="@string/diceMessageToStartRolling"/>
         </LinearLayout>
-        <GridLayout
+        <LinearLayout
             android:orientation="vertical"
-            android:rowCount="1"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content">
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
             <Button
                 android:id="@+id/mainFavorite1"
                 android:onClick="onFavoriteClick"
                 android:background="@null"
+                android:paddingEnd="5dp"
+                android:paddingStart="5dp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Button
                 android:id="@+id/mainFavorite2"
                 android:onClick="onFavoriteClick"
                 android:background="@null"
+                android:paddingEnd="5dp"
+                android:paddingStart="5dp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             <Button
                 android:id="@+id/mainFavorite3"
                 android:onClick="onFavoriteClick"
                 android:background="@null"
+                android:paddingEnd="5dp"
+                android:paddingStart="5dp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
+            </LinearLayout>
             <Spinner
                 android:id="@+id/mainOtherSpinner"
-                android:layout_width="wrap_content"
+                android:paddingEnd="5dp"
+                android:paddingStart="5dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"/>
-        </GridLayout>
+        </LinearLayout>
         <SurfaceView
             android:id="@+id/drawingSurface"
             android:layout_width="match_parent"
