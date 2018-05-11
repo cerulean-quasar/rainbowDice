@@ -95,6 +95,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             setContentView(R.layout.activity_dice_customization_landscape);
             LinearLayout layout = findViewById(R.id.dice_list);
             layout.setOrientation(LinearLayout.VERTICAL);
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(R.attr.background_landscape, value, true);
+            getWindow().setBackgroundDrawableResource(value.resourceId);
         } else {
             setContentView(R.layout.activity_dice_customization);
         }

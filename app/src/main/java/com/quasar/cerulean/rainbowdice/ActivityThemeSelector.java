@@ -21,6 +21,7 @@
 package com.quasar.cerulean.rainbowdice;
 
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.TypedValue;
@@ -47,6 +48,13 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         }
 
         super.onCreate(savedInstanceState);
+
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(R.attr.background_landscape, value, true);
+            getWindow().setBackgroundDrawableResource(value.resourceId);
+        }
+
         initializeGui(true);
     }
 
@@ -90,6 +98,9 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
     }
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+        if (view == null) {
+            return;
+        }
         TextView text = (TextView) view;
 
         String themeName = text.getText().toString();
@@ -106,9 +117,15 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         configurationFile.setThemeName(themeName);
         setTheme(themeId);
 
-        TypedValue value = new TypedValue();
-        getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
-        getWindow().setBackgroundDrawableResource(value.resourceId);
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(R.attr.background_landscape, value, true);
+            getWindow().setBackgroundDrawableResource(value.resourceId);
+        } else {
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
+            getWindow().setBackgroundDrawableResource(value.resourceId);
+        }
 
         initializeGui(false);
     }

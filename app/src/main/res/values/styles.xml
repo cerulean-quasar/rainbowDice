@@ -6,6 +6,7 @@
     <attr name="rounded_rectangle_unclicked" format="reference"/>
     <attr name="divider" format="reference"/>
     <attr name="divider_vertical" format="reference"/>
+    <attr name="background_landscape" format="reference"/>
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -25,6 +26,7 @@
         <item name="rounded_rectangle_unclicked">@drawable/space_nebula1</item>
         <item name="divider">@drawable/space_supernova</item>
         <item name="divider_vertical">@drawable/space_supernova_vertical</item>
+        <item name="background_landscape">@drawable/space_landscape</item>
         <item name="android:textSize">20sp</item>
     </style>
 
@@ -38,6 +40,7 @@
         <item name="rounded_rectangle_unclicked">@drawable/sky_butterfly_yellow</item>
         <item name="divider">@drawable/sky_vine</item>
         <item name="divider_vertical">@drawable/sky_vine_vertical</item>
+        <item name="background_landscape">@drawable/sky_landscape</item>
         <item name="android:textSize">20sp</item>
     </style>
 
@@ -51,6 +54,7 @@
         <item name="rounded_rectangle_unclicked">@drawable/trees_flower</item>
         <item name="divider">@drawable/trees_branch</item>
         <item name="divider_vertical">@drawable/trees_branch_vertical</item>
+        <item name="background_landscape">@drawable/trees_landscape</item>
         <item name="android:textSize">20sp</item>
     </style>
 </resources>

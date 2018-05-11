@@ -148,6 +148,10 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
         // the user selected a dice configuration to roll.  We need to load it and roll the dice
+        if (view == null) {
+            return;
+        }
+
         TextView item = view.findViewById(R.id.list_item);
         String filename = item.getText().toString();
         if (filename.isEmpty()) {

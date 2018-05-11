@@ -20,8 +20,10 @@
 package com.quasar.cerulean.rainbowdice;
 
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -54,6 +56,12 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dice_configuration);
+
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(R.attr.background_landscape, value, true);
+            getWindow().setBackgroundDrawableResource(value.resourceId);
+        }
 
         resetFileList();
         resetFavoriteSpinners();
