@@ -384,6 +384,14 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     public void onDiceListItemClick(View view) {
+        // first gather the data from the screen and update the config.  So that you get the config
+        // value changes where the focus has not been lost yet.
+        updateConfigFromScreen();
+
+        // then update the dice list item with the updated config values
+        repopulateCurrentListItemFromConfig();
+
+        // now switch the active dice set.
         int i = 0;
         for (DiceGuiConfig cfg : diceConfigs) {
             if (cfg.button == view) {
@@ -431,6 +439,13 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     public void onNew(View view) {
+        // first gather the data from the screen and update the config.  So that you get the config
+        // value changes where the focus has not been lost yet.
+        updateConfigFromScreen();
+
+        // then update the dice list item with the updated config values
+        repopulateCurrentListItemFromConfig();
+
         LinearLayout layoutDiceList = findViewById(R.id.dice_list);
         LayoutInflater inflater = getLayoutInflater();
 

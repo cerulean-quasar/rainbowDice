@@ -85,9 +85,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     protected void onCreate(Bundle savedInstanceState) {
         configurationFile = new ConfigurationFile(this);
 
-        diceConfig = new DieConfiguration[1];
-        diceConfig[0] = new DieConfiguration(4, 6, 1, 1, 0, true);
-
         String themeName = configurationFile.getTheme();
         if (themeName != null && !themeName.isEmpty()) {
             int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
@@ -96,6 +93,9 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
         super.onCreate(savedInstanceState);
         initGui();
+
+        diceConfig = new DieConfiguration[1];
+        loadFromFile(configurationFile.getFavorite1());
     }
 
     void initGui() {
