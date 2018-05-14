@@ -76,7 +76,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
-    private boolean dropDownClickMeansRoll = true;
     private Thread drawer;
     private DieConfiguration[] diceConfig;
     private DiceResult diceResult = null;
@@ -98,7 +97,14 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         initGui();
 
         logFile = new LogFile(this);
-        loadFromFile(configurationFile.getFavorite1());
+        TextView text = findViewById(R.id.rollResult);
+        text.setText(R.string.diceMessageStartup);
+        if (configurationFile.getFavorite1()==null) {
+            diceConfig = new DieConfiguration[1];
+            diceConfig[1] = new DieConfiguration(1, 6, 1, 1, 0, true);
+        } else {
+            loadFromFile(configurationFile.getFavorite1());
+        }
     }
 
     void initGui() {
@@ -171,11 +177,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         startDrawing(drawSurfaceHolder);
-        if (dropDownClickMeansRoll) {
-            rollTheDice();
-        } else {
-            dropDownClickMeansRoll = true;
-        }
     }
 
     public void onNothingSelected(AdapterView<?> parent) {
@@ -232,14 +233,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void onConfigure(MenuItem item) {
-        dropDownClickMeansRoll = false;
         joinDrawer();
         Intent intent = new Intent(this, DiceConfigurationActivity.class);
         startActivityForResult(intent, DICE_CONFIGURATION_ACTIVITY);
     }
 
     public void onOpenLogFile(MenuItem item) {
-        dropDownClickMeansRoll = false;
         joinDrawer();
         Intent intent = new Intent(this, DiceLogActivity.class);
         startActivityForResult(intent, Constants.DICE_LOG_FILE_ACTIVITY);
@@ -250,7 +249,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void onSelectTheme(MenuItem item) {
-        dropDownClickMeansRoll = false;
         joinDrawer();
         Intent intent = new Intent(this, ActivityThemeSelector.class);
         startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);

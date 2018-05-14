@@ -20,6 +20,7 @@
     <string name="diceConfigStart">start</string>
     <string name="diceConfigIncrement">next</string>
     <string name="diceConfigReRoll">reroll on</string>
+    <string name="diceMessageStartup">Select a favorite below or click on an item from the drop down list then click "Roll" to roll the dice.</string>
     <string name="D2">D2</string>
     <string name="D3">D3</string>
     <string name="D4">D4</string>
