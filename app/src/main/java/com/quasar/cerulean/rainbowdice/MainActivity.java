@@ -76,10 +76,13 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
+    private boolean dropDownClickMeansRoll = true;
     private Thread drawer;
     private DieConfiguration[] diceConfig;
     private DiceResult diceResult = null;
     private ConfigurationFile configurationFile;
+    private LogFile logFile;
+    private String diceFileLoaded;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,7 +97,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         super.onCreate(savedInstanceState);
         initGui();
 
-        diceConfig = new DieConfiguration[1];
+        logFile = new LogFile(this);
         loadFromFile(configurationFile.getFavorite1());
     }
 
@@ -114,6 +117,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     protected void onPause() {
         super.onPause();
         joinDrawer();
+        logFile.writeFile();
     }
 
     @Override
@@ -126,16 +130,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     protected void onStart() {
         super.onStart();
         diceResult = null;
-        rollTheDice();
-        startDrawer();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         diceResult = null;
-        rollTheDice();
-        startDrawer();
     }
 
     @Override
@@ -171,6 +171,11 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         startDrawing(drawSurfaceHolder);
+        if (dropDownClickMeansRoll) {
+            rollTheDice();
+        } else {
+            dropDownClickMeansRoll = true;
+        }
     }
 
     public void onNothingSelected(AdapterView<?> parent) {
@@ -195,6 +200,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         startDrawing(drawSurfaceHolder);
+        rollTheDice();
     }
 
     @Override
@@ -226,9 +232,17 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void onConfigure(MenuItem item) {
+        dropDownClickMeansRoll = false;
         joinDrawer();
         Intent intent = new Intent(this, DiceConfigurationActivity.class);
         startActivityForResult(intent, DICE_CONFIGURATION_ACTIVITY);
+    }
+
+    public void onOpenLogFile(MenuItem item) {
+        dropDownClickMeansRoll = false;
+        joinDrawer();
+        Intent intent = new Intent(this, DiceLogActivity.class);
+        startActivityForResult(intent, Constants.DICE_LOG_FILE_ACTIVITY);
     }
 
     public void onRoll(MenuItem item) {
@@ -236,13 +250,14 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     public void onSelectTheme(MenuItem item) {
+        dropDownClickMeansRoll = false;
         joinDrawer();
         Intent intent = new Intent(this, ActivityThemeSelector.class);
         startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
     }
 
     private void loadFromFile(String filename) {
-        StringBuffer json = new StringBuffer();
+        StringBuilder json = new StringBuilder();
 
         try {
             byte[] bytes = new byte[1024];
@@ -275,17 +290,18 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             System.out.println("Exception on reading JSON from file: " + filename + " message: " + e.getMessage());
             return;
         }
-
+        diceFileLoaded = filename;
     }
 
     private void resetFavorites() {
         configurationFile = new ConfigurationFile(this);
 
-        String[] excludeFiles = new String[4];
+        String[] excludeFiles = new String[5];
         excludeFiles[0] = ConfigurationFile.configFile;
         excludeFiles[1] = configurationFile.getFavorite1();
         excludeFiles[2] = configurationFile.getFavorite2();
         excludeFiles[3] = configurationFile.getFavorite3();
+        excludeFiles[4] = LogFile.diceLogFilename;
         Spinner other = findViewById(R.id.mainOtherSpinner);
         FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
         other.setAdapter(spinAdapter1);
@@ -495,7 +511,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         }
 
         surfaceReady = true;
-        rollTheDice();
     }
 
     private byte[] readAssetFile(boolean nullAppend, String filename) {
@@ -533,6 +548,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
                 // no dice need reroll, just update the results text view with the results.
                 text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
                         getString(R.string.addition), getString(R.string.subtraction)));
+                logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
                 diceResult = null;
             } else {
                 text.setText(getString(R.string.diceMessageReRoll));

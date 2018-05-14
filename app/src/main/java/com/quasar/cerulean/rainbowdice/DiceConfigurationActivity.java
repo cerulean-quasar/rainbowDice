@@ -83,8 +83,9 @@ public class DiceConfigurationActivity extends AppCompatActivity {
     }
 
     private void resetFavoriteSpinners() {
-        String[] excludeFiles = new String[1];
+        String[] excludeFiles = new String[2];
         excludeFiles[0] = ConfigurationFile.configFile;
+        excludeFiles[1] = LogFile.diceLogFilename;
         Spinner spinner1 = findViewById(R.id.favorite1);
         FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
         spinner1.setAdapter(spinAdapter1);

@@ -36,6 +36,7 @@
     <string name="rerollText">re-roll on: %d</string>
     <string name="themeTextDisplay">Text for this theme</string>
     <string name="selectTheme">Select a Theme</string>
+    <string name="openLogFile">Open Log File</string>
     <string-array name="themeArray">
         <item>Space</item>
         <item>Sky</item>

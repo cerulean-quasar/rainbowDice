@@ -28,4 +28,6 @@ public class Constants {
 
     public static final int DICE_THEME_SELECTION_ACTIVITY = 3;
     public static final String themeNameConfigValue = "ThemeName";
+
+    public static final int DICE_LOG_FILE_ACTIVITY = 4;
 }

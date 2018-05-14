@@ -19,6 +19,7 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.content.res.Resources;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -28,6 +29,7 @@ import org.json.JSONObject;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Locale;
 
 public class DieConfiguration implements Parcelable {
     private int numberOfDice;
@@ -189,4 +191,30 @@ public class DieConfiguration implements Parcelable {
     }
 
     public boolean isRepresentableByTwoTenSided() { return numberOfSides == 100 && startAt <= 1 && startAt >= 0 && increment == 1;}
+
+    public String toString() {
+        if (reRollOn >= startAt) {
+            return String.format(Locale.getDefault(), "%dD%d (%d, %d,...,%d reroll on %d)",
+                    numberOfDice, numberOfSides, startAt, startAt + increment, startAt + (numberOfSides - 1) * increment, reRollOn);
+        } else {
+            return String.format(Locale.getDefault(), "%dD%d (%d, %d,...,%d)",
+                    numberOfDice, numberOfSides, startAt, startAt + increment, startAt + (numberOfSides - 1) * increment);
+        }
+    }
+
+    public static String arrayToString(DieConfiguration[] arr) {
+        StringBuilder stringRepresentation = new StringBuilder();
+        for (int i = 0; i < arr.length; i++) {
+            if (i != 0) {
+                if (arr[i].isAddOperation()) {
+                    stringRepresentation.append(" + ");
+                } else {
+                    stringRepresentation.append(" - ");
+                }
+            }
+            stringRepresentation.append(arr[i].toString());
+        }
+
+        return stringRepresentation.toString();
+    }
 }
