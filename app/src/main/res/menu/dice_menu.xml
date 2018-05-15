@@ -2,12 +2,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/editMenuItem"
-        android:title="@string/roll"
-        app:showAsAction="ifRoom"
-        android:onClick="onRoll"
-        />
-    <item
         android:title="@string/openLogFile"
         android:onClick="onOpenLogFile"
         />

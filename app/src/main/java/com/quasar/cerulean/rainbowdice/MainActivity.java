@@ -158,6 +158,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
         // the user selected a dice configuration to roll.  We need to load it and roll the dice
+        /*
         if (view == null) {
             return;
         }
@@ -169,18 +170,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         }
 
         joinDrawer();
-        /*
-        destroyModels();
-        loadFromFile(filename);
-        loadModelsAndTextures();
-        recreateModels();
-        rollTheDice();
-        */
         destroySurface();
         loadFromFile(filename);
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         startDrawing(drawSurfaceHolder);
+        */
     }
 
     public void onNothingSelected(AdapterView<?> parent) {
@@ -248,7 +243,28 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         startActivityForResult(intent, Constants.DICE_LOG_FILE_ACTIVITY);
     }
 
-    public void onRoll(MenuItem item) {
+    public void onRoll(View view) {
+        Spinner spinner = findViewById(R.id.mainOtherSpinner);
+        View viewSelected = spinner.getSelectedView();
+        if (viewSelected == null) {
+            return;
+        }
+        TextView text = viewSelected.findViewById(R.id.list_item);
+        String filename = text.getText().toString();
+
+        joinDrawer();
+        /*
+        destroyModels();
+        loadFromFile(filename);
+        loadModelsAndTextures();
+        recreateModels();
+        rollTheDice();
+        */
+        destroySurface();
+        loadFromFile(filename);
+        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        startDrawing(drawSurfaceHolder);
         rollTheDice();
     }
 

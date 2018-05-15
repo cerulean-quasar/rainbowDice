@@ -27,7 +27,7 @@
             <Button
                 android:id="@+id/mainFavorite1"
                 android:onClick="onFavoriteClick"
-                android:background="@null"
+                android:background="#40808080"
                 android:paddingEnd="5dp"
                 android:paddingStart="5dp"
                 android:layout_width="wrap_content"
@@ -35,7 +35,7 @@
             <Button
                 android:id="@+id/mainFavorite2"
                 android:onClick="onFavoriteClick"
-                android:background="@null"
+                android:background="#40808080"
                 android:paddingEnd="5dp"
                 android:paddingStart="5dp"
                 android:layout_width="wrap_content"
@@ -43,18 +43,36 @@
             <Button
                 android:id="@+id/mainFavorite3"
                 android:onClick="onFavoriteClick"
-                android:background="@null"
+                android:background="#40808080"
                 android:paddingEnd="5dp"
                 android:paddingStart="5dp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
             </LinearLayout>
-            <Spinner
-                android:id="@+id/mainOtherSpinner"
-                android:paddingEnd="5dp"
-                android:paddingStart="5dp"
+            <ImageView
+                android:contentDescription="divider"
+                android:src="?attr/divider"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+            <LinearLayout
+                android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content">
+                <Spinner
+                    android:id="@+id/mainOtherSpinner"
+                    android:paddingEnd="5dp"
+                    android:paddingStart="5dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+                <Button
+                    android:onClick="onRoll"
+                    android:text="@string/roll"
+                    android:background="#40808080"
+                    android:paddingEnd="5dp"
+                    android:paddingStart="5dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
         </LinearLayout>
         <SurfaceView
             android:id="@+id/drawingSurface"
