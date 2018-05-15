@@ -574,26 +574,15 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         updateConfigFromScreen();
 
-        String json;
-        try {
-            JSONArray jsonArray = new JSONArray();
-            for (DiceGuiConfig diceConfig : diceConfigs) {
-                JSONObject obj = diceConfig.config.toJSON();
-                jsonArray.put(obj);
-            }
-            json = jsonArray.toString();
-        } catch (JSONException e) {
-            System.out.println("Exception in writing out JSON: " + e.getMessage());
-            return;
+        DieConfiguration[] configs = new DieConfiguration[diceConfigs.size()];
+        for (int i = 0; i < configs.length; i++) {
+            configs[i] = diceConfigs.get(i).config;
         }
 
         try {
             FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-            outputStream.write(json.getBytes());
+            DieConfiguration.saveToFile(outputStream, configs);
             outputStream.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-            return;
         } catch (IOException e) {
             System.out.println("Exception on writing to file: " + filename + " message: " + e.getMessage());
             return;

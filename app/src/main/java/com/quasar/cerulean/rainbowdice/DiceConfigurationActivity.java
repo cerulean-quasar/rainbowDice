@@ -73,7 +73,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         LayoutInflater inflater = getLayoutInflater();
         File[] filearr = getFilesDir().listFiles();
         for (File file : filearr) {
-            if (!file.getName().equals(ConfigurationFile.configFile)) {
+            if (!file.getName().equals(ConfigurationFile.configFile) && !file.getName().equals(LogFile.diceLogFilename)) {
                 LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
                 TextView text = layout.findViewById(R.id.filename);
                 text.setText(file.getName());
@@ -195,6 +195,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         if (text != null) {
             String filename = text.getText().toString();
             configurationFile.setFavorite1(filename);
+        } else {
+            configurationFile.setFavorite1(null);
         }
 
         spinner = findViewById(R.id.favorite2);
@@ -202,6 +204,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         if (text != null) {
             String filename = text.getText().toString();
             configurationFile.setFavorite2(filename);
+        } else {
+            configurationFile.setFavorite2(null);
         }
 
         spinner = findViewById(R.id.favorite3);
@@ -209,6 +213,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         if (text != null) {
             String filename = text.getText().toString();
             configurationFile.setFavorite3(filename);
+        } else {
+            configurationFile.setFavorite3(null);
         }
 
         configurationFile.writeFile();

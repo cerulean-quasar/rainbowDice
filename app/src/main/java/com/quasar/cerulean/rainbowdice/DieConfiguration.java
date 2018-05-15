@@ -19,6 +19,7 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.content.Context;
 import android.content.res.Resources;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -28,6 +29,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Locale;
 
@@ -71,6 +73,29 @@ public class DieConfiguration implements Parcelable {
             return null;
         }
     }
+
+    public static void saveToFile(FileOutputStream outputStream, DieConfiguration[] diceConfigs) {
+        String json;
+        try {
+            JSONArray jsonArray = new JSONArray();
+            for (DieConfiguration diceConfig : diceConfigs) {
+                JSONObject obj = diceConfig.toJSON();
+                jsonArray.put(obj);
+            }
+            json = jsonArray.toString();
+        } catch (JSONException e) {
+            System.out.println("Exception in writing out JSON: " + e.getMessage());
+            return;
+        }
+
+        try {
+            outputStream.write(json.getBytes());
+        } catch (IOException e) {
+            System.out.println("Exception on writing to file.  Message: " + e.getMessage());
+            return;
+        }
+    }
+
 
     public static DieConfiguration fromJson(JSONObject obj) throws org.json.JSONException {
         int inNumberOfDice = obj.getInt("NumberOfDice");

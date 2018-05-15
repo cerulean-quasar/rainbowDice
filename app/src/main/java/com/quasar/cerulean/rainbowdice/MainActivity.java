@@ -19,6 +19,7 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -48,8 +49,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -99,11 +102,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         logFile = new LogFile(this);
         TextView text = findViewById(R.id.rollResult);
         text.setText(R.string.diceMessageStartup);
-        if (configurationFile.getFavorite1()==null) {
-            diceConfig = new DieConfiguration[1];
-            diceConfig[1] = new DieConfiguration(1, 6, 1, 1, 0, true);
-        } else {
+        createDefaults();
+        if (configurationFile.getFavorite1()!=null) {
             loadFromFile(configurationFile.getFavorite1());
+        } else {
+            diceConfig = new DieConfiguration[1];
+            diceConfig[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
         }
     }
 
@@ -289,6 +293,66 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             return;
         }
         diceFileLoaded = filename;
+    }
+
+    private void createDefaults() {
+        File[] files = getFilesDir().listFiles();
+        int count = 0;
+        for (File file : files) {
+            String filename = file.getName();
+            if (!filename.equals(ConfigurationFile.configFile) &&
+                    !filename.equals(LogFile.diceLogFilename)) {
+                count++;
+            }
+        }
+
+        if (count == 0) {
+            try {
+                String[] jsonStrings = new String[5];
+                String filename;
+                // There are no favorites or dice configuration defaults.  Add a few example dice
+                // configurations.
+                DieConfiguration[] dice = new DieConfiguration[1];
+                dice[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
+                filename = "1D6";
+                FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+                configurationFile.setFavorite1(filename);
+
+                dice[0] = new DieConfiguration(2, 6, 1, 1, 0, true);
+                filename = "2D6";
+                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+                configurationFile.setFavorite2(filename);
+
+                dice[0] = new DieConfiguration(1, 20, 1, 1, 0, true);
+                filename = "1D20";
+                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+                configurationFile.setFavorite3(filename);
+
+                dice[0] = new DieConfiguration(1, 100, 0, 1, -1, true);
+                filename = "Percentile";
+                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+
+                dice[0] = new DieConfiguration(4, 3, -1, 1, -2, true);
+                filename = "Plus Minus Dice";
+                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+            } catch (IOException e) {
+                System.out.println("Exception on writing to file.  Message: " + e.getMessage());
+                return;
+            }
+
+            configurationFile.writeFile();
+            resetFavorites();
+        }
     }
 
     private void resetFavorites() {

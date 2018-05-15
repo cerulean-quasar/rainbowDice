@@ -82,10 +82,19 @@ public class ConfigurationFile {
         String json;
         try {
             JSONObject obj = new JSONObject();
-            obj.put(favorite1, fav1File);
-            obj.put(favorite2, fav2File);
-            obj.put(favorite3, fav3File);
-            obj.put(theme, themeName);
+            if (fav1File != null) {
+                obj.put(favorite1, fav1File);
+            }
+            if (fav2File != null) {
+                obj.put(favorite2, fav2File);
+            }
+            if (fav3File != null) {
+                obj.put(favorite3, fav3File);
+            }
+
+            if (themeName != null) {
+                obj.put(theme, themeName);
+            }
             json = obj.toString();
         } catch (JSONException e) {
             System.out.println("Exception in writing out JSON: " + e.getMessage());
