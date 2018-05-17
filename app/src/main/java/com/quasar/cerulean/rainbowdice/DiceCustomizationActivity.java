@@ -63,6 +63,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     private static final int DEFAULT_INCREMENT = 1;
     private static final int DEFAULT_NBR_DICE = 1;
     private static final int DEFAULT_NBR_SIDES = 6;
+    private static final int OTHER_BUTTON_INDEX = 10;
     private String saveFileName = null;
     private Dialog saveDialog = null;
 
@@ -168,12 +169,19 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
                     TextView text = (TextView) v;
                     String string = text.getText().toString();
-                    if (string.isEmpty() || Integer.decode(string) == 0) {
+                    int nbrSides;
+                    if (string.isEmpty()) {
+                        nbrSides = DEFAULT_NBR_SIDES;
+                    } else {
+                        nbrSides = Integer.decode(string);
+                    }
+
+                    if (string.isEmpty() || nbrSides == 0 || nbrSides == 1) {
                         // set to the default!
                         text.setText(String.format(Locale.getDefault(), "%d", DEFAULT_NBR_SIDES));
                         cfg.setNumberOfSides(DEFAULT_NBR_SIDES);
                     } else {
-                        cfg.setNumberOfSides(Integer.decode(string));
+                        cfg.setNumberOfSides(nbrSides);
                     }
 
                     repopulateCurrentListItemFromConfig();
@@ -250,11 +258,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     public void dxClicked(View view) {
-        EditText text = findViewById(R.id.otherText);
+        boolean isOtherButton = false;
         if (view.getId() == R.id.otherButton) {
-            text.setEnabled(true);
-        } else {
-            text.setEnabled(false);
+            isOtherButton = true;
         }
 
         // save the config values from the screen in case we need to load a new edit panel.
@@ -270,7 +276,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         // next load the panel and make sure the panel is updated with the config values.
-        editConfig(configBeingEdited);
+        editConfig(configBeingEdited, isOtherButton);
 
         // next reset the dice list item to display the new number of sides.
         repopulateCurrentListItemFromConfig();
@@ -453,7 +459,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
                 ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
                 configBeingEdited = i;
-                editConfig(i);
+                editConfig(i, getButtonForDieSides(cfg.config.getNumberOfSides()) == diceSidesButtons[OTHER_BUTTON_INDEX]);
             } else {
                 TypedValue value = new TypedValue();
                 getTheme().resolveAttribute(R.attr.rounded_rectangle_unclicked, value, true);
@@ -486,7 +492,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         configBeingEdited = 0;
-        editConfig(configBeingEdited);
+        editConfig(configBeingEdited,
+                getButtonForDieSides(diceConfigs.get(configBeingEdited).config.getNumberOfSides()) == diceSidesButtons[OTHER_BUTTON_INDEX]);
         TypedValue value = new TypedValue();
         getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
         ((LinearLayout)diceConfigs.get(configBeingEdited).button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
@@ -537,7 +544,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         layoutDiceList.addView(layoutNew);
 
         // populate the detailed dice config page
-        editConfig(diceConfigs.size() - 1);
+        int i = diceConfigs.size() - 1;
+        Button buttonSides = getButtonForDieSides(diceConfigs.get(i).config.getNumberOfSides());
+        editConfig(diceConfigs.size() - 1, buttonSides == diceSidesButtons[OTHER_BUTTON_INDEX]);
 
         // update the dice list item
         repopulateCurrentListItemFromConfig();
@@ -742,10 +751,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             i++;
         }
 
-        editConfig(0);
+        editConfig(0, getButtonForDieSides(diceConfigs.get(0).config.getNumberOfSides()) == diceSidesButtons[OTHER_BUTTON_INDEX]);
     }
 
-    private void editConfig(int i) {
+    private void editConfig(int i, boolean isOtherButton) {
         configBeingEdited = i;
         DieConfiguration config = diceConfigs.get(i).config;
         boolean newPanelIsConstant = config.getNumberOfSides() == 1;
@@ -759,11 +768,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         Button button = getButtonForDieSides(config.getNumberOfSides());
         TextView other = findViewById(R.id.otherText);
-        if (button == getButtonForDieSides(-1)) {
+        if (isOtherButton) {
             // the "other" button is pressed.  Populate the associated edit text with
             // the number of sides and enable it.
             other.setEnabled(true);
             other.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfSides()));
+            button = diceSidesButtons[OTHER_BUTTON_INDEX];
         } else {
             other.setEnabled(false);
         }
