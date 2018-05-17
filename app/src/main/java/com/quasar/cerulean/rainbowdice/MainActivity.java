@@ -458,7 +458,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
                     symbolSet.add(symbol);
                 }
 
-            } else {
+            } else if (nbrSides > 1) {
                 for (int j = 0; j < nbrSides; j++) {
                     String symbol = String.format(Locale.getDefault(), "%d", startOn + increment * j);
                     symbolSet.add(symbol);
@@ -519,7 +519,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
                     loadModel(symbolsTens);
                     loadModel(symbolsOnes);
                 }
-            } else {
+            } else if (nbrSides > 1){
                 String[] symbols = new String[nbrSides];
                 for (int j = 0; j < nbrSides; j++) {
                     symbols[j] = String.format(Locale.getDefault(), "%d", startOn + increment * j);

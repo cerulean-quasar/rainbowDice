@@ -304,7 +304,7 @@ void DiceModelCube::loadModel() {
         vertices.push_back(vertex);
 
         //bottom
-        vertex.textureToUse = texAtlas->getImageIndex(symbols[1]);
+        vertex.textureToUse = texAtlas->getImageIndex(symbols[1%symbols.size()]);
         switch (i) {
         case 0:
             vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse)};

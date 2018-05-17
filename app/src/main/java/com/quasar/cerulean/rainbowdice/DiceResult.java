@@ -32,10 +32,14 @@ public class DiceResult {
         // Does this die get added or subtracted?
         public boolean isAddOperation;
 
-        DieResult (int inResult, boolean inNeedsReRoll, boolean inIsAddOperation) {
+        // is the result from a constant (D1 dice)?
+        public boolean isConstant;
+
+        DieResult (int inResult, boolean inNeedsReRoll, boolean inIsAddOperation, boolean inIsConstant) {
             result = inResult;
             needsReRoll = inNeedsReRoll;
             isAddOperation = inIsAddOperation;
+            isConstant = inIsConstant;
         }
     }
 
@@ -59,23 +63,29 @@ public class DiceResult {
                     if (value + value2 == reRollOn) {
                         needsReRoll = true;
                     }
-                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation);
+                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation, false);
                     dieResults.add(dieResult);
                     diceResults.add(dieResults);
-                    dieResult = new DieResult(value2, needsReRoll, isAddOperation);
+                    dieResult = new DieResult(value2, needsReRoll, isAddOperation, false);
                     dieResults2.add(dieResult);
                     diceResults.add(dieResults2);
+                    i++;
+                } else if (die.getNumberOfSides() == 1) {
+                    DieResult dieResult = new DieResult(die.getStartAt(), false, isAddOperation, true);
+                    ArrayList<DieResult> dieResults = new ArrayList<>();
+                    dieResults.add(dieResult);
+                    diceResults.add(dieResults);
                 } else {
                     ArrayList<DieResult> dieResults = new ArrayList<>();
                     int value = Integer.valueOf(values[i]);
                     if (value == reRollOn) {
                         needsReRoll = true;
                     }
-                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation);
+                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation, false);
                     dieResults.add(dieResult);
                     diceResults.add(dieResults);
+                    i++;
                 }
-                i++;
             }
         }
     }
@@ -92,10 +102,12 @@ public class DiceResult {
                     needsReRoll = true;
                 }
 
-                DieResult dieResult = new DieResult(value, needsReRoll, prev.isAddOperation);
+                DieResult dieResult = new DieResult(value, needsReRoll, prev.isAddOperation, false);
                 prevResult.add(dieResult);
             }
-            i++;
+            if (!prev.isConstant) {
+                i++;
+            }
         }
     }
 
@@ -106,7 +118,9 @@ public class DiceResult {
             if (dieResults.get(dieResults.size()-1).needsReRoll) {
                 indicesNeedReRoll.add(i);
             }
-            i++;
+            if (!dieResults.get(dieResults.size()-1).isConstant) {
+                i++;
+            }
         }
 
         if (indicesNeedReRoll.isEmpty()) {

@@ -16,16 +16,16 @@
     <android.support.constraint.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-        <include layout="@layout/customization_die"/>
+        <include layout="@layout/customization_main"/>
         <Button
-            android:id="@+id/d2Button"
+            android:id="@+id/d1Button"
             android:onClick="dxClicked"
             app:layout_constraintCircle="@id/edit_panel"
             app:layout_constraintCircleRadius="130dp"
             app:layout_constraintCircleAngle="30"
             android:layout_width="90dp"
             android:layout_height="50dp"
-            android:text="@string/D2" />
+            android:text="@string/D1" />
         <Button
             android:id="@+id/d3Button"
             android:onClick="dxClicked"
@@ -130,6 +130,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:inputType="number"
+                android:text="1"
                 android:enabled="false"/>
         </LinearLayout>
 

@@ -218,7 +218,9 @@ public class DieConfiguration implements Parcelable {
     public boolean isRepresentableByTwoTenSided() { return numberOfSides == 100 && startAt <= 1 && startAt >= 0 && increment == 1;}
 
     public String toString() {
-        if (reRollOn >= startAt) {
+        if (numberOfSides == 1) {
+            return String.format(Locale.getDefault(), "%d", startAt);
+        } else if (reRollOn >= startAt) {
             return String.format(Locale.getDefault(), "%dD%d (%d, %d,...,%d reroll on %d)",
                     numberOfDice, numberOfSides, startAt, startAt + increment, startAt + (numberOfSides - 1) * increment, reRollOn);
         } else {
