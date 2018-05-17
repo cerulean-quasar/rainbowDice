@@ -14,7 +14,7 @@
     <Button
         android:id="@+id/die_config_button"
         android:onClick="onDiceListItemClick"
-        android:background="@android:color/transparent"
+        android:background="#40808080"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 </LinearLayout>
