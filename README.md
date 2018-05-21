@@ -19,13 +19,17 @@ and a random angle the dice is rotated about the z-axis (pointing out of the scr
 The following screen shows the app after rolling the dice.  Note that the
 result is displayed and computed for the user in a separate text box.
 
-<img src=screenshots/rainbowDice1.png width=200> <img src=screenshots/rainbowDice2.png width=200> <img src=screenshots/rainbowDice3.png width=200> <img src=screenshots/rainbowDice4.png width=200>
+<img src=screenshots/rainbowDice1.png width=200> <img src=screenshots/rainbowDice2.png width=200>
 
 This picture shows the favorite selection and dice configuration screens.  Note
 that gamers can enter several rows and an operation indicating whether the dice
 in the two rows should be added or subtracted.
 
-<img src=screenshots/rainbowDice_favoriteSelection.png width=200> <img src=screenshots/rainbowDice_customization.png width=200>
+<img src=screenshots/rainbowDice_favoriteSelection.png width=200> <img src=screenshots/rainbowDice_customization1.png width=200> <img src=screenshots/rainbowDice_customization2.png width=200>
+
+The roll results are also stored in a log file.  Ten results are kept at a time.
+
+<img src=screenshots/rainbowDice_log.png width=200>
 
 Please read the [design docs](https://github.com/cerulean-quasar/rainbowDice/blob/master/docs/design.md "design docs")
 for more information on the design of Rainbow Dice.
