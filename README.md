@@ -16,6 +16,9 @@ the accelerometer (used in the way previously stated), and /dev/urandom.  The
 /dev/urandom device is used to generate a random face to start facing the screen
 and a random angle the dice is rotated about the z-axis (pointing out of the screen).
 
+The user can select from several different themes to be used for all the screens.  In the
+screen shots that follow, a different theme is displayed.
+
 The following screen shows the app after rolling the dice.  Note that the
 result is displayed and computed for the user in a separate text box.
 
