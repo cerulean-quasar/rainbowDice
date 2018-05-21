@@ -7,8 +7,8 @@
         android:onClick="onSaveDiceCustomization"
         />
     <item
-        android:title="@string/done"
+        android:title="@string/cancel"
         app:showAsAction="ifRoom"
-        android:onClick="onDoneDiceCustomization"
+        android:onClick="onCancelDiceCustomization"
         />
 </menu>

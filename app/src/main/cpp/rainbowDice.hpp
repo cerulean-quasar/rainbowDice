@@ -47,5 +47,7 @@ public:
     virtual void resetPositions(std::set<int> &dice)=0;
 
     virtual void cleanupThread()=0;
+
+    virtual ~RainbowDice() { }
 };
 #endif

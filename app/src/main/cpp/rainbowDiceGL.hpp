@@ -60,6 +60,7 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
+    virtual ~RainbowDiceGL() {}
 private:
     WindowType *window;
     EGLContext context;

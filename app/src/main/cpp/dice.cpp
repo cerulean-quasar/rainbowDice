@@ -28,6 +28,13 @@
 #include "text.hpp"
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <limits>
 
 float const DicePhysicsModel::errorVal = 0.15f;
 float const DicePhysicsModel::viscosity = 2.0f;
@@ -47,6 +54,7 @@ unsigned long const Filter::highPassAccelerationMaxSize = 512;
 float const DicePhysicsModel::angularSpeedScaleFactor = 5.0f;
 float const AngularVelocity::maxAngularSpeed = 10.0f;
 Filter DicePhysicsModel::filter;
+const float pi = glm::acos(-1.0f);
 
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
     VkVertexInputBindingDescription bindingDescription = {};
@@ -124,6 +132,13 @@ void DicePhysicsModel::resetPosition() {
     acceleration = glm::vec3();
     angularVelocity.setAngularSpeed(0);
     angularVelocity.setSpinAxis(glm::vec3());
+
+    glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
+    glm::mat4 rotate = glm::toMat4(qTotalRotated);
+    glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
+    ubo.model = translate * rotate * scale;
+
+    randomizeUpFace();
 }
 
 void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
@@ -276,6 +291,73 @@ void DicePhysicsModel::updateModelMatrix() {
     ubo.model = translate * rotate * scale;
 }
 
+std::string DicePhysicsModel::calculateUpFace() {
+    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 upPerpendicular;
+    glm::vec3 perpendicularFaceVec;
+
+    float angleMin = pi;
+    float angle;
+    uint32_t upFace = 0;
+
+    for (uint32_t i = 0; i < numberFaces; i++) {
+        getAngleAxis(i, angle, perpendicularFaceVec);
+        if (angleMin > angle) {
+            angleMin = angle;
+            upPerpendicular = perpendicularFaceVec;
+            upFace = i;
+        }
+    }
+
+    glm::quat quaternian = glm::angleAxis(angleMin, glm::normalize(glm::cross(upPerpendicular, zaxis)));
+    qTotalRotated = glm::normalize(quaternian * qTotalRotated);
+
+    upFace = getUpFaceIndex(upFace);
+    return symbols[upFace%symbols.size()];
+}
+
+void DicePhysicsModel::randomizeUpFace() {
+    unsigned int randomFace;
+    unsigned int randomAngle;
+    const unsigned int max_number = std::numeric_limits<unsigned int>::max()/numberFaces * numberFaces;
+
+    int fd = open("/dev/urandom", O_RDONLY);
+
+    if (fd == -1) {
+        throw std::runtime_error(std::string("Could not open /dev/urandom: ") + strerror(errno));
+    }
+
+    do {
+        ssize_t nbrBytes = read(fd, &randomFace, sizeof(randomFace));
+
+        if (nbrBytes != sizeof(randomFace)) {
+            throw std::runtime_error("Could not read enough random data.");
+        }
+    } while (randomFace > max_number);
+
+    ssize_t nbrBytes = read(fd, &randomAngle, sizeof(randomAngle));
+
+    if (nbrBytes != sizeof(randomAngle)) {
+        throw std::runtime_error("Could not read enough random data.");
+    }
+
+    close(fd);
+
+    uint32_t upFace = randomFace % numberFaces;
+
+    float angle;
+    glm::vec3 normalVector;
+    glm::vec3 zaxis = glm::vec3(0.0, 0.0, 1.0);
+    getAngleAxis(upFace, angle, normalVector);
+    glm::quat quaternian = glm::angleAxis(angle, glm::normalize(glm::cross(normalVector, zaxis)));
+
+    angle = randomAngle;
+    angle = angle / std::numeric_limits<unsigned int>::max() * 2 * pi;
+    glm::quat quaternian2 = glm::angleAxis(angle, zaxis);
+
+    qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
+}
+
 void DiceModelCube::loadModel() {
     Vertex vertex = {};
 
@@ -371,107 +453,72 @@ void DiceModelCube::loadModel() {
         indices.push_back(8+4*i);
         indices.push_back(11+4*i);
         indices.push_back(10+4*i);
-
     }
 }
 
 void DiceModelCube::cubeTop(Vertex &vertex, uint32_t i) {
-    const float pi = glm::acos(-1.0f);
     vertex.pos = {glm::cos(2*i*pi/4), sqrtf(2)/2, glm::sin(2*i*pi/4)};
 }
 
 void DiceModelCube::cubeBottom(Vertex &vertex, uint32_t i) {
-    const float pi = glm::acos(-1.0f);
     vertex.pos = {glm::cos(2*i*pi/4), -sqrtf(2)/2, glm::sin(2*i*pi/4)};
 }
 
-std::string DiceModelCube::calculateUpFace() {
-    const float pi = glm::acos(-1.0f);
+void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
     glm::vec3 upPerpendicular;
 
-    float angleMin = pi;
-    float angle;
-    uint32_t upFace = 0;
-
-    /* what was the top face at the start (y being up) */
-    glm::vec4 p04 = ubo.model * glm::vec4(vertices[2].pos, 1.0f);
-    glm::vec4 q4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
-    glm::vec4 r4 = ubo.model * glm::vec4(vertices[6].pos, 1.0f);
-    glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
-    glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
-    glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
-    glm::vec3 perpendicularFaceVec = glm::normalize(glm::cross(q-r, q-p0));
-    angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
-    if (angleMin > angle) {
-        upPerpendicular = perpendicularFaceVec;
-        angleMin = angle;
-        upFace = 0;
+    if (faceIndex == 0) {
+        /* what was the top face at the start (y being up) */
+        glm::vec4 p04 = ubo.model * glm::vec4(vertices[2].pos, 1.0f);
+        glm::vec4 q4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
+        glm::vec4 r4 = ubo.model * glm::vec4(vertices[6].pos, 1.0f);
+        glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
+        glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
+        glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
+        axis = glm::normalize(glm::cross(q - r, q - p0));
+        angle = glm::acos(glm::dot(axis, zaxis));
+    } else if (faceIndex == 1) {
+        /* what was the bottom face at the start */
+        glm::vec4 p04 = ubo.model * glm::vec4(vertices[7].pos, 1.0f);
+        glm::vec4 q4 = ubo.model * glm::vec4(vertices[1].pos, 1.0f);
+        glm::vec4 r4 = ubo.model * glm::vec4(vertices[3].pos, 1.0f);
+        glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
+        glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
+        glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
+        axis = glm::normalize(glm::cross(q - r, q - p0));
+        angle = glm::acos(glm::dot(axis, zaxis));
+    } else {
+        /* what were the side faces at the start */
+        glm::vec4 p04 = ubo.model * glm::vec4(vertices[4 * faceIndex].pos, 1.0f);
+        glm::vec4 q4 = ubo.model * glm::vec4(vertices[1 + 4 * faceIndex].pos, 1.0f);
+        glm::vec4 r4 = ubo.model * glm::vec4(vertices[3 + 4 * faceIndex].pos, 1.0f);
+        glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
+        glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
+        glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
+        axis = glm::normalize(glm::cross(q - r, q - p0));
+        angle = glm::acos(glm::dot(axis, zaxis));
     }
-
-    /* what was the bottom face at the start */
-    p04 = ubo.model * glm::vec4(vertices[7].pos, 1.0f);
-    q4 = ubo.model * glm::vec4(vertices[1].pos, 1.0f);
-    r4 = ubo.model * glm::vec4(vertices[3].pos, 1.0f);
-    p0 = glm::vec3(p04.x, p04.y, p04.z);
-    q = glm::vec3(q4.x, q4.y, q4.z);
-    r = glm::vec3(r4.x, r4.y, r4.z);
-    perpendicularFaceVec = glm::normalize(glm::cross(q-r, q-p0));
-    angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
-    if (angleMin > angle) {
-        upPerpendicular = perpendicularFaceVec;
-        angleMin = angle;
-        upFace = 1;
-    }
-
-    /* what were the side faces at the start */
-    for (uint32_t i = 0; i < 4; i++) {
-        p04 = ubo.model * glm::vec4(vertices[8+4*i].pos, 1.0f);
-        q4 = ubo.model * glm::vec4(vertices[9+4*i].pos, 1.0f);
-        r4 = ubo.model * glm::vec4(vertices[11+4*i].pos, 1.0f);
-        p0 = glm::vec3(p04.x, p04.y, p04.z);
-        q = glm::vec3(q4.x, q4.y, q4.z);
-        r = glm::vec3(r4.x, r4.y, r4.z);
-        perpendicularFaceVec = glm::normalize(glm::cross(q-r, q-p0));
-        angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
-        if (angleMin > angle) {
-            upPerpendicular = perpendicularFaceVec;
-            angleMin = angle;
-            upFace = i+2;
-        }
-    }
-
-    glm::quat quaternian = glm::angleAxis(angleMin, glm::normalize(glm::cross(upPerpendicular, zaxis)));
-    qTotalRotated = glm::normalize(quaternian * qTotalRotated);
-
-    return symbols[upFace%symbols.size()];
 }
 
 void DiceModelHedron::loadModel() {
-    sides = symbols.size();
-    while (sides < 6 || sides % 2 != 0) {
-        sides *= 2;
-    }
-
-    const float pi = glm::acos(-1.0f);
-
     // top
-    for (uint32_t i = 0; i < sides/2; i ++) {
+    for (uint32_t i = 0; i < numberFaces/2; i ++) {
         // bottom
         glm::vec3 p0 = {0.0f, -1.0f, 0.0f};
-        glm::vec3 q = {glm::cos(4*i*pi/sides), 0.0f, glm::sin(4*i*pi/sides)};
-        glm::vec3 r = {glm::cos(4.0f*((i+1)%(sides/2))*pi/sides), 0.0f, glm::sin(4*((i+1)%(sides/2))*pi/sides)};
+        glm::vec3 q = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
+        glm::vec3 r = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
         addVertices(p0, q, r, i);
 
         // top
         p0 = {0.0f, 1.0f, 0.0f};
-        q = {glm::cos(4.0f*((i+1)%(sides/2))*pi/sides), 0.0f, glm::sin(4*((i+1)%(sides/2))*pi/sides)};
-        r = {glm::cos(4*i*pi/sides), 0.0f, glm::sin(4*i*pi/sides)};
-        addVertices(p0, q, r, i+sides/2);
+        q = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
+        r = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
+        addVertices(p0, q, r, i+numberFaces/2);
     }
 
     // indices - not really using these
-    for (uint32_t i = 0; i < sides*15; i ++) {
+    for (uint32_t i = 0; i < numberFaces*15; i ++) {
         indices.push_back(i);
     }
 }
@@ -589,48 +636,29 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertices.push_back(vertex);
 }
 
-std::string DiceModelHedron::calculateUpFace() {
-    const float pi = glm::acos(-1.0f);
-    const uint32_t nbrVerticesPerFace = vertices.size()/sides;
+void DiceModelHedron::getAngleAxis(uint32_t face, float &angle, glm::vec3 &axis) {
+    const uint32_t nbrVerticesPerFace = vertices.size()/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
-    glm::vec3 upPerpendicular;
 
-    float angleMin = pi;
-    float angle;
-    uint32_t upFace = 0;
-    for (uint32_t i = 0; i < sides; i++) {
-        glm::vec4 p04 = ubo.model * glm::vec4(vertices[i * nbrVerticesPerFace].pos, 1.0f);
-        glm::vec4 q4 = ubo.model * glm::vec4(vertices[3 + i * nbrVerticesPerFace].pos, 1.0f);
-        glm::vec4 r4 = ubo.model * glm::vec4(vertices[6 + i * nbrVerticesPerFace].pos, 1.0f);
-        glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
-        glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
-        glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
-        glm::vec3 perpendicularFaceVec = glm::normalize(glm::cross(q-r, q-p0));
-        angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
-        if (angleMin > angle) {
-            upPerpendicular = perpendicularFaceVec;
-            upFace = getUpFaceIndex(i);
-            angleMin = angle;
-        }
-    }
-
-    glm::quat quaternian = glm::angleAxis(angleMin, glm::normalize(glm::cross(upPerpendicular, zaxis)));
-    qTotalRotated = glm::normalize(quaternian * qTotalRotated);
-
-    return symbols[upFace%symbols.size()];
+    glm::vec4 p04 = ubo.model * glm::vec4(vertices[face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 q4 = ubo.model * glm::vec4(vertices[3 + face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 r4 = ubo.model * glm::vec4(vertices[6 + face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
+    glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
+    glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
+    axis = glm::normalize(glm::cross(q-r, q-p0));
+    angle = glm::acos(glm::dot(axis, zaxis));
 }
 
-int DiceModelHedron::getUpFaceIndex(int i) {
+uint32_t DiceModelHedron::getUpFaceIndex(uint32_t i) {
     if (i%2 == 0) {
         return i/2;
     } else {
-        return i/2 + sides/2;
+        return i/2 + numberFaces/2;
     }
 }
 
 void DiceModelTetrahedron::loadModel() {
-    sides = 4;
-
     glm::vec3 p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
     glm::vec3 q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
     glm::vec3 r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
@@ -650,17 +678,12 @@ void DiceModelTetrahedron::loadModel() {
     addVertices(p0, q, r, 3);
 
     // indices - not really using these
-    for (uint32_t i = 0; i < sides*15; i ++) {
+    for (uint32_t i = 0; i < numberFaces*15; i ++) {
         indices.push_back(i);
     }
 }
 
-int DiceModelTetrahedron::getUpFaceIndex(int i) {
-    return i;
-}
-
 void DiceModelIcosahedron::loadModel() {
-    sides = 20;
     float phi = (1+sqrtf(5.0f))/2;
     float scaleFactor = 2;
     uint32_t i = 0;
@@ -768,13 +791,9 @@ void DiceModelIcosahedron::loadModel() {
     addVertices(p0, q, r, i++);
 
     // indices - not really using these
-    for (i = 0; i < sides*15; i ++) {
+    for (i = 0; i < numberFaces*15; i ++) {
         indices.push_back(i);
     }
-}
-
-int DiceModelIcosahedron::getUpFaceIndex(int i) {
-    return i;
 }
 
 void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i) {
@@ -885,8 +904,6 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertices.push_back(vertex);
 }
 
-uint32_t const DiceModelDodecahedron::sides = 12;
-
 void DiceModelDodecahedron::loadModel() {
     float phi = (1+sqrtf(5.0f))/2;
     uint32_t i = 0;
@@ -976,38 +993,21 @@ void DiceModelDodecahedron::loadModel() {
     addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
 
     // indices - not really using these
-    for (i = 0; i < sides*5*3; i ++) {
+    for (i = 0; i < numberFaces*5*3; i ++) {
         indices.push_back(i);
     }
 }
 
-std::string DiceModelDodecahedron::calculateUpFace() {
-    float const pi = glm::acos(-1.0f);
-    uint32_t const nbrVerticesPerFace = vertices.size()/sides;
+void DiceModelDodecahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
+    uint32_t const nbrVerticesPerFace = vertices.size()/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
-    glm::vec3 upPerpendicular;
 
-    float angleMin = pi;
-    float angle;
-    uint32_t upFace = 0;
-    for (uint32_t i = 0; i < sides; i++) {
-        glm::vec4 a4 = ubo.model * glm::vec4(vertices[i * nbrVerticesPerFace].pos, 1.0f);
-        glm::vec4 b4 = ubo.model * glm::vec4(vertices[1 + i * nbrVerticesPerFace].pos, 1.0f);
-        glm::vec4 c4 = ubo.model * glm::vec4(vertices[4 + i * nbrVerticesPerFace].pos, 1.0f);
-        glm::vec3 a = glm::vec3(a4.x, a4.y, a4.z);
-        glm::vec3 b = glm::vec3(b4.x, b4.y, b4.z);
-        glm::vec3 c = glm::vec3(c4.x, c4.y, c4.z);
-        glm::vec3 perpendicularFaceVec = glm::normalize(glm::cross(c-b, a-b));
-        angle = glm::acos(glm::dot(perpendicularFaceVec, zaxis));
-        if (angleMin > angle) {
-            upPerpendicular = perpendicularFaceVec;
-            upFace = i;
-            angleMin = angle;
-        }
-    }
-
-    glm::quat quaternian = glm::angleAxis(angleMin, glm::normalize(glm::cross(upPerpendicular, zaxis)));
-    qTotalRotated = glm::normalize(quaternian * qTotalRotated);
-
-    return symbols[upFace%symbols.size()];
+    glm::vec4 a4 = ubo.model * glm::vec4(vertices[faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 b4 = ubo.model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 c4 = ubo.model * glm::vec4(vertices[4 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec3 a = glm::vec3(a4.x, a4.y, a4.z);
+    glm::vec3 b = glm::vec3(b4.x, b4.y, b4.z);
+    glm::vec3 c = glm::vec3(c4.x, c4.y, c4.z);
+    axis = glm::normalize(glm::cross(c-b, a-b));
+    angle = glm::acos(glm::dot(axis, zaxis));
 }

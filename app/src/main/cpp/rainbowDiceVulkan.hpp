@@ -94,6 +94,7 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
+    virtual ~RainbowDiceVulkan() { }
 private:
     struct QueueFamilyIndices {
         int graphicsFamily = -1;

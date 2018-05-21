@@ -140,10 +140,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     saveFileName = filename;
                 } catch (FileNotFoundException e) {
                     System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-                    filename = null;
+                    configs = null;
+                    saveFileName = null;
                 } catch (IOException e) {
                     System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
-                    filename = null;
+                    configs = null;
+                    saveFileName = null;
                 }
 
             }
@@ -611,8 +613,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         saveDialog = new AlertDialog.Builder(this).setTitle(R.string.save).setView(saveDialogView).show();
     }
 
-    public void onDoneDiceCustomization(MenuItem item) {
-        setResult(RESULT_OK, null);
+    public void onCancelDiceCustomization(MenuItem item) {
+        setResult(RESULT_CANCELED, null);
         finish();
     }
 
@@ -647,6 +649,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         saveDialog.dismiss();
         saveDialog = null;
+
+        setResult(RESULT_OK, null);
+        finish();
     }
 
     private void updateConfigFromScreen() {
