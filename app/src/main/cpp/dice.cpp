@@ -319,7 +319,7 @@ std::string DicePhysicsModel::calculateUpFace() {
 void DicePhysicsModel::randomizeUpFace() {
     unsigned int randomFace;
     unsigned int randomAngle;
-    const unsigned int max_number = std::numeric_limits<unsigned int>::max()/numberFaces * numberFaces;
+    const unsigned int too_big = std::numeric_limits<unsigned int>::max()/numberFaces * numberFaces;
 
     int fd = open("/dev/urandom", O_RDONLY);
 
@@ -333,7 +333,7 @@ void DicePhysicsModel::randomizeUpFace() {
         if (nbrBytes != sizeof(randomFace)) {
             throw std::runtime_error("Could not read enough random data.");
         }
-    } while (randomFace > max_number);
+    } while (randomFace >= too_big);
 
     ssize_t nbrBytes = read(fd, &randomAngle, sizeof(randomAngle));
 

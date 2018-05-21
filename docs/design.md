@@ -5,6 +5,41 @@ areas however, comments would not work since these code segments require picture
 So, instead of comments, we have this design document.  We used the same variables in it as in
 the code.
 
+## The Use of Randomness in Rainbow Dice
+
+The dice in Rainbow Dice bounce around inside a virtual box.  They gain spin
+when bouncing off of walls.  They bounce off each other as well.  The user can
+shake the device to cause the dice to bounce around more.  They slow down due
+to a fake viscosity in their virtual environment.  Gravity causes them to fall
+to the top of the screen where they eventually get stuck.  With the input the
+user provides in shaking and tilting the device, one would guess that there is
+plenty of randomness in the way the dice roll.
+
+However, just to be safe, we added the use of /dev/urandom to change the face
+initially pointing upwards and to select an inital angle that each die is
+rotated around the z-axis.  The method by which this was done is described
+below.  For source code, look at
+[dice.cpp](https://github.com/cerulean-quasar/rainbowDice/blob/master/app/src/main/cpp/dice.cpp)
+
+For which die face is facing the screen, we read some data the size of an
+unsigned int into an unsigned int from /dev/urandom.  Then, we checked to see
+if the number read was less than the maximum unsigned int divided by the number
+of faces multiplied by the number of faces (using integer division). If it is
+not less, then we will throw away the data, and try again.  This will ensure
+that when we take the random number modulo the number of faces, we will get
+even probabilities for each face to be chosen as the face facing the screen.
+
+For which angle the die starts out rotated around the z-axis where the z-axis
+points out of the screen, we did the following. First we read some data the
+size of an unsigned int into an unsigned int.  Then we assign this data to a
+float.  Next we divide by the maximum unsigned int and multiply by 2pi.  This
+gives us a float between 0 and 2pi with even distribution.  We use this number
+to give the die an initial rotation around the z-axis.
+
+Note, in this process (for both, determining the face pointing towards the
+screen and the angle the die is rotated about the z-axis), we determine these
+values for each die individually.
+
 ## How to the Textures Were Computed
 
 ### Background
