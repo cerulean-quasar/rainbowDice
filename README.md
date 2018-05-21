@@ -25,7 +25,7 @@ This picture shows the favorite selection and dice configuration screens.  Note
 that gamers can enter several rows and an operation indicating whether the dice
 in the two rows should be added or subtracted.
 
-<img src=screenshots/rainbowDice_favoriteSelection.png width=200> <img src=screenshots/rainbowDice_customization1.png width=200> <img src=screenshots/rainbowDice_customization2.png width=200>
+<img src=screenshots/rainbowDice_favoriteSelection.png width=200> <img src=screenshots/rainbowDice_customization1.png width=200> <img src=screenshots/rainbowDice_customization2.png width=400>
 
 The roll results are also stored in a log file.  Ten results are kept at a time.
 
