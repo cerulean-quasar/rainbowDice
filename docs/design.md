@@ -18,8 +18,8 @@ plenty of randomness in the way the dice roll.
 However, just to be safe, we added the use of /dev/urandom to change the face
 initially pointing upwards and to select an inital angle that each die is
 rotated around the z-axis.  The method by which this was done is described
-below.  For source code, look at
-[dice.cpp](https://github.com/cerulean-quasar/rainbowDice/blob/master/app/src/main/cpp/dice.cpp)
+below.  For source code, look at `DicePhysicsModel::randomizeUpFace` in
+[dice.cpp](https://github.com/cerulean-quasar/rainbowDice/blob/master/app/src/main/cpp/dice.cpp).
 
 For which die face is facing the screen, we read some data the size of an
 unsigned int into an unsigned int from /dev/urandom.  Then, we checked to see
