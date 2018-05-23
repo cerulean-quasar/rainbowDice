@@ -247,6 +247,10 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         Spinner spinner = findViewById(R.id.mainOtherSpinner);
         View viewSelected = spinner.getSelectedView();
         if (viewSelected == null) {
+            // The user does not have any extra dice definitions in the drop down menu.
+            // Load the results text box with an error message.
+            TextView text = findViewById(R.id.rollResult);
+            text.setText(R.string.errorNoDiceDefinitions);
             return;
         }
         TextView text = viewSelected.findViewById(R.id.list_item);

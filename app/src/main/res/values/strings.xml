@@ -22,6 +22,8 @@
     <string name="diceConfigReRoll">reroll on</string>
     <string name="diceConfigConstant">Value</string>
     <string name="diceMessageStartup">Select a favorite below or click on an item from the drop down list then click "Roll" to roll the dice.</string>
+    <string name="errorNoDiceDefinitions">There are no items in the drop down list.  Either create some with "Configure Dice->New" or click on a favorite instead.</string>
+    <string name="confirm">Delete dice configuration: %s?</string>
     <string name="D1">Bonus</string>
     <string name="D3">D3</string>
     <string name="D4">D4</string>

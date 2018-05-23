@@ -5,6 +5,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -52,5 +55,17 @@ public class DiceLogActivity extends AppCompatActivity {
 
             layout.addView(layoutItem);
         }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.dice_log_menu, menu);
+        return true;
+    }
+
+    public void onLogExit(MenuItem item) {
+        setResult(RESULT_OK, null);
+        finish();
     }
 }

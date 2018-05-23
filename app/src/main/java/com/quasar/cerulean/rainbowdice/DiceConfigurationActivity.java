@@ -19,8 +19,10 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.TypedValue;
@@ -38,12 +40,19 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.io.File;
+import java.util.Locale;
 
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_FILENAME;
 
 public class DiceConfigurationActivity extends AppCompatActivity {
     ConfigurationFile configurationFile;
+    private class DeleteRequestedInfo {
+        public String filename;
+        public Dialog confirmDialog;
+        public int layoutFileLocation;
+    }
+    DeleteRequestedInfo deleteRequestedInfo = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,15 +164,36 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                 TextView text = item.findViewById(R.id.filename);
                 String filename = text.getText().toString();
 
-                // delete the file
-                if (!filename.isEmpty()) {
-                    deleteFile(filename);
-                    layout.removeViewAt(i);
-                    resetFavoriteSpinners();
+                if (filename.isEmpty()) {
+                    return;
                 }
+
+                LinearLayout confirmLayout = (LinearLayout) getLayoutInflater().inflate(R.layout.configuration_confirm_dialog, layout, false);
+                deleteRequestedInfo = new DeleteRequestedInfo();
+                deleteRequestedInfo.filename = filename;
+                deleteRequestedInfo.layoutFileLocation = i;
+                String confirmMessage = String.format(Locale.getDefault(), getString(R.string.confirm), filename);
+                deleteRequestedInfo.confirmDialog = new AlertDialog.Builder(this).setTitle(confirmMessage).setView(confirmLayout).show();
+
+                return;
             }
         }
 
+    }
+
+    public void onDeleteDiceConfig(View view) {
+        // delete the file
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        layout.removeViewAt(deleteRequestedInfo.layoutFileLocation);
+        deleteFile(deleteRequestedInfo.filename);
+        deleteRequestedInfo.confirmDialog.dismiss();
+        deleteRequestedInfo = null;
+        resetFavoriteSpinners();
+    }
+
+    public void onCancelDeleteDiceConfig(View view) {
+        deleteRequestedInfo.confirmDialog.dismiss();
+        deleteRequestedInfo = null;
     }
 
     public void onEdit(View view) {

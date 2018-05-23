@@ -602,7 +602,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         LinearLayout layout = findViewById(R.id.dice_list);
         LayoutInflater inflater = getLayoutInflater();
 
-        LinearLayout saveDialogView = (LinearLayout) inflater.inflate(R.layout.save_as_dialog, layout, false);
+        LinearLayout saveDialogView = (LinearLayout) inflater.inflate(R.layout.customization_save_as_dialog, layout, false);
 
         if (saveFileName != null) {
             EditText text = saveDialogView.findViewById(R.id.filename);
