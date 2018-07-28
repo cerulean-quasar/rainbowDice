@@ -184,7 +184,7 @@ void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
     }
 }
 
-void DicePhysicsModel::updateModelMatrix() {
+bool DicePhysicsModel::updateModelMatrix() {
     // reset the position in the case that it got stuck outside the boundry
     if (position.x < -maxposx) {
         position.x = -maxposx;
@@ -207,7 +207,7 @@ void DicePhysicsModel::updateModelMatrix() {
         glm::mat4 rotate = glm::toMat4(qTotalRotated);
         glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
         ubo.model = translate * rotate * scale;
-        return;
+        return true;
     }
 
     auto currentTime = std::chrono::high_resolution_clock::now();
@@ -289,6 +289,14 @@ void DicePhysicsModel::updateModelMatrix() {
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
     ubo.model = translate * rotate * scale;
+
+    float difference = glm::length(position - prevPosition);
+    if (difference < 0.01) {
+        return false;
+    } else {
+        prevPosition = position;
+        return true;
+    }
 }
 
 std::string DicePhysicsModel::calculateUpFace() {

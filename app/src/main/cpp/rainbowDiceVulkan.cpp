@@ -1908,16 +1908,22 @@ void RainbowDiceVulkan::loadObject(std::vector<std::string> &symbols) {
     dice.push_back(o);
 }
 
-void RainbowDiceVulkan::updateUniformBuffer() {
+bool RainbowDiceVulkan::updateUniformBuffer() {
     for (int i = 0; i < dice.size(); i++) {
         for (int j = i+1; j < dice.size(); j++) {
             dice[i]->die->calculateBounce(dice[j]->die);
         }
     }
+
+    bool needsRedraw = false;
     for (auto die : dice) {
-        die->die->updateModelMatrix();
+        if (die->die->updateModelMatrix()) {
+            needsRedraw = true;
+        }
         die->updateUniformBuffer();
     }
+
+    return needsRedraw;
 }
 
 void RainbowDiceVulkan::updateAcceleration(float x, float y, float z) {

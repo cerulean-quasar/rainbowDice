@@ -343,15 +343,20 @@ GLuint RainbowDiceGL::loadShaders() {
     return ProgramID;
 }
 
-void RainbowDiceGL::updateUniformBuffer() {
+bool RainbowDiceGL::updateUniformBuffer() {
     for (int i = 0; i < dice.size(); i++) {
         for (int j = i+1; j < dice.size(); j++) {
             dice[i].die->calculateBounce(dice[j].die.get());
         }
     }
+    bool needsRedraw = false;
     for (auto die : dice) {
-        die.die->updateModelMatrix();
+        if (die.die->updateModelMatrix()) {
+            needsRedraw = true;
+        }
     }
+
+    return needsRedraw;
 }
 
 bool RainbowDiceGL::allStopped() {

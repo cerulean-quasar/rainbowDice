@@ -24,7 +24,7 @@ public:
 
     virtual void drawFrame()=0;
 
-    virtual void updateUniformBuffer()=0;
+    virtual bool updateUniformBuffer()=0;
 
     virtual bool allStopped()=0;
 

@@ -38,7 +38,7 @@ public:
 
     virtual void drawFrame();
 
-    virtual void updateUniformBuffer();
+    virtual bool updateUniformBuffer();
 
     virtual bool allStopped();
 
