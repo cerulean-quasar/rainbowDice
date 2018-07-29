@@ -266,7 +266,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
             if (needsRedraw) {
                 diceGraphics->drawFrame();
             }
-            
+
             if (diceGraphics->allStopped()) {
                 ASensorEventQueue_disableSensor(eventQueue, sensor);
                 results = diceGraphics->getDiceResults();
