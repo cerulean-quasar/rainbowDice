@@ -32,6 +32,7 @@
 #include <string>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include "vulkanWrapper.hpp"
 
 struct Vertex {
@@ -223,7 +224,7 @@ public:
     }
 
     void setView();
-    void updatePerspectiveMatrix(int surfaceWidth, int surfaceHeight);
+    void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
     void updateAcceleration(float x, float y, float z);
     void updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);

@@ -79,12 +79,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
-    private Thread drawer;
-    private DieConfiguration[] diceConfig;
+    private Thread drawer = null;
+    private DieConfiguration[] diceConfig = null;
     private DiceResult diceResult = null;
-    private ConfigurationFile configurationFile;
-    private LogFile logFile;
-    private String diceFileLoaded;
+    private ConfigurationFile configurationFile = null;
+    private LogFile logFile = null;
+    private String diceFileLoaded = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

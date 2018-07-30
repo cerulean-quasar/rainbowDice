@@ -17,6 +17,8 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#include <cstdint>
+#include <stdexcept>
 #include "rainbowDiceGlobal.hpp"
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
@@ -59,7 +61,7 @@ void DestroyDebugReportCallbackEXT(VkInstance instance,
 void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
     window = inWindow;
     if (!loadVulkan()) {
-        throw std::runtime_error("Could not find vulkan library.");
+        throw std::runtime_error(std::string("Could not find vulkan library."));
     }
     createInstance();
 

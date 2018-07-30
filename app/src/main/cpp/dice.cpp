@@ -111,7 +111,7 @@ void DicePhysicsModel::setView() {
 
 }
 
-void DicePhysicsModel::updatePerspectiveMatrix(int surfaceWidth, int surfaceHeight) {
+void DicePhysicsModel::updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) {
     /* perspective matrix: takes the perspective projection, the aspect ratio, near and far
      * view planes.
      */
