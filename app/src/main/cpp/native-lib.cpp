@@ -262,8 +262,11 @@ Java_com_quasar_cerulean_rainbowdice_Draw_draw(
                 }
 
             }
-            diceGraphics->updateUniformBuffer();
-            diceGraphics->drawFrame();
+            bool needsRedraw = diceGraphics->updateUniformBuffer();
+            if (needsRedraw) {
+                diceGraphics->drawFrame();
+            }
+
             if (diceGraphics->allStopped()) {
                 ASensorEventQueue_disableSensor(eventQueue, sensor);
                 results = diceGraphics->getDiceResults();

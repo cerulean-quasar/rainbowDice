@@ -199,6 +199,7 @@ private:
     glm::vec3 acceleration;
     glm::vec3 velocity;
     glm::vec3 position;
+    glm::vec3 prevPosition;
 
     bool stopped;
     std::string result;
@@ -207,11 +208,13 @@ public:
     /* MVP matrix */
     UniformBufferObject ubo = {};
 
+    /* Set previous position to a bogus value to make sure the die is drawn first thing */
     DicePhysicsModel(std::vector<std::string> &inSymbols, uint32_t inNumberFaces)
         : DiceModel(inSymbols), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
-          velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f), stopped(false)
+          velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f),
+          prevPosition(10.0f, 0.0f, 0.0f), stopped(false)
     {
     }
 
@@ -226,7 +229,7 @@ public:
     void setView();
     void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
     void updateAcceleration(float x, float y, float z);
-    void updateModelMatrix();
+    bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
     bool isStopped() { return stopped; }
     std::string getResult() { return result; }

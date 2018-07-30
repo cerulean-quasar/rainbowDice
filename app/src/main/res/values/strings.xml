@@ -10,7 +10,7 @@
     <string name="delete">Delete</string>
     <string name="new_item">New</string>
     <string name="favorites">Favorites:</string>
-    <string name="configureDice">Configure Dice</string>
+    <string name="configureDice">Configure</string>
     <string name="diceMessageRolling">Rolling...</string>
     <string name="diceMessageResult">result: %s = %d</string>
     <string name="diceMessageToStartRolling">Shake while rolling</string>
