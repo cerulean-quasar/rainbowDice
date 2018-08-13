@@ -28,6 +28,7 @@
 #include "text.hpp"
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
+#include "random.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -381,45 +382,21 @@ uint32_t DicePhysicsModel::calculateUpFace() {
 }
 
 void DicePhysicsModel::randomizeUpFace() {
-    unsigned int randomFace;
-    unsigned int randomAngle;
-    const unsigned int too_big = std::numeric_limits<unsigned int>::max()/numberFaces * numberFaces;
+    Random random;
+    uint32_t upFace = random.getUInt(0, numberFaces);
 
-    int fd = open("/dev/urandom", O_RDONLY);
-
-    if (fd == -1) {
-        throw std::runtime_error(std::string("Could not open /dev/urandom: ") + strerror(errno));
-    }
-
-    do {
-        ssize_t nbrBytes = read(fd, &randomFace, sizeof(randomFace));
-
-        if (nbrBytes != sizeof(randomFace)) {
-            throw std::runtime_error("Could not read enough random data.");
-        }
-    } while (randomFace >= too_big);
-
-    ssize_t nbrBytes = read(fd, &randomAngle, sizeof(randomAngle));
-
-    if (nbrBytes != sizeof(randomAngle)) {
-        throw std::runtime_error("Could not read enough random data.");
-    }
-
-    close(fd);
-
-    uint32_t upFace = randomFace % numberFaces;
-
-    float angle;
+    float angle = random.getFloat(0.0f, 2 * pi);
     glm::vec3 normalVector;
     glm::vec3 zaxis = glm::vec3(0.0, 0.0, 1.0);
     getAngleAxis(upFace, angle, normalVector);
     glm::quat quaternian = glm::angleAxis(angle, glm::normalize(glm::cross(normalVector, zaxis)));
 
-    angle = randomAngle;
-    angle = angle / std::numeric_limits<unsigned int>::max() * 2 * pi;
     glm::quat quaternian2 = glm::angleAxis(angle, zaxis);
 
     qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
+
+    position.x = random.getFloat(-screenWidth/2, screenWidth/2);
+    position.y = random.getFloat(-screenHeight/2, screenHeight/2);
 }
 
 void DiceModelCube::loadModel() {

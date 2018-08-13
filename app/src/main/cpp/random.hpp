@@ -17,14 +17,16 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include <memory>
-#include "rainbowDiceGlobal.hpp"
-#include "text.hpp"
-
-const std::string SHADER_VERT_FILE = "vertexShader";
-const std::string SHADER_FRAG_FILE = "fragmentShader";
-
-std::unique_ptr<TextureAtlas> texAtlas;
-
-float const screenWidth = 1.4f;
-float const screenHeight = 1.6f;
+#ifndef RAINBOW_DICE_RANDOM_HPP
+#define RAINBOW_DICE_RANDOM_HPP
+class Random {
+private:
+    int fd;
+    template<typename T> T get();
+public:
+    Random() : fd(-1) { }
+    unsigned int getUInt(unsigned int lowerBound, unsigned int upperBound);
+    float getFloat(float lowerBound, float upperBound);
+    ~Random();
+};
+#endif

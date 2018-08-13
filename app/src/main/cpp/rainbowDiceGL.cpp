@@ -345,8 +345,10 @@ GLuint RainbowDiceGL::loadShaders() {
 
 bool RainbowDiceGL::updateUniformBuffer() {
     for (int i = 0; i < dice.size(); i++) {
-        for (int j = i+1; j < dice.size(); j++) {
-            dice[i].die->calculateBounce(dice[j].die.get());
+        if (!dice[i].die->isStopped()) {
+            for (int j = i + 1; j < dice.size(); j++) {
+                dice[i].die->calculateBounce(dice[j].die.get());
+            }
         }
     }
     bool needsRedraw = false;
@@ -355,8 +357,8 @@ bool RainbowDiceGL::updateUniformBuffer() {
             needsRedraw = true;
         }
         if (die.die->isStopped() && !die.die->isStoppedAnimationStarted()) {
-            float width = 1.4f;
-            float height = 1.6f;
+            float width = screenWidth;
+            float height = screenHeight;
             float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
             float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
             if (stoppedX > width/(2*DicePhysicsModel::stoppedRadius)-1) {

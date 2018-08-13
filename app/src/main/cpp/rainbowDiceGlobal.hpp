@@ -25,8 +25,8 @@
 
 typedef ANativeWindow WindowType;
 
-extern const std::string SHADER_VERT_FILE;
-extern const std::string SHADER_FRAG_FILE;
+extern std::string const SHADER_VERT_FILE;
+extern std::string const SHADER_FRAG_FILE;
 
 #include "rainbowDice.hpp"
 #include "text.hpp"
@@ -34,5 +34,8 @@ extern const std::string SHADER_FRAG_FILE;
 #include <GLES2/gl2.h>
 
 extern std::unique_ptr<TextureAtlas> texAtlas;
+
+extern float const screenWidth;
+extern float const screenHeight;
 
 #endif
