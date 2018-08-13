@@ -149,9 +149,11 @@ public:
     /* vertex, index, and texture data for drawing the model */
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
+    bool isOpenGl;
 
-    DiceModel(std::vector<std::string> &inSymbols)
+    DiceModel(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
     {
+        isOpenGl = inIsOpenGl;
         symbols = inSymbols;
     }
 
@@ -219,8 +221,8 @@ public:
     UniformBufferObject ubo = {};
 
     /* Set previous position to a bogus value to make sure the die is drawn first thing */
-    DicePhysicsModel(std::vector<std::string> &inSymbols, uint32_t inNumberFaces)
-        : DiceModel(inSymbols), qTotalRotated(), numberFaces(inNumberFaces),
+    DicePhysicsModel(std::vector<std::string> &inSymbols, uint32_t inNumberFaces, bool inIsOpenGl = false)
+        : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f),
@@ -229,8 +231,9 @@ public:
     {
     }
 
-    DicePhysicsModel(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, uint32_t inNumberFaces)
-        : DiceModel(inSymbols), qTotalRotated(), numberFaces(inNumberFaces),
+    DicePhysicsModel(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, uint32_t inNumberFaces,
+                    bool inIsOpenGl = false)
+        : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false), animationDone(false),
@@ -252,7 +255,7 @@ public:
     bool isStoppedAnimationStarted() { return doneY != 0.0f; }
     std::string getResult() { return result; }
     void resetPosition();
-    virtual void loadModel(bool isGL) = 0;
+    virtual void loadModel() = 0;
     uint32_t calculateUpFace();
     void randomizeUpFace();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
@@ -265,17 +268,17 @@ private:
     void cubeTop(Vertex &vertex, uint32_t i);
     void cubeBottom(Vertex &vertex, uint32_t i);
 public:
-    DiceModelCube(std::vector<std::string> &inSymbols)
-        : DicePhysicsModel(inSymbols, 6)
+    DiceModelCube(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
+        : DicePhysicsModel(inSymbols, 6, inIsOpenGl)
     {
     }
 
-    DiceModelCube(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
-        : DicePhysicsModel(inSymbols, inPosition, 6)
+    DiceModelCube(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, bool inIsOpenGl = false)
+        : DicePhysicsModel(inSymbols, inPosition, 6, inIsOpenGl)
     {
     }
 
-    virtual void loadModel(bool isGL);
+    virtual void loadModel();
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };
@@ -288,23 +291,24 @@ class DiceModelHedron : public DicePhysicsModel {
 protected:
     void addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i);
 public:
-    DiceModelHedron(std::vector<std::string> &inSymbols, uint32_t inNumberFaces = 0)
-        : DicePhysicsModel(inSymbols, inNumberFaces)
+    DiceModelHedron(std::vector<std::string> &inSymbols, uint32_t inNumberFaces = 0, bool inIsOpenGl = false)
+        : DicePhysicsModel(inSymbols, inNumberFaces, inIsOpenGl)
     {
         if (inNumberFaces == 0) {
             numberFaces = inSymbols.size()%2==0?inSymbols.size():inSymbols.size()*2;
         }
     }
 
-    DiceModelHedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, uint32_t inNumberFaces = 0)
-        : DicePhysicsModel(inSymbols, inPosition, inNumberFaces)
+    DiceModelHedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, uint32_t inNumberFaces = 0,
+                    bool inIsOpenGl = false)
+        : DicePhysicsModel(inSymbols, inPosition, inNumberFaces, inIsOpenGl)
     {
         if (inNumberFaces == 0) {
             numberFaces = inSymbols.size()%2==0?inSymbols.size():inSymbols.size()*2;
         }
     }
 
-    virtual void loadModel(bool isGL);
+    virtual void loadModel();
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual uint32_t getUpFaceIndex(uint32_t i);
     virtual void yAlign(uint32_t faceIndex);
@@ -312,33 +316,33 @@ public:
 
 class DiceModelTetrahedron : public DiceModelHedron {
 public:
-    DiceModelTetrahedron(std::vector<std::string> &inSymbols)
-        : DiceModelHedron(inSymbols, 4)
+    DiceModelTetrahedron(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
+        : DiceModelHedron(inSymbols, 4, inIsOpenGl)
     {
     }
 
-    DiceModelTetrahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
-        : DiceModelHedron(inSymbols, inPosition, 4)
+    DiceModelTetrahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, bool inIsOpenGl = false)
+        : DiceModelHedron(inSymbols, inPosition, 4, inIsOpenGl)
     {
     }
 
-    virtual void loadModel(bool isGL);
+    virtual void loadModel();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
 };
 
 class DiceModelIcosahedron : public DiceModelHedron {
 public:
-    DiceModelIcosahedron(std::vector<std::string> &inSymbols)
-            : DiceModelHedron(inSymbols, 20)
+    DiceModelIcosahedron(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
+            : DiceModelHedron(inSymbols, 20, inIsOpenGl)
     {
     }
 
-    DiceModelIcosahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
-            : DiceModelHedron(inSymbols, inPosition, 20)
+    DiceModelIcosahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, bool inIsOpenGl = false)
+            : DiceModelHedron(inSymbols, inPosition, 20, inIsOpenGl)
     {
     }
 
-    virtual void loadModel(bool isGL);
+    virtual void loadModel();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
 };
 
@@ -347,17 +351,17 @@ private:
     void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i);
 
 public:
-    DiceModelDodecahedron(std::vector<std::string> &inSymbols)
-    : DicePhysicsModel(inSymbols, 12)
+    DiceModelDodecahedron(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
+    : DicePhysicsModel(inSymbols, 12, inIsOpenGl)
             {
             }
 
-    DiceModelDodecahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition)
-    : DicePhysicsModel(inSymbols, inPosition, 12)
+    DiceModelDodecahedron(std::vector<std::string> &inSymbols, glm::vec3 &inPosition, bool inIsOpenGl = false)
+    : DicePhysicsModel(inSymbols, inPosition, 12, inIsOpenGl)
     {
     }
 
-    virtual void loadModel(bool isGL);
+    virtual void loadModel();
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };

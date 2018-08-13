@@ -422,7 +422,7 @@ void DicePhysicsModel::randomizeUpFace() {
     qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
 }
 
-void DiceModelCube::loadModel(bool isGL) {
+void DiceModelCube::loadModel() {
     Vertex vertex = {};
 
     uint32_t totalNbrImages = texAtlas->getNbrImages();
@@ -433,33 +433,17 @@ void DiceModelCube::loadModel(bool isGL) {
         vertex.textureToUse = texAtlas->getImageIndex(symbols[0]);
         switch (i) {
         case 0:
-            if (isGL) {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            } else {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            }
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
             break;
         case 1:
-            if (isGL) {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            } else {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            }
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
             break;
         case 2:
-            if (isGL) {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            } else {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            }
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
             break;
         case 3:
         default:
-            if (isGL) {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            } else {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            }
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
             break;
         }
         vertex.color = colors[i%colors.size()];
@@ -470,33 +454,17 @@ void DiceModelCube::loadModel(bool isGL) {
         vertex.textureToUse = texAtlas->getImageIndex(symbols[1%symbols.size()]);
         switch (i) {
         case 0:
-            if (isGL) {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            } else {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            }
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
             break;
         case 1:
-            if (isGL) {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            } else {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            }
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
             break;
         case 2:
-            if (isGL) {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            } else {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            }
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
             break;
         case 3:
         default:
-            if (isGL) {
-                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-            } else {
-                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-            }
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
             break;
         }
         vertex.color = colors[(i+3) %colors.size()];
@@ -529,35 +497,19 @@ void DiceModelCube::loadModel(bool isGL) {
         vertex.textureToUse = texAtlas->getImageIndex(symbols[(i+2)%symbols.size()]);
 
         cubeTop(vertex, i);
-        if (isGL) {
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-        } else {
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-        }
+        vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
         vertices.push_back(vertex);
 
         cubeTop(vertex, (i+1)%4);
-        if (isGL) {
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-        } else {
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-        }
+        vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
         vertices.push_back(vertex);
 
         cubeBottom(vertex, i);
-        if (isGL) {
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-        } else {
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-        }
+        vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
         vertices.push_back(vertex);
 
         cubeBottom(vertex, (i+1)%4);
-        if (isGL) {
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
-        } else {
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
-        }
+        vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
         vertices.push_back(vertex);
 
         indices.push_back(9+4*i);
@@ -616,8 +568,15 @@ void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
 }
 
 void DiceModelCube::yAlign(uint32_t faceIndex) {
-    glm::vec3 yaxis = glm::vec3(0.0f,1.0f,0.0f);
-    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 yaxis;
+    glm::vec3 zaxis;
+    if (isOpenGl) {
+        zaxis = {0.0f, 0.0f, -1.0f};
+        yaxis = {0.0f, -1.0f, 0.0f};
+    } else {
+        zaxis = {0.0f, 0.0f, 1.0f};
+        yaxis = {0.0f, 1.0f, 0.0f};
+    }
     glm::vec3 axis;
     if (faceIndex == 0 || faceIndex == 1) {
         glm::vec4 p24 = ubo.model * glm::vec4(vertices[2].pos, 1.0f);
@@ -647,7 +606,7 @@ void DiceModelCube::yAlign(uint32_t faceIndex) {
     }
 }
 
-void DiceModelHedron::loadModel(bool isGL) {
+void DiceModelHedron::loadModel() {
     // top
     for (uint32_t i = 0; i < numberFaces/2; i ++) {
         // bottom
@@ -806,8 +765,15 @@ uint32_t DiceModelHedron::getUpFaceIndex(uint32_t i) {
 
 void DiceModelHedron::yAlign(uint32_t faceIndex) {
     const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
-    glm::vec3 yaxis = glm::vec3(0.0f,1.0f,0.0f);
-    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 yaxis;
+    glm::vec3 zaxis;
+    if (isOpenGl) {
+        zaxis = {0.0f, 0.0f, -1.0f};
+        yaxis = {0.0f, -1.0f, 0.0f};
+    } else {
+        zaxis = {0.0f, 0.0f, 1.0f};
+        yaxis = {0.0f, 1.0f, 0.0f};
+    }
     glm::vec3 axis;
 
     glm::vec4 p1prime4 = ubo.model * glm::vec4(vertices[1 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
@@ -824,7 +790,7 @@ void DiceModelHedron::yAlign(uint32_t faceIndex) {
     qTotalRotated = glm::normalize(q * qTotalRotated);
 }
 
-void DiceModelTetrahedron::loadModel(bool isGL) {
+void DiceModelTetrahedron::loadModel() {
     glm::vec3 p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
     glm::vec3 q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
     glm::vec3 r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
@@ -849,7 +815,7 @@ void DiceModelTetrahedron::loadModel(bool isGL) {
     }
 }
 
-void DiceModelIcosahedron::loadModel(bool isGL) {
+void DiceModelIcosahedron::loadModel() {
     float phi = (1+sqrtf(5.0f))/2;
     float scaleFactor = 2;
     uint32_t i = 0;
@@ -1070,7 +1036,7 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertices.push_back(vertex);
 }
 
-void DiceModelDodecahedron::loadModel(bool isGL) {
+void DiceModelDodecahedron::loadModel() {
     float phi = (1+sqrtf(5.0f))/2;
     uint32_t i = 0;
     float scaleFactor = 2.0f;
@@ -1180,8 +1146,15 @@ void DiceModelDodecahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::
 
 void DiceModelDodecahedron::yAlign(uint32_t faceIndex){
     const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
-    glm::vec3 yaxis = glm::vec3(0.0f,1.0f,0.0f);
-    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 yaxis;
+    glm::vec3 zaxis;
+    if (isOpenGl) {
+        zaxis = {0.0f, 0.0f, -1.0f};
+        yaxis = {0.0f, -1.0f, 0.0f};
+    } else {
+        zaxis = {0.0f, 0.0f, 1.0f};
+        yaxis = {0.0f, 1.0f, 0.0f};
+    }
     glm::vec3 axis;
 
     glm::vec4 p14 = ubo.model * glm::vec4(vertices[5 + nbrVerticesPerFace * faceIndex].pos, 1.0f);

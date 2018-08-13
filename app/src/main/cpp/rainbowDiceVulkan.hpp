@@ -165,7 +165,7 @@ private:
         }
 
         void loadModel(int width, int height) {
-            die->loadModel(false);
+            die->loadModel();
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }

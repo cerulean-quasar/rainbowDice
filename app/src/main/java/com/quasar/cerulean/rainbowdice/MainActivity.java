@@ -475,10 +475,14 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         Paint paint = new Paint();
         paint.setUnderlineText(true);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(25.0f);
         canvas.drawARGB(0,0,0,0);
         int i = 0;
         for (String symbol : symbolSet) {
+            if (symbol.length() < 3) {
+                paint.setTextSize(50.0f);
+            } else {
+                paint.setTextSize(25.0f);
+            }
             canvas.drawText(symbol, 40, i*TEXHEIGHT + 40, paint);
             i++;
         }

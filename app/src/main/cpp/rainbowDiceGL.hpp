@@ -80,20 +80,20 @@ private:
         {
             long nbrSides = symbols.size();
             if (nbrSides == 4) {
-                die.reset((DicePhysicsModel*)new DiceModelTetrahedron(symbols, position));
+                die.reset((DicePhysicsModel*)new DiceModelTetrahedron(symbols, position, true));
             } else if (nbrSides == 12) {
-                die.reset((DicePhysicsModel*)new DiceModelDodecahedron(symbols, position));
+                die.reset((DicePhysicsModel*)new DiceModelDodecahedron(symbols, position, true));
             } else if (nbrSides == 20) {
-                die.reset((DicePhysicsModel*)new DiceModelIcosahedron(symbols, position));
+                die.reset((DicePhysicsModel*)new DiceModelIcosahedron(symbols, position, true));
             } else if (6 % nbrSides == 0) {
-                die.reset((DicePhysicsModel*)new DiceModelCube(symbols, position));
+                die.reset((DicePhysicsModel*)new DiceModelCube(symbols, position, true));
             } else {
-                die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position));
+                die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, true));
             }
         }
 
         void loadModel(int width, int height) {
-            die->loadModel(true);
+            die->loadModel();
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }
