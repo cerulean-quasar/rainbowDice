@@ -114,7 +114,7 @@ void RainbowDiceVulkan::cleanup() {
     dice.clear();
 
     if (texAtlas.get() != nullptr && logicalDevice != VK_NULL_HANDLE) {
-        ((TextureAtlasVulkan*)texAtlas.get())->destroy(logicalDevice);
+        (static_cast<TextureAtlasVulkan*>(texAtlas.get()))->destroy(logicalDevice);
     }
 
     if (logicalDevice != VK_NULL_HANDLE) {
@@ -1922,6 +1922,17 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
         if (die->die->updateModelMatrix()) {
             needsRedraw = true;
         }
+        if (die->die->isStopped() && !die->die->isStoppedAnimationStarted()) {
+            float width = 1.4f;
+            float height = 1.6f;
+            float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            if (stoppedX > width/(2*DicePhysicsModel::stoppedRadius)-1) {
+                stoppedX = 0;
+                stoppedY++;
+            }
+            die->die->animateMove(x, y);
+        }
         die->updateUniformBuffer();
     }
 
@@ -1948,7 +1959,7 @@ void RainbowDiceVulkan::resetPositions(std::set<int> &diceIndices) {
 
 bool RainbowDiceVulkan::allStopped() {
     for (auto die : dice) {
-        if (!die->die->isStopped()) {
+        if (!die->die->isStopped() || !die->die->isStoppedAnimationDone()) {
             return false;
         }
     }

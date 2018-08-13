@@ -354,6 +354,17 @@ bool RainbowDiceGL::updateUniformBuffer() {
         if (die.die->updateModelMatrix()) {
             needsRedraw = true;
         }
+        if (die.die->isStopped() && !die.die->isStoppedAnimationStarted()) {
+            float width = 1.4f;
+            float height = 1.6f;
+            float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
+            float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            if (stoppedX > width/(2*DicePhysicsModel::stoppedRadius)-1) {
+                stoppedX = 0;
+                stoppedY++;
+            }
+            die.die->animateMove(x, y);
+        }
     }
 
     return needsRedraw;
@@ -361,7 +372,7 @@ bool RainbowDiceGL::updateUniformBuffer() {
 
 bool RainbowDiceGL::allStopped() {
     for (auto die : dice) {
-        if (!die.die->isStopped()) {
+        if (!die.die->isStopped() || !die.die->isStoppedAnimationDone()) {
             return false;
         }
     }

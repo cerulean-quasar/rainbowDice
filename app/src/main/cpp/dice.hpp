@@ -186,6 +186,7 @@ private:
     static float const errorVal;
     static float const radius;
     static float const angularSpeedScaleFactor;
+    static float const stoppedAnimationTime;
 
     /* for the accelerometer data.  These data are saved between dice creation and deletion. */
     static Filter filter;
@@ -202,9 +203,18 @@ private:
     glm::vec3 prevPosition;
 
     bool stopped;
+    bool animationDone;
+    float doneX;
+    float doneY;
+    float stoppedPositionX;
+    float stoppedPositionY;
+    float animationTime;
     std::string result;
 
 public:
+    // radius of a die when it is done rolling (It is shrinked and moved out of the rolling space).
+    static float const stoppedRadius;
+
     /* MVP matrix */
     UniformBufferObject ubo = {};
 
@@ -214,7 +224,8 @@ public:
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f),
-          prevPosition(10.0f, 0.0f, 0.0f), stopped(false)
+          prevPosition(10.0f, 0.0f, 0.0f), stopped(false), animationDone(false),
+          doneX(0.0f), doneY(0.0f), animationTime(0.0f)
     {
     }
 
@@ -222,7 +233,8 @@ public:
         : DiceModel(inSymbols), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
-          velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false)
+          velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false), animationDone(false),
+          doneX(0.0f), doneY(0.0f), animationTime(0.0f)
     {
     }
 
@@ -231,14 +243,21 @@ public:
     void updateAcceleration(float x, float y, float z);
     bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
+    void animateMove(float x, float y) {
+        doneX = x;
+        doneY = y;
+    }
     bool isStopped() { return stopped; }
+    bool isStoppedAnimationDone() { return animationDone; }
+    bool isStoppedAnimationStarted() { return doneY != 0.0f; }
     std::string getResult() { return result; }
     void resetPosition();
-    virtual void loadModel() = 0;
-    std::string calculateUpFace();
+    virtual void loadModel(bool isGL) = 0;
+    uint32_t calculateUpFace();
     void randomizeUpFace();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) = 0;
+    virtual void yAlign(uint32_t faceIndex) = 0;
 };
 
 class DiceModelCube : public DicePhysicsModel {
@@ -256,8 +275,9 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(bool isGL);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
+    virtual void yAlign(uint32_t faceIndex);
 };
 
 
@@ -284,9 +304,10 @@ public:
         }
     }
 
-    virtual void loadModel();
+    virtual void loadModel(bool isGL);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual uint32_t getUpFaceIndex(uint32_t i);
+    virtual void yAlign(uint32_t faceIndex);
 };
 
 class DiceModelTetrahedron : public DiceModelHedron {
@@ -301,7 +322,7 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(bool isGL);
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
 };
 
@@ -317,7 +338,7 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(bool isGL);
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
 };
 
@@ -336,7 +357,8 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(bool isGL);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
+    virtual void yAlign(uint32_t faceIndex);
 };
 #endif

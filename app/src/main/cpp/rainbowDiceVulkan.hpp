@@ -165,7 +165,7 @@ private:
         }
 
         void loadModel(int width, int height) {
-            die->loadModel();
+            die->loadModel(false);
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }
@@ -207,6 +207,9 @@ private:
     };
 
     std::vector<Dice*> dice;
+
+    int stoppedX = 0;
+    int stoppedY = 0;
 
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;

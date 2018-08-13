@@ -42,6 +42,9 @@ float const DicePhysicsModel::radius = 0.2f;
 float const DicePhysicsModel::maxposx = 0.5f;
 float const DicePhysicsModel::maxposy = 0.5f;
 float const DicePhysicsModel::maxposz = 1.0f;
+float const DicePhysicsModel::stoppedAnimationTime = 0.5f; // seconds
+float const DicePhysicsModel::stoppedRadius = 0.1f;
+
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
         {1.0f, 0.5f, 0.0f}, // orange
@@ -184,6 +187,15 @@ void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
     }
 }
 
+void checkQuaternion(glm::quat &q) {
+    if (glm::length(q) == 0) {
+        q = glm::quat();
+    }
+    if (q.x != q.x || q.y != q.y || q.z != q.z || q.w != q.w) {
+        q = glm::quat();
+    }
+}
+
 bool DicePhysicsModel::updateModelMatrix() {
     // reset the position in the case that it got stuck outside the boundry
     if (position.x < -maxposx) {
@@ -202,17 +214,46 @@ bool DicePhysicsModel::updateModelMatrix() {
         position.z = maxposz;
     }
 
-    if (stopped) {
-        glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
-        glm::mat4 rotate = glm::toMat4(qTotalRotated);
-        glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
-        ubo.model = translate * rotate * scale;
-        return true;
-    }
-
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - prevTime).count();
     prevTime = currentTime;
+
+    if (stopped) {
+        if (animationDone) {
+            return false;
+        } else if (doneY == 0.0f) {
+            glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
+            checkQuaternion(qTotalRotated);
+            glm::mat4 rotate = glm::toMat4(qTotalRotated);
+            glm::mat4 translate = glm::translate(position);
+            ubo.model = translate * rotate * scale;
+            return true;
+        } else if (stoppedAnimationTime <= animationTime) {
+            animationDone = true;
+            position.x = doneX;
+            position.y = doneY;
+            glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
+            checkQuaternion(qTotalRotated);
+            glm::mat4 rotate = glm::toMat4(qTotalRotated);
+            glm::mat4 translate = glm::translate(position);
+            ubo.model = translate * rotate * scale;
+            return true;
+        } else {
+            // we need to animate the move to the location it is supposed to go when it is done
+            // rolling so that it is out of the way of rolling dice.
+            animationTime += time;
+            float r = radius - (radius - stoppedRadius)/stoppedAnimationTime*animationTime;
+            position.x = (doneX - stoppedPositionX)/stoppedAnimationTime*animationTime + stoppedPositionX;
+            position.y = (doneY - stoppedPositionY)/stoppedAnimationTime*animationTime + stoppedPositionY;
+            glm::mat4 scale = glm::scale(glm::vec3(r, r, r));
+            checkQuaternion(qTotalRotated);
+            glm::mat4 rotate = glm::toMat4(qTotalRotated);
+            glm::mat4 translate = glm::translate(position);
+            ubo.model = translate * rotate * scale;
+            return true;
+        }
+    }
+
     float speed = glm::length(velocity);
 
     if (speed != 0) {
@@ -267,13 +308,21 @@ bool DicePhysicsModel::updateModelMatrix() {
     if ((position.z > maxposz || maxposz - position.z < errorVal) && fabs(velocity.z) < errorVal) {
         stopped = true;
 
-        std::string upFaceSymbol = calculateUpFace();
+        uint32_t upFace = calculateUpFace();
+        std::string upFaceSymbol = symbols[getUpFaceIndex(upFace)%symbols.size()];
+
+        glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
+        checkQuaternion(qTotalRotated);
+        glm::mat4 rotate = glm::toMat4(qTotalRotated);
+        glm::mat4 translate = glm::translate(position);
+        ubo.model = translate * rotate * scale;
+        yAlign(upFace);
         result = upFaceSymbol;
 
         angularVelocity.setAngularSpeed(0);
-        velocity.x = 0;
-        velocity.y = 0;
-        velocity.z = 0;
+        velocity = {0.0f, 0.0f, 0.0f};
+        stoppedPositionX = position.x;
+        stoppedPositionY = position.y;
         position.z = maxposz;
     }
 
@@ -286,9 +335,14 @@ bool DicePhysicsModel::updateModelMatrix() {
     }
 
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
+    checkQuaternion(qTotalRotated);
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
     ubo.model = translate * rotate * scale;
+
+    if (stopped) {
+        return true;
+    }
 
     float difference = glm::length(position - prevPosition);
     if (difference < 0.01) {
@@ -299,7 +353,7 @@ bool DicePhysicsModel::updateModelMatrix() {
     }
 }
 
-std::string DicePhysicsModel::calculateUpFace() {
+uint32_t DicePhysicsModel::calculateUpFace() {
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
     glm::vec3 upPerpendicular;
     glm::vec3 perpendicularFaceVec;
@@ -317,11 +371,13 @@ std::string DicePhysicsModel::calculateUpFace() {
         }
     }
 
-    glm::quat quaternian = glm::angleAxis(angleMin, glm::normalize(glm::cross(upPerpendicular, zaxis)));
-    qTotalRotated = glm::normalize(quaternian * qTotalRotated);
+    glm::vec3 cross = glm::cross(upPerpendicular, zaxis);
+    if (angleMin != 0 && glm::length(cross) > 0) {
+        glm::quat q = glm::angleAxis(angleMin, glm::normalize(cross));
+        qTotalRotated = glm::normalize(q * qTotalRotated);
+    }
 
-    upFace = getUpFaceIndex(upFace);
-    return symbols[upFace%symbols.size()];
+    return upFace;
 }
 
 void DicePhysicsModel::randomizeUpFace() {
@@ -366,7 +422,7 @@ void DicePhysicsModel::randomizeUpFace() {
     qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
 }
 
-void DiceModelCube::loadModel() {
+void DiceModelCube::loadModel(bool isGL) {
     Vertex vertex = {};
 
     uint32_t totalNbrImages = texAtlas->getNbrImages();
@@ -377,16 +433,33 @@ void DiceModelCube::loadModel() {
         vertex.textureToUse = texAtlas->getImageIndex(symbols[0]);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
+            if (isGL) {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            } else {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            }
             break;
         case 1:
-            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse)};
+            if (isGL) {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            } else {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            }
             break;
         case 2:
-            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse)};
+            if (isGL) {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            } else {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            }
             break;
         case 3:
-            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
+        default:
+            if (isGL) {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            } else {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            }
             break;
         }
         vertex.color = colors[i%colors.size()];
@@ -397,16 +470,33 @@ void DiceModelCube::loadModel() {
         vertex.textureToUse = texAtlas->getImageIndex(symbols[1%symbols.size()]);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse)};
+            if (isGL) {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            } else {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            }
             break;
         case 1:
-            vertex.texCoord = {0, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
+            if (isGL) {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            } else {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            }
             break;
         case 2:
-            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse+1)};
+            if (isGL) {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            } else {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            }
             break;
         case 3:
-            vertex.texCoord = {1, (1.0f/totalNbrImages)*(vertex.textureToUse)};
+        default:
+            if (isGL) {
+                vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            } else {
+                vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            }
             break;
         }
         vertex.color = colors[(i+3) %colors.size()];
@@ -439,19 +529,35 @@ void DiceModelCube::loadModel() {
         vertex.textureToUse = texAtlas->getImageIndex(symbols[(i+2)%symbols.size()]);
 
         cubeTop(vertex, i);
-        vertex.texCoord = {0,(1.0f/totalNbrImages)*(vertex.textureToUse)};
+        if (isGL) {
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+        } else {
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+        }
         vertices.push_back(vertex);
 
         cubeTop(vertex, (i+1)%4);
-        vertex.texCoord = {0,(1.0f/totalNbrImages)*(vertex.textureToUse+1)};
+        if (isGL) {
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+        } else {
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+        }
         vertices.push_back(vertex);
 
         cubeBottom(vertex, i);
-        vertex.texCoord = {1,(1.0f/totalNbrImages)*(vertex.textureToUse)};
+        if (isGL) {
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+        } else {
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+        }
         vertices.push_back(vertex);
 
         cubeBottom(vertex, (i+1)%4);
-        vertex.texCoord = {1,(1.0f/totalNbrImages)*(vertex.textureToUse+1)};
+        if (isGL) {
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+        } else {
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+        }
         vertices.push_back(vertex);
 
         indices.push_back(9+4*i);
@@ -509,7 +615,39 @@ void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
     }
 }
 
-void DiceModelHedron::loadModel() {
+void DiceModelCube::yAlign(uint32_t faceIndex) {
+    glm::vec3 yaxis = glm::vec3(0.0f,1.0f,0.0f);
+    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 axis;
+    if (faceIndex == 0 || faceIndex == 1) {
+        glm::vec4 p24 = ubo.model * glm::vec4(vertices[2].pos, 1.0f);
+        glm::vec4 p04 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
+        glm::vec3 p2 = {p24.x, p24.y, p24.z};
+        glm::vec3 p0 = {p04.x, p04.y, p04.z};
+        axis = p2 - p0;
+        if (faceIndex == 1) {
+            axis = -axis;
+        }
+    } else {
+        glm::vec4 p84 = ubo.model * glm::vec4(vertices[8+4*(faceIndex-2)].pos, 1.0f);
+        glm::vec4 p94 = ubo.model * glm::vec4(vertices[9+4*(faceIndex-2)].pos, 1.0f);
+        glm::vec3 p9 = {p94.x, p94.y, p94.z};
+        glm::vec3 p8 = {p84.x, p84.y, p84.z};
+        axis = p8 - p9;
+    }
+
+    float angle = glm::acos(glm::dot(glm::normalize(axis), yaxis));
+    if (axis.x < 0) {
+        angle = -angle;
+    }
+
+    if (angle != 0.0f) {
+        glm::quat q = glm::angleAxis(angle, zaxis);
+        qTotalRotated = glm::normalize(q * qTotalRotated);
+    }
+}
+
+void DiceModelHedron::loadModel(bool isGL) {
     // top
     for (uint32_t i = 0; i < numberFaces/2; i ++) {
         // bottom
@@ -645,7 +783,7 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
 }
 
 void DiceModelHedron::getAngleAxis(uint32_t face, float &angle, glm::vec3 &axis) {
-    const uint32_t nbrVerticesPerFace = vertices.size()/numberFaces;
+    const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
 
     glm::vec4 p04 = ubo.model * glm::vec4(vertices[face * nbrVerticesPerFace].pos, 1.0f);
@@ -666,7 +804,27 @@ uint32_t DiceModelHedron::getUpFaceIndex(uint32_t i) {
     }
 }
 
-void DiceModelTetrahedron::loadModel() {
+void DiceModelHedron::yAlign(uint32_t faceIndex) {
+    const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
+    glm::vec3 yaxis = glm::vec3(0.0f,1.0f,0.0f);
+    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 axis;
+
+    glm::vec4 p1prime4 = ubo.model * glm::vec4(vertices[1 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 p34 = ubo.model * glm::vec4(vertices[4 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec3 p1prime = {p1prime4.x, p1prime4.y, p1prime4.z};
+    glm::vec3 p3 = {p34.x, p34.y, p34.z};
+    axis = p1prime - p3;
+
+    float angle = glm::acos(glm::dot(glm::normalize(axis), yaxis));
+    if (axis.x < 0) {
+        angle = -angle;
+    }
+    glm::quat q = glm::angleAxis(angle, zaxis);
+    qTotalRotated = glm::normalize(q * qTotalRotated);
+}
+
+void DiceModelTetrahedron::loadModel(bool isGL) {
     glm::vec3 p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
     glm::vec3 q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
     glm::vec3 r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
@@ -691,7 +849,7 @@ void DiceModelTetrahedron::loadModel() {
     }
 }
 
-void DiceModelIcosahedron::loadModel() {
+void DiceModelIcosahedron::loadModel(bool isGL) {
     float phi = (1+sqrtf(5.0f))/2;
     float scaleFactor = 2;
     uint32_t i = 0;
@@ -912,7 +1070,7 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertices.push_back(vertex);
 }
 
-void DiceModelDodecahedron::loadModel() {
+void DiceModelDodecahedron::loadModel(bool isGL) {
     float phi = (1+sqrtf(5.0f))/2;
     uint32_t i = 0;
     float scaleFactor = 2.0f;
@@ -1007,7 +1165,7 @@ void DiceModelDodecahedron::loadModel() {
 }
 
 void DiceModelDodecahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
-    uint32_t const nbrVerticesPerFace = vertices.size()/numberFaces;
+    uint32_t const nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
 
     glm::vec4 a4 = ubo.model * glm::vec4(vertices[faceIndex * nbrVerticesPerFace].pos, 1.0f);
@@ -1018,4 +1176,24 @@ void DiceModelDodecahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::
     glm::vec3 c = glm::vec3(c4.x, c4.y, c4.z);
     axis = glm::normalize(glm::cross(c-b, a-b));
     angle = glm::acos(glm::dot(axis, zaxis));
+}
+
+void DiceModelDodecahedron::yAlign(uint32_t faceIndex){
+    const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
+    glm::vec3 yaxis = glm::vec3(0.0f,1.0f,0.0f);
+    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 axis;
+
+    glm::vec4 p14 = ubo.model * glm::vec4(vertices[5 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 c4 = ubo.model * glm::vec4(vertices[4 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec3 p1 = {p14.x, p14.y, p14.z};
+    glm::vec3 c = {c4.x, c4.y, c4.z};
+    axis = p1 - c;
+
+    float angle = glm::acos(glm::dot(glm::normalize(axis), yaxis));
+    if (axis.x < 0) {
+        angle = -angle;
+    }
+    glm::quat q = glm::angleAxis(angle, zaxis);
+    qTotalRotated = glm::normalize(q * qTotalRotated);
 }

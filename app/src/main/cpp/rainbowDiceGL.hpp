@@ -93,12 +93,15 @@ private:
         }
 
         void loadModel(int width, int height) {
-            die->loadModel();
+            die->loadModel(true);
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }
     };
     std::vector<Dice> dice;
+
+    int stoppedX = 0;
+    int stoppedY = 0;
 
     GLuint loadShaders();
 };
