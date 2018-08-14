@@ -1914,12 +1914,15 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
     for (int i = 0; i < dice.size(); i++) {
         if (!dice[i]->die->isStopped()) {
             for (int j = i + 1; j < dice.size(); j++) {
-                dice[i]->die->calculateBounce(dice[j]->die);
+                if (!dice[j]->die->isStopped()) {
+                    dice[i]->die->calculateBounce(dice[j]->die);
+                }
             }
         }
     }
 
     bool needsRedraw = false;
+    uint32_t i=0;
     for (auto die : dice) {
         if (die->die->updateModelMatrix()) {
             needsRedraw = true;
@@ -1927,15 +1930,15 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
         if (die->die->isStopped() && !die->die->isStoppedAnimationStarted()) {
             float width = screenWidth;
             float height = screenHeight;
+            uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
             float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
             float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            if (stoppedX > width/(2*DicePhysicsModel::stoppedRadius)-1) {
-                stoppedX = 0;
-                stoppedY++;
-            }
             die->die->animateMove(x, y);
         }
         die->updateUniformBuffer();
+        i++;
     }
 
     return needsRedraw;

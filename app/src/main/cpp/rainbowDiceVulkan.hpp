@@ -208,9 +208,6 @@ private:
 
     std::vector<Dice*> dice;
 
-    int stoppedX = 0;
-    int stoppedY = 0;
-
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapChainFramebuffers;

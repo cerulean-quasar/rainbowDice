@@ -37,7 +37,7 @@ public class DiceLogActivity extends AppCompatActivity {
 
         LinearLayout layout = findViewById(R.id.dice_log_list);
         LayoutInflater inflater = getLayoutInflater();
-        for (int i = 0; i < log.size(); i++) {
+        for (int i = log.size()-1; i >= 0 ; i--) {
             LogFile.LogItem item = log.get(i);
             LinearLayout layoutItem = (LinearLayout)inflater.inflate(R.layout.dice_log_item, layout, false);
 

@@ -129,10 +129,6 @@ void RainbowDiceGL::initPipeline() {
         die.loadModel(w, h);
     }
 
-    // Get a handle for our "MVP" uniform
-    // Only during the initialisation
-    MatrixID = glGetUniformLocation(programID, "MVP");
-
     for (int i=0; i < dice.size(); i++) {
         // the vertex buffer
         glGenBuffers(1, &dice[i].vertexBuffer);
@@ -208,8 +204,26 @@ void RainbowDiceGL::drawFrame() {
         // Send our transformation to the currently bound shader, in the "MVP"
         // uniform. This is done in the main loop since each model will have a
         // different MVP matrix (At least for the M part)
-        glm::mat4 mvp = dice[i].die->ubo.proj * dice[i].die->ubo.view * dice[i].die->ubo.model;
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp[0][0]);
+
+        // the projection matrix
+        GLint MatrixID = glGetUniformLocation(programID, "proj");
+        glm::mat4 matrix = dice[i].die->ubo.proj;
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+
+        // view matrix
+        MatrixID = glGetUniformLocation(programID, "view");
+        matrix = dice[i].die->ubo.view;
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+
+        // model matrix
+        MatrixID = glGetUniformLocation(programID, "model");
+        matrix = dice[i].die->ubo.model;
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+
+        // the model matrix for the normal vector
+        MatrixID = glGetUniformLocation(programID, "normalMatrix");
+        matrix = glm::transpose(glm::inverse(dice[i].die->ubo.model));
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // 1st attribute buffer : colors
         GLint colorID = glGetAttribLocation(programID, "inColor");
@@ -237,7 +251,6 @@ void RainbowDiceGL::drawFrame() {
         );
         glEnableVertexAttribArray(position);
 
-
         // Send in the texture coordinates
         GLint texCoordID = glGetAttribLocation(programID, "inTexCoord");
         glVertexAttribPointer(
@@ -249,6 +262,18 @@ void RainbowDiceGL::drawFrame() {
             (void*) offsetof (Vertex, texCoord)  // array buffer offset
         );
         glEnableVertexAttribArray(texCoordID);
+
+        // attribute buffer : vertices for die
+        GLint normalID = glGetAttribLocation(programID, "inNormal");
+        glVertexAttribPointer(
+                normalID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, normal)) // array buffer offset
+        );
+        glEnableVertexAttribArray(normalID);
 
         // Draw the triangles !
         //glDrawArrays(GL_TRIANGLES, 0, dice[0].die->vertices.size() /* total number of vertices*/);
@@ -347,11 +372,14 @@ bool RainbowDiceGL::updateUniformBuffer() {
     for (int i = 0; i < dice.size(); i++) {
         if (!dice[i].die->isStopped()) {
             for (int j = i + 1; j < dice.size(); j++) {
-                dice[i].die->calculateBounce(dice[j].die.get());
+                if (!dice[j].die->isStopped()) {
+                    dice[i].die->calculateBounce(dice[j].die.get());
+                }
             }
         }
     }
     bool needsRedraw = false;
+    uint32_t i = 0;
     for (auto die : dice) {
         if (die.die->updateModelMatrix()) {
             needsRedraw = true;
@@ -359,14 +387,14 @@ bool RainbowDiceGL::updateUniformBuffer() {
         if (die.die->isStopped() && !die.die->isStoppedAnimationStarted()) {
             float width = screenWidth;
             float height = screenHeight;
+            uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
             float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
             float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            if (stoppedX > width/(2*DicePhysicsModel::stoppedRadius)-1) {
-                stoppedX = 0;
-                stoppedY++;
-            }
             die.die->animateMove(x, y);
         }
+        i++;
     }
 
     return needsRedraw;

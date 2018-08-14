@@ -44,7 +44,7 @@ float const DicePhysicsModel::maxposx = 0.5f;
 float const DicePhysicsModel::maxposy = 0.5f;
 float const DicePhysicsModel::maxposz = 1.0f;
 float const DicePhysicsModel::stoppedAnimationTime = 0.5f; // seconds
-float const DicePhysicsModel::stoppedRadius = 0.1f;
+float const DicePhysicsModel::stoppedRadius = 0.12f;
 
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
@@ -96,17 +96,17 @@ std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescription
     attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
     attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
 
-    /* describes which texture to use */
+    /* normal to the surface this vertex is on */
     attributeDescriptions[3].binding = 0;
     attributeDescriptions[3].location = 3;
-    attributeDescriptions[3].format = VK_FORMAT_R32_UINT;
-    attributeDescriptions[3].offset = offsetof(Vertex, textureToUse);
+    attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[3].offset = offsetof(Vertex, normal);
 
     return attributeDescriptions;
 }
 
 bool Vertex::operator==(const Vertex& other) const {
-    return pos == other.pos && color == other.color && texCoord == other.texCoord && textureToUse == other.textureToUse;
+    return pos == other.pos && color == other.color && texCoord == other.texCoord && normal == other.normal;
 }
 
 void DicePhysicsModel::setView() {
@@ -130,6 +130,7 @@ void DicePhysicsModel::updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t s
 void DicePhysicsModel::resetPosition() {
     prevTime = std::chrono::high_resolution_clock::now();
     stopped = false;
+    animationDone = false;
     position = glm::vec3();
     velocity = glm::vec3();
     qTotalRotated = glm::quat();
@@ -406,21 +407,22 @@ void DiceModelCube::loadModel() {
 
     // vertices
     for (uint32_t i = 0; i < 4; i ++) {
-        // top
-        vertex.textureToUse = texAtlas->getImageIndex(symbols[0]);
+        // top (y is "up")
+        vertex.normal = {0.0f, 1.0f, 0.0f};
+        uint32_t textureToUse = texAtlas->getImageIndex(symbols[0]);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse + 1)};
             break;
         case 1:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse)};
             break;
         case 2:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse)};
             break;
         case 3:
         default:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse + 1)};
             break;
         }
         vertex.color = colors[i%colors.size()];
@@ -428,20 +430,21 @@ void DiceModelCube::loadModel() {
         vertices.push_back(vertex);
 
         //bottom
-        vertex.textureToUse = texAtlas->getImageIndex(symbols[1%symbols.size()]);
+        vertex.normal = {0.0f, -1.0f, 0.0f};
+        textureToUse = texAtlas->getImageIndex(symbols[1%symbols.size()]);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse)};
             break;
         case 1:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse + 1)};
             break;
         case 2:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse + 1)};
             break;
         case 3:
         default:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse)};
             break;
         }
         vertex.color = colors[(i+3) %colors.size()];
@@ -471,22 +474,32 @@ void DiceModelCube::loadModel() {
     // sides
     for (uint32_t i = 0; i < 4; i ++) {
         vertex.color = colors[i%colors.size()];
-        vertex.textureToUse = texAtlas->getImageIndex(symbols[(i+2)%symbols.size()]);
+        uint32_t textureToUse = texAtlas->getImageIndex(symbols[(i+2)%symbols.size()]);
+
+        if (i == 0) {
+            vertex.normal = {sqrtf(2) / 2, 0.0f, sqrtf(2) / 2};
+        } else if (i == 1) {
+            vertex.normal = {-sqrtf(2) / 2, 0.0f, sqrtf(2) / 2};
+        } else if (i == 2) {
+            vertex.normal = {-sqrtf(2) / 2, 0.0f, -sqrtf(2) / 2};
+        } else { // i == 3
+            vertex.normal = {sqrtf(2) / 2, 0.0f, -sqrtf(2) / 2};
+        }
 
         cubeTop(vertex, i);
-        vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+        vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse)};
         vertices.push_back(vertex);
 
         cubeTop(vertex, (i+1)%4);
-        vertex.texCoord = {0, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+        vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse + 1)};
         vertices.push_back(vertex);
 
         cubeBottom(vertex, i);
-        vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse)};
+        vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse)};
         vertices.push_back(vertex);
 
         cubeBottom(vertex, (i+1)%4);
-        vertex.texCoord = {1, (1.0f / totalNbrImages) * (vertex.textureToUse + 1)};
+        vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse + 1)};
         vertices.push_back(vertex);
 
         indices.push_back(9+4*i);
@@ -619,24 +632,24 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     glm::vec3 p1 = p2 - 1.0f/(1.0f+k) * ((r+q)/2.0f - p0);
     glm::vec3 p1prime = p3 - 1.0f/(1.0f+k) * ((r+q)/2.0f - p0);
 
+    // the vector normal to this face
+    vertex.normal = glm::normalize(glm::cross(r-q, p0-q));
+
     // Top triangle
     // not really using textures for this triangle
     vertex.pos = p0;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[i%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p1prime;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     // bottom left triangle
@@ -644,19 +657,16 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.pos = q;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2) %colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p3;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2) %colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p1prime;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     // bottom right triangle
@@ -664,57 +674,48 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     vertex.pos = r;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2)%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i+2)%colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     // bottom text triangle
     vertex.pos = p1prime;
     vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p3;
     vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i+2)%colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i+2)%colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     // top text triangle
     vertex.pos = p1prime;
     vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i+2)%colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i+1)%colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 }
 
@@ -914,24 +915,24 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     glm::vec3 p1 = 1.0f/2.0f * (e+b-d+c);
     glm::vec3 p2 = 1.0f/2.0f * (e+b+d-c);
 
+    // normal vector to the face
+    vertex.normal = glm::normalize(glm::cross(d-c, b-c));
+
     // Top triangle
     // not really using textures for this triangle
     vertex.pos = a;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[i % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = b;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = e;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     // right bottom triangle
@@ -939,19 +940,16 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertex.pos = b;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = c;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 2) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p1;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     // left bottom triangle
@@ -959,57 +957,48 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertex.pos = e;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     vertex.pos = d;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 2) % colors.size()];
-    vertex.textureToUse = 0;
     vertices.push_back(vertex);
 
     // bottom texture triangle
     vertex.pos = p1;
     vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = c;
     vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i + 2) % colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = d;
     vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i + 2) % colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     // top texture triangle
     vertex.pos = p1;
     vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = d;
     vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
     vertex.color = colors[(i + 2) % colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 
     vertex.pos = p2;
     vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse)};
     vertex.color = colors[(i + 1) % colors.size()];
-    vertex.textureToUse = textureToUse;
     vertices.push_back(vertex);
 }
 

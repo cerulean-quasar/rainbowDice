@@ -22,16 +22,26 @@
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
-layout(location = 2) in flat uint fragTextureToUse;
+layout(location = 2) in vec3 fragNormal;
+layout(location = 3) in vec3 fragPosition;
 
 layout(binding = 1) uniform sampler2D texSampler;
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
+    vec3 color;
     if (texture(texSampler, fragTexCoord).r != 0) {
-        outColor = vec4(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b, 1.0);
+        color = vec3(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b);
     } else {
-        outColor = vec4(fragColor, 1.0);
+        color = fragColor;
     }
+
+    vec3 lightpos = vec3(0.0, 0.0, 5.0);
+    vec3 lightDirection = normalize(lightpos - fragPosition);
+    float diff = max(dot(fragNormal, lightDirection), 0.0);
+    vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
+
+    vec3 ambient = vec3(0.3, 0.3, 0.3);
+    outColor = vec4((ambient + diffuse) * color, 1.0);
 }

@@ -68,7 +68,6 @@ private:
     EGLSurface surface;
     EGLDisplay display;
     GLuint programID;
-    GLint MatrixID;
     std::vector<GLuint> texture;
 
     struct Dice {
@@ -88,7 +87,7 @@ private:
             } else if (6 % nbrSides == 0) {
                 die.reset((DicePhysicsModel*)new DiceModelCube(symbols, position, true));
             } else {
-                die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, true));
+                die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, nbrSides, true));
             }
         }
 
@@ -99,9 +98,6 @@ private:
         }
     };
     std::vector<Dice> dice;
-
-    int stoppedX = 0;
-    int stoppedY = 0;
 
     GLuint loadShaders();
 };
