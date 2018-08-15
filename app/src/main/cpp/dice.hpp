@@ -189,6 +189,8 @@ private:
     static float const radius;
     static float const angularSpeedScaleFactor;
     static float const stoppedAnimationTime;
+    static float const goingToStopAnimationTime;
+    static float const waitAfterDoneTime;
 
     /* for the accelerometer data.  These data are saved between dice creation and deletion. */
     static Filter filter;
@@ -203,6 +205,12 @@ private:
     glm::vec3 velocity;
     glm::vec3 position;
     glm::vec3 prevPosition;
+
+    bool goingToStop;
+    float stoppedRotateTime;
+    float stoppedAngle;
+    glm::vec3 stoppedRotationAxis;
+    uint32_t upFace;
 
     bool stopped;
     bool animationDone;
@@ -226,8 +234,8 @@ public:
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f),
-          prevPosition(10.0f, 0.0f, 0.0f), stopped(false), animationDone(false),
-          doneX(0.0f), doneY(0.0f), animationTime(0.0f)
+          prevPosition(10.0f, 0.0f, 0.0f), goingToStop(false), stoppedRotateTime(0.0f),
+          stopped(false), animationDone(false), doneX(0.0f), doneY(0.0f), animationTime(0.0f)
     {
     }
 
@@ -236,8 +244,9 @@ public:
         : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
-          velocity(0.0f,0.0f,0.0f), position(inPosition), stopped(false), animationDone(false),
-          doneX(0.0f), doneY(0.0f), animationTime(0.0f)
+          velocity(0.0f,0.0f,0.0f), position(inPosition),
+          prevPosition(10.0f, 0.0f, 0.0f), goingToStop(false), stoppedRotateTime(0.0f),
+          stopped(false), animationDone(false), doneX(0.0f), doneY(0.0f), animationTime(0.0f)
     {
     }
 

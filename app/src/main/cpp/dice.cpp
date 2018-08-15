@@ -44,6 +44,8 @@ float const DicePhysicsModel::maxposx = 0.5f;
 float const DicePhysicsModel::maxposy = 0.5f;
 float const DicePhysicsModel::maxposz = 1.0f;
 float const DicePhysicsModel::stoppedAnimationTime = 0.5f; // seconds
+float const DicePhysicsModel::goingToStopAnimationTime = 0.2f; // seconds
+float const DicePhysicsModel::waitAfterDoneTime = 0.6f; // seconds
 float const DicePhysicsModel::stoppedRadius = 0.12f;
 
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
@@ -225,10 +227,10 @@ bool DicePhysicsModel::updateModelMatrix() {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - prevTime).count();
     prevTime = currentTime;
 
-    if (stopped) {
+    if (goingToStop) {
         if (animationDone) {
             return false;
-        } else if (doneY == 0.0f) {
+        } else if (doneY == 0.0f && stopped) {
             glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
             checkQuaternion(qTotalRotated);
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
@@ -245,15 +247,62 @@ bool DicePhysicsModel::updateModelMatrix() {
             glm::mat4 translate = glm::translate(position);
             ubo.model = translate * rotate * scale;
             return true;
-        } else {
+        } else if (stopped) {
             // we need to animate the move to the location it is supposed to go when it is done
             // rolling so that it is out of the way of rolling dice.
             animationTime += time;
-            float r = radius - (radius - stoppedRadius)/stoppedAnimationTime*animationTime;
-            position.x = (doneX - stoppedPositionX)/stoppedAnimationTime*animationTime + stoppedPositionX;
-            position.y = (doneY - stoppedPositionY)/stoppedAnimationTime*animationTime + stoppedPositionY;
+            float r = radius - (radius - stoppedRadius) / stoppedAnimationTime * animationTime;
+            position.x = (doneX - stoppedPositionX) / stoppedAnimationTime * animationTime +
+                         stoppedPositionX;
+            position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
+                         stoppedPositionY;
             glm::mat4 scale = glm::scale(glm::vec3(r, r, r));
             checkQuaternion(qTotalRotated);
+            glm::mat4 rotate = glm::toMat4(qTotalRotated);
+            glm::mat4 translate = glm::translate(position);
+            ubo.model = translate * rotate * scale;
+            return true;
+        } else if (waitAfterDoneTime <= stoppedRotateTime) {
+            // done settling the dice to the floor.  Wait for some time before moving the die to the
+            // top of the screen.
+            stopped = true;
+            yAlign(upFace);
+            checkQuaternion(qTotalRotated);
+            glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
+            glm::mat4 rotate = glm::toMat4(qTotalRotated);
+            glm::mat4 translate = glm::translate(position);
+            ubo.model = translate * rotate * scale;
+            return true;
+        } else if (goingToStopAnimationTime > stoppedRotateTime){
+            // we need to animate the dice slowly settling to the floor.
+            stoppedRotateTime += time;
+            if (goingToStopAnimationTime < stoppedRotateTime) {
+                stoppedRotateTime = goingToStopAnimationTime;
+            }
+            glm::mat4 rotate;
+            if (stoppedAngle != 0) {
+                glm::quat q = glm::angleAxis(
+                        stoppedAngle / goingToStopAnimationTime * stoppedRotateTime,
+                        stoppedRotationAxis);
+                rotate = glm::toMat4(glm::normalize(q * qTotalRotated));
+            } else {
+                rotate = glm::mat4(1.0f);
+            }
+            glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
+            glm::mat4 translate = glm::translate(position);
+            ubo.model = translate * rotate * scale;
+            return true;
+        } else {
+            stoppedRotateTime += time;
+            // stopped animation done, now wait a while and then begin the animation to
+            // rotate and move the dice to the top of the screen.
+            if (stoppedAngle != 0.0f) {
+                glm::quat q = glm::angleAxis(stoppedAngle, stoppedRotationAxis);
+                qTotalRotated = glm::normalize(q * qTotalRotated);
+                checkQuaternion(qTotalRotated);
+                stoppedAngle = 0.0f;
+            }
+            glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
             ubo.model = translate * rotate * scale;
@@ -313,17 +362,10 @@ bool DicePhysicsModel::updateModelMatrix() {
     velocity += acceleration * time;
 
     if ((position.z > maxposz || maxposz - position.z < errorVal) && fabs(velocity.z) < errorVal) {
-        stopped = true;
+        goingToStop = true;
 
-        uint32_t upFace = calculateUpFace();
+        upFace = calculateUpFace();
         std::string upFaceSymbol = symbols[getUpFaceIndex(upFace)%symbols.size()];
-
-        glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
-        checkQuaternion(qTotalRotated);
-        glm::mat4 rotate = glm::toMat4(qTotalRotated);
-        glm::mat4 translate = glm::translate(position);
-        ubo.model = translate * rotate * scale;
-        yAlign(upFace);
         result = upFaceSymbol;
 
         angularVelocity.setAngularSpeed(0);
@@ -341,13 +383,13 @@ bool DicePhysicsModel::updateModelMatrix() {
         angularVelocity.setAngularSpeed(angularSpeed);
     }
 
-    glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
+    glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
     checkQuaternion(qTotalRotated);
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
-    glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
+    glm::mat4 translate = glm::translate(position);
     ubo.model = translate * rotate * scale;
 
-    if (stopped) {
+    if (goingToStop) {
         return true;
     }
 
@@ -380,8 +422,11 @@ uint32_t DicePhysicsModel::calculateUpFace() {
 
     glm::vec3 cross = glm::cross(upPerpendicular, zaxis);
     if (angleMin != 0 && glm::length(cross) > 0) {
-        glm::quat q = glm::angleAxis(angleMin, glm::normalize(cross));
-        qTotalRotated = glm::normalize(q * qTotalRotated);
+        stoppedAngle = angleMin;
+        stoppedRotationAxis = glm::normalize(cross);
+    } else {
+        stoppedAngle = 0;
+        stoppedRotationAxis = zaxis;
     }
 
     return upFace;
