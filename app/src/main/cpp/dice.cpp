@@ -152,40 +152,45 @@ void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
 }
 
 void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
-    if (glm::length(position - other->position) < radius) {
-        // they are almost at the exact same spot, just choose a direction to bounce...
-        // Using radius instead of 2*radius because we don't want to hit this condition
-        // often since it makes the dice animation look jagged.  Give the else if condition a
-        // chance to fix the problem instead.
-        position.x += radius;
-        other->position.x -= radius;
-        velocity.y += errorVal;
-        other->velocity.y -= errorVal;
-    } else if (glm::length(position - other->position) < 2 * radius) {
+    if (glm::length(position - other->position) < 2 * radius) {
         // the dice are too close, they need to bounce off of each other
+
+        if (glm::length(position-other->position) == 0) {
+            position.x += radius;
+            other->position.x -= radius;
+        }
         glm::vec3 norm = glm::normalize(position - other->position);
+        float length = glm::length(position - other->position);
+        if (length < radius) {
+            // they are almost at the exact same spot, just choose a direction to bounce...
+            // Using radius instead of 2*radius because we don't want to hit this condition
+            // often since it makes the dice animation look jagged.  Give the else if condition a
+            // chance to fix the problem instead.
+            position = position + (radius-length) * norm;
+            other->position = other->position - (radius-length) * norm;
+        }
         float dot = glm::dot(norm, velocity);
         if (fabs(dot) < errorVal) {
             // The speed of approach is near 0.  make it some larger value so that
             // the dice move apart from each other.
             if (dot < 0) {
-                dot = -errorVal;
+                dot = -10*errorVal;
             } else {
-                dot = errorVal;
+                dot = 10*errorVal;
             }
         }
-        velocity = velocity - norm * dot * 2.0f;
+        velocity = velocity - norm * 2.0f * dot;
         dot = glm::dot(norm, other->velocity);
         if (fabs(dot) < errorVal) {
             // The speed of approach is near 0.  make it some larger value so that
             // the dice move apart from each other.
             if (dot < 0) {
-                dot = -errorVal;
+                dot = -10*errorVal;
             } else {
-                dot = errorVal;
+                dot = 10*errorVal;
             }
         }
-        other->velocity = other->velocity - norm * dot * 2.0f;
+        other->velocity = other->velocity - norm * 2.0f * dot;
     }
 }
 
@@ -398,6 +403,12 @@ void DicePhysicsModel::randomizeUpFace() {
 
     position.x = random.getFloat(-screenWidth/2, screenWidth/2);
     position.y = random.getFloat(-screenHeight/2, screenHeight/2);
+    position.z = -maxposz;
+
+    float factor = 10;
+    velocity.x = random.getFloat(-factor, factor);
+    velocity.y = random.getFloat(-factor, factor);
+    velocity.x = random.getFloat(-factor, factor);
 }
 
 void DiceModelCube::loadModel() {

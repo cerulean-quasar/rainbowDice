@@ -438,6 +438,11 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     private void loadModelsAndTextures() {
+        if (diceConfig == null || diceConfig.length == 0) {
+            // somehow someone managed to crash the code by having dice config null.  I don't know
+            // how they did this, but returning here avoids the crash.
+            return;
+        }
         int TEXWIDTH = 64;
         int TEXHEIGHT = 64;
 
