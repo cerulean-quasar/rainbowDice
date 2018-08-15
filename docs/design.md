@@ -40,7 +40,7 @@ Note, in this process (for both, determining the face pointing towards the
 screen and the angle the die is rotated about the z-axis), we determine these
 values for each die individually.
 
-## How to the Textures Were Computed
+## How to the Textures Were Computed for the Icosahedron, the Tetrahedron, the Octohedron, and Other Dice Based Off the Octohedron.
 
 ### Background
 
@@ -172,8 +172,26 @@ p1prime = p3 - (((r+q)/2 -p0)/H)b = p3 - ((r+q)/2 - p0)(1/(k+1))
 ### Conclusion
 
 Now with vectors: `p1`, `p1prime`, `p2`, and `p3`, we can create all triangles for a side of the
-octohedron (or similar shape).  The vectors: `p1`, `p1prime`, `p2`, and `p3` are used as UV
-coordinates for the textures containing the symbols that go on each die face.
+octohedron (or other triangular faced dice).  The vectors: `p1`, `p1prime`, `p2`, and `p3` are
+used as UV coordinates for the textures containing the symbols that go on each die face.
+
+## The Cube Model.
+
+The cube is also completely rendered in software.  Below is a display of the points added to
+the vertices array for the top and bottom faces (where y is the "up" axis).
+
+<img src=/docs/pictures/cube_model.png>
+
+## The Dodecahedron Model
+
+The dodecahedron is completely rendered in software.  Below is a display of a face of the dodecahedron.
+The vertices are labeled the same as they are in the code.  The display also shows how the dodecahedron
+face is split up into triangles.
+
+<img src=/docs/pictures/dodecahedron_face.png>
+
+The triangles described by (p1,p2,D) and (p1,D,C) are used to hold the texture for the number on the
+die face.
 
 ## Which Side is Up After a Roll
 
