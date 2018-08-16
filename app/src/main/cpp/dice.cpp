@@ -43,9 +43,17 @@ float const DicePhysicsModel::radius = 0.2f;
 float const DicePhysicsModel::maxposx = 0.5f;
 float const DicePhysicsModel::maxposy = 0.5f;
 float const DicePhysicsModel::maxposz = 1.0f;
+
+// Time for the stopped animation to complete
 float const DicePhysicsModel::stoppedAnimationTime = 0.5f; // seconds
+
+// Time it takes for stopped die to settle to being flat from a cocked position.
 float const DicePhysicsModel::goingToStopAnimationTime = 0.2f; // seconds
+
+// Time to wait after the dice settled flat before moving them to the top of the window.
 float const DicePhysicsModel::waitAfterDoneTime = 0.6f; // seconds
+
+// the radius of the dice after it has moved to the top of the screen.
 float const DicePhysicsModel::stoppedRadius = 0.12f;
 
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
@@ -132,7 +140,16 @@ void DicePhysicsModel::updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t s
 void DicePhysicsModel::resetPosition() {
     prevTime = std::chrono::high_resolution_clock::now();
     stopped = false;
+    goingToStop = false;
     animationDone = false;
+    animationTime = 0.0f;
+    stoppedRotateTime = 0.0f;
+    stoppedAngle = 0.0f;
+    stoppedRotationAxis = {0.0f, 0.0f, 1.0f};
+    doneX = 0.0f;
+    doneY = 0.0f;
+    stoppedPositionX = 0.0f;
+    stoppedPositionY = 0.0f;
     position = glm::vec3();
     velocity = glm::vec3();
     qTotalRotated = glm::quat();
