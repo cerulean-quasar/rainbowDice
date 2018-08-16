@@ -179,6 +179,12 @@ protected:
     static const std::vector<glm::vec3> colors;
     glm::quat qTotalRotated;
     uint32_t numberFaces;
+
+    // for performing various rotations after the die is considered to have stopped moving
+    // first for rotating so that the up face is flat to the screen and second so for rotating
+    // the number so that it is upright.
+    float stoppedAngle;
+    glm::vec3 stoppedRotationAxis;
 private:
     static float const maxposx;
     static float const maxposy;
@@ -208,8 +214,6 @@ private:
 
     bool goingToStop;
     float stoppedRotateTime;
-    float stoppedAngle;
-    glm::vec3 stoppedRotationAxis;
     uint32_t upFace;
 
     bool stopped;

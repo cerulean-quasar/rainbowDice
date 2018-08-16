@@ -255,10 +255,15 @@ bool DicePhysicsModel::updateModelMatrix() {
             ubo.model = translate * rotate * scale;
             return true;
         } else if (stoppedAnimationTime <= animationTime) {
+            // all animations after the dice lands are done.
             animationDone = true;
             position.x = doneX;
             position.y = doneY;
             glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
+            if (stoppedAngle != 0) {
+                glm::quat q = glm::angleAxis(stoppedAngle, stoppedRotationAxis);
+                qTotalRotated = glm::normalize(q * qTotalRotated);
+            }
             checkQuaternion(qTotalRotated);
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
@@ -268,14 +273,25 @@ bool DicePhysicsModel::updateModelMatrix() {
             // we need to animate the move to the location it is supposed to go when it is done
             // rolling so that it is out of the way of rolling dice.
             animationTime += time;
+            if (stoppedAnimationTime < animationTime) {
+                animationTime = stoppedAnimationTime;
+            }
             float r = radius - (radius - stoppedRadius) / stoppedAnimationTime * animationTime;
             position.x = (doneX - stoppedPositionX) / stoppedAnimationTime * animationTime +
                          stoppedPositionX;
             position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
                          stoppedPositionY;
+            glm::mat4 rotate;
+            if (stoppedAngle != 0) {
+                glm::quat q = glm::angleAxis(stoppedAngle/stoppedAnimationTime*animationTime,
+                                             stoppedRotationAxis);
+                checkQuaternion(qTotalRotated);
+                checkQuaternion(q);
+                rotate = glm::toMat4(glm::normalize(q*qTotalRotated));
+            } else {
+                rotate = glm::mat4(1);
+            }
             glm::mat4 scale = glm::scale(glm::vec3(r, r, r));
-            checkQuaternion(qTotalRotated);
-            glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
             ubo.model = translate * rotate * scale;
             return true;
@@ -284,7 +300,6 @@ bool DicePhysicsModel::updateModelMatrix() {
             // top of the screen.
             stopped = true;
             yAlign(upFace);
-            checkQuaternion(qTotalRotated);
             glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
@@ -663,10 +678,8 @@ void DiceModelCube::yAlign(uint32_t faceIndex) {
         angle = -angle;
     }
 
-    if (angle != 0.0f) {
-        glm::quat q = glm::angleAxis(angle, zaxis);
-        qTotalRotated = glm::normalize(q * qTotalRotated);
-    }
+    stoppedRotationAxis = zaxis;
+    stoppedAngle = angle;
 }
 
 void DiceModelHedron::loadModel() {
@@ -837,8 +850,8 @@ void DiceModelHedron::yAlign(uint32_t faceIndex) {
     if (axis.x < 0) {
         angle = -angle;
     }
-    glm::quat q = glm::angleAxis(angle, zaxis);
-    qTotalRotated = glm::normalize(q * qTotalRotated);
+    stoppedRotationAxis = zaxis;
+    stoppedAngle = angle;
 }
 
 void DiceModelTetrahedron::loadModel() {
@@ -1206,6 +1219,6 @@ void DiceModelDodecahedron::yAlign(uint32_t faceIndex){
     if (axis.x < 0) {
         angle = -angle;
     }
-    glm::quat q = glm::angleAxis(angle, zaxis);
-    qTotalRotated = glm::normalize(q * qTotalRotated);
+    stoppedRotationAxis = zaxis;
+    stoppedAngle = angle;
 }
