@@ -361,7 +361,21 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
                 outputStream.close();
 
                 dice[0] = new DieConfiguration(4, 3, -1, 1, -2, true);
-                filename = "Plus Minus Dice";
+                filename = "Fudge Dice";
+                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+
+                dice[0] = new DieConfiguration(12, 6, 1, 1, 0, true);
+                filename = "12D6";
+                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+                DieConfiguration.saveToFile(outputStream, dice);
+                outputStream.close();
+
+                dice = new DieConfiguration[2];
+                dice[0] = new DieConfiguration(1, 6, 1, 1, 6, true);
+                dice[1] = new DieConfiguration(1, 6, 1, 1, 6, false);
+                filename = "d6-d6(reroll 6's)";
                 outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
                 DieConfiguration.saveToFile(outputStream, dice);
                 outputStream.close();
@@ -437,11 +451,12 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         drawer = null;
     }
 
-    private void loadModelsAndTextures() {
+    private boolean loadModelsAndTextures() {
         if (diceConfig == null || diceConfig.length == 0) {
             // somehow someone managed to crash the code by having dice config null.  I don't know
             // how they did this, but returning here avoids the crash.
-            return;
+            publishError("No dice configurations exist, please choose dice.");
+            return false;
         }
         int TEXWIDTH = 64;
         int TEXHEIGHT = 64;
@@ -475,7 +490,17 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             }
         }
 
-        Bitmap bitmap = Bitmap.createBitmap(TEXWIDTH, TEXHEIGHT*symbolSet.size(), ALPHA_8);
+        Bitmap bitmap;
+        try {
+            bitmap = Bitmap.createBitmap(TEXWIDTH, TEXHEIGHT * symbolSet.size(), ALPHA_8);
+        } catch (Exception e) {
+            if (e.getMessage() != null) {
+                publishError(e.getMessage());
+            } else {
+                publishError("Could not generate dice textures.");
+            }
+            return false;
+        }
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
         paint.setUnderlineText(true);
@@ -500,13 +525,13 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             imageBuffer.get(bytes);
         } catch (Exception e) {
             publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
-            return;
+            return false;
         }
         String err = addSymbols(symbolSet.toArray(new String[symbolSet.size()]), symbolSet.size(),
                 TEXWIDTH, TEXHEIGHT*symbolSet.size(), TEXHEIGHT, bitmapSize, bytes);
         if (err != null && err.length() != 0) {
             publishError(err);
-            return;
+            return false;
         }
 
         // now load the models. Some of the vertices depend on the size of the texture image.
@@ -543,6 +568,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             }
         }
 
+        return true;
     }
 
     public void publishError(String err) {
@@ -566,7 +592,9 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             }
         }
 
-        loadModelsAndTextures();
+        if (!loadModelsAndTextures()) {
+            return;
+        }
 
         byte[] vertShader;
         byte[] fragShader;

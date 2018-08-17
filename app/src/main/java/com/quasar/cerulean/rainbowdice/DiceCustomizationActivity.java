@@ -37,7 +37,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -525,9 +524,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         Spinner operationSpinner = layoutNew.findViewById(R.id.operation);
 
-        ArrayAdapter<CharSequence> spinAdapter = ArrayAdapter.createFromResource(this,
-                R.array.operationArray, android.R.layout.simple_spinner_item);
-        spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        OperationAdapter spinAdapter = new OperationAdapter(this);
         operationSpinner.setAdapter(spinAdapter);
         operationSpinner.setOnItemSelectedListener(this);
 
@@ -587,8 +584,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             return;
         }
 
-        TextView text = (TextView) view;
-        if (text.getText().toString().equals(getString(R.string.addition))) {
+        if (pos == OperationAdapter.plusPosition) {
             diceConfigs.get(i / 2 + 1).config.setIsAddOperation(true);
         } else {
             diceConfigs.get(i / 2 + 1).config.setIsAddOperation(false);
@@ -725,9 +721,9 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             // die config.
             if (operation != null) {
                 if (config.isAddOperation()) {
-                    operation.setSelection(0);
+                    operation.setSelection(OperationAdapter.plusPosition);
                 } else {
-                    operation.setSelection(1);
+                    operation.setSelection(OperationAdapter.minusPosition);
                 }
             }
 
@@ -746,9 +742,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 // there is at least one more dice config to come, add a divider
                 LinearLayout layoutDivider = (LinearLayout) inflater.inflate(R.layout.dice_list_divider, layout, false);
                 operation = layoutDivider.findViewById(R.id.operation);
-                ArrayAdapter<CharSequence> spinAdapter = ArrayAdapter.createFromResource(this,
-                        R.array.operationArray, android.R.layout.simple_spinner_item);
-                spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                OperationAdapter spinAdapter = new OperationAdapter(this);
                 operation.setAdapter(spinAdapter);
                 operation.setOnItemSelectedListener(this);
                 layout.addView(layoutDivider);
