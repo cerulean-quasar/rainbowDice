@@ -22,6 +22,7 @@ package com.quasar.cerulean.rainbowdice;
 
 import android.content.Context;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -29,17 +30,22 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.LinkedList;
 
 public class ConfigurationFile {
     public static final String configFile = "diceConfigurationFile";
+    private static final String version = "version";
+
+    // for version 0.
     private static final String favorite1 = "favorite1";
     private static final String favorite2 = "favorite2";
     private static final String favorite3 = "favorite3";
+
+    // for version 1
+    private static final String diceList = "diceList";
     private static final String theme = "theme";
 
-    private String fav1File;
-    private String fav2File;
-    private String fav3File;
+    private LinkedList<String> diceConfigList;
     private String themeName;
 
     private Context ctx;
@@ -68,13 +74,35 @@ public class ConfigurationFile {
 
         try {
             JSONObject obj = new JSONObject(json.toString());
-            fav1File = obj.getString(favorite1);
-            fav2File = obj.getString(favorite2);
-            fav3File = obj.getString(favorite3);
-            themeName = obj.getString(theme);
+            int versionNbr = obj.getInt(version);
+
+            if (versionNbr == 0) {
+                loadVersion0(obj);
+            } else if (versionNbr == 1) {
+                loadVersion1(obj);
+            }
         } catch (JSONException e) {
             System.out.println("Exception on reading JSON from file: " + configFile + " message: " + e.getMessage());
             return;
+        }
+    }
+
+    private void loadVersion0(JSONObject obj) throws JSONException {
+        String fav1File = obj.getString(favorite1);
+        String fav2File = obj.getString(favorite2);
+        String fav3File = obj.getString(favorite3);
+
+        diceConfigList.add(fav1File);
+        diceConfigList.add(fav2File);
+        diceConfigList.add(fav3File);
+        themeName = obj.getString(theme);
+    }
+
+    private void loadVersion1(JSONObject obj) throws JSONException {
+        JSONArray arr = obj.getJSONArray(diceList);
+        for (int i = 0; i < arr.length(); i ++) {
+            String dice = arr.getString(i);
+            diceConfigList.add(dice);
         }
     }
 
@@ -82,19 +110,20 @@ public class ConfigurationFile {
         String json;
         try {
             JSONObject obj = new JSONObject();
-            if (fav1File != null) {
-                obj.put(favorite1, fav1File);
+
+            obj.put(version, 1);
+
+            JSONArray arr = new JSONArray();
+            for (String dice : diceConfigList) {
+                arr.put(dice);
             }
-            if (fav2File != null) {
-                obj.put(favorite2, fav2File);
-            }
-            if (fav3File != null) {
-                obj.put(favorite3, fav3File);
-            }
+
+            obj.put(diceList, arr);
 
             if (themeName != null) {
                 obj.put(theme, themeName);
             }
+
             json = obj.toString();
         } catch (JSONException e) {
             System.out.println("Exception in writing out JSON: " + e.getMessage());
@@ -115,32 +144,28 @@ public class ConfigurationFile {
 
     }
 
-    public String getFavorite1() {
-        return fav1File;
+    public LinkedList<String> getDiceList() {
+        return diceConfigList;
     }
 
-    public String getFavorite2() {
-        return fav2File;
+    public void add(String name) {
+        if (!diceList.contains(name)) {
+            diceConfigList.add(name);
+        }
     }
 
-    public String getFavorite3() {
-        return fav3File;
+    public void remove(String name) {
+        diceConfigList.remove(name);
+    }
+
+    public void rename(String oldName, String newName) {
+        int i = diceConfigList.indexOf(oldName);
+        diceConfigList.remove(i);
+        diceConfigList.add(i, newName);
     }
 
     public String getTheme() {
         return themeName;
-    }
-
-    public void setFavorite1(String in) {
-        fav1File = in;
-    }
-
-    public void setFavorite2(String in) {
-        fav2File = in;
-    }
-
-    public void setFavorite3(String in) {
-        fav3File = in;
     }
 
     public void setThemeName(String in) {

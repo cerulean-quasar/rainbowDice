@@ -54,7 +54,7 @@ import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIV
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_FILENAME;
 
 public class DiceConfigurationActivity extends AppCompatActivity {
-    ConfigurationFile configurationFile;
+    DiceConfigurationManager configurationFile;
     private class DeleteRequestedInfo {
         public String filename;
         public Dialog confirmDialog;
