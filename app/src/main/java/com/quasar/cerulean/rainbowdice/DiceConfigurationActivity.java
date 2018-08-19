@@ -19,12 +19,17 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.app.Activity;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.os.IBinder;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -33,8 +38,11 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
+import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -72,6 +80,12 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             getWindow().setBackgroundDrawableResource(value.resourceId);
         }
 
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
         resetFileList();
         resetFavoriteSpinners();
     }
@@ -84,9 +98,76 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         for (File file : filearr) {
             if (!file.getName().equals(ConfigurationFile.configFile) && !file.getName().equals(LogFile.diceLogFilename)) {
                 LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
-                TextView text = layout.findViewById(R.id.filename);
+                EditText text = layout.findViewById(R.id.filename);
                 text.setText(file.getName());
                 diceLayout.addView(layout);
+
+                final File currentFile = file;
+                final Context ctx = this;
+                final LinearLayout editDeleteLayout = layout;
+                final EditText edit = text;
+                text.addTextChangedListener(new TextWatcher() {
+                    public void afterTextChanged(Editable s) {
+                    }
+
+                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                    }
+
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        if (editDeleteLayout.getChildCount() == 3) {
+                            ImageButton save = new ImageButton(ctx);
+                            save.setBackgroundColor(0);
+                            save.setImageDrawable(ctx.getDrawable(R.drawable.save));
+                            save.setOnClickListener(new View.OnClickListener() {
+                                public void onClick(View view) {
+                                    String newFileName = edit.getText().toString();
+                                    if (newFileName.length() > 0) {
+                                        String parent = currentFile.getParent();
+                                        if (parent != null) {
+                                            newFileName = parent.concat("/").concat(newFileName);
+                                        }
+                                        File newFile = new File(newFileName);
+                                        currentFile.renameTo(newFile);
+
+                                        editDeleteLayout.removeViewAt(4);
+                                        editDeleteLayout.removeViewAt(3);
+
+                                        InputMethodManager imm =
+                                                (InputMethodManager)ctx.getSystemService(
+                                                        Activity.INPUT_METHOD_SERVICE);
+                                        IBinder tkn = edit.getWindowToken();
+                                        if (tkn != null) {
+                                            imm.hideSoftInputFromWindow(tkn, 0);
+                                        }
+                                        resetFavoriteSpinners();
+                                        resetFileList();
+                                    }
+                                }
+                            });
+                            editDeleteLayout.addView(save);
+
+                            ImageButton dropChanges = new ImageButton(ctx);
+                            dropChanges.setBackgroundColor(0);
+                            dropChanges.setImageDrawable(ctx.getDrawable(R.drawable.drop_changes));
+                            dropChanges.setOnClickListener(new View.OnClickListener() {
+                                public void onClick(View view) {
+                                    edit.setText(currentFile.getName());
+                                    editDeleteLayout.removeViewAt(4);
+                                    editDeleteLayout.removeViewAt(3);
+                                    InputMethodManager imm =
+                                            (InputMethodManager)ctx.getSystemService(
+                                                    Activity.INPUT_METHOD_SERVICE);
+                                    IBinder tkn = edit.getWindowToken();
+                                    if (tkn != null) {
+                                        imm.hideSoftInputFromWindow(tkn, 0);
+                                    }
+                                }
+                            });
+                            editDeleteLayout.addView(dropChanges);
+                        }
+                    }
+                });
+
             }
         }
     }
@@ -161,7 +242,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             ImageButton delete = item.findViewById(R.id.trash);
             if (delete == view) {
                 // this is the row that caused the delete event
-                TextView text = item.findViewById(R.id.filename);
+                EditText text = item.findViewById(R.id.filename);
                 String filename = text.getText().toString();
 
                 if (filename.isEmpty()) {
@@ -199,13 +280,12 @@ public class DiceConfigurationActivity extends AppCompatActivity {
     public void onEdit(View view) {
         // find the list item that created the edit event
         LinearLayout layout = findViewById(R.id.dice_layout);
-        ViewParent parent = view.getParent();
         for (int i=0; i < layout.getChildCount(); i++) {
             LinearLayout item = (LinearLayout)layout.getChildAt(i);
             ImageButton edit = item.findViewById(R.id.editDice);
             if (edit == view) {
                 // this is the row that caused the edit event
-                TextView text = item.findViewById(R.id.filename);
+                EditText text = item.findViewById(R.id.filename);
                 String filename = text.getText().toString();
 
                 // start the customization app with the file
@@ -257,51 +337,4 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         Intent intent = new Intent(this, DiceCustomizationActivity.class);
         startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
     }
-
-    private class StringArrayAdapter extends BaseAdapter {
-        private String[] strings;
-        public StringArrayAdapter(int resId) {
-            strings = getResources().getStringArray(resId);
-        }
-
-        public int getPosition(String inString) {
-            int i = 0;
-            for (String string : strings) {
-                if (inString.equals(string)) {
-                    return i;
-                }
-                i++;
-            }
-            return -1;
-        }
-
-        @Override
-        public int getCount() {
-            return strings.length;
-        }
-
-        @Override
-        public String getItem(int position) {
-            return strings[position];
-        }
-
-        @Override
-        public long getItemId(int position) {
-            return strings[position].hashCode();
-        }
-
-        @Override
-        public View getView(int position, View convertView, ViewGroup container) {
-            if (convertView == null) {
-                convertView = getLayoutInflater().inflate(R.layout.list_item_dice_configuration, container, false);
-            }
-
-            TextView text = convertView.findViewById(R.id.list_item);
-            text.setText(getItem(position));
-
-            return text;
-        }
-
-    }
-
 }
