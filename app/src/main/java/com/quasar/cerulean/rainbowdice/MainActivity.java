@@ -56,6 +56,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
 import java.util.Locale;
 import java.util.TreeSet;
 
@@ -65,7 +66,7 @@ import static android.graphics.Bitmap.Config.ARGB_8888;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.themeNameConfigValue;
 
-public class MainActivity extends AppCompatActivity  implements AdapterView.OnItemSelectedListener {
+public class MainActivity extends AppCompatActivity {
 
     // Used to load the 'native-lib' library on application startup.
     static {
@@ -82,13 +83,13 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     private Thread drawer = null;
     private DieConfiguration[] diceConfig = null;
     private DiceResult diceResult = null;
-    private ConfigurationFile configurationFile = null;
+    private DiceConfigurationManager configurationFile = null;
     private LogFile logFile = null;
     private String diceFileLoaded = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        configurationFile = new ConfigurationFile(this);
+        configurationFile = new DiceConfigurationManager(this);
 
         String themeName = configurationFile.getTheme();
         if (themeName != null && !themeName.isEmpty()) {
@@ -97,14 +98,15 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         }
 
         super.onCreate(savedInstanceState);
+        createDefaults();
         initGui();
 
         logFile = new LogFile(this);
         TextView text = findViewById(R.id.rollResult);
         text.setText(R.string.diceMessageStartup);
-        createDefaults();
-        if (configurationFile.getFavorite1()!=null) {
-            loadFromFile(configurationFile.getFavorite1());
+        LinkedList<String> diceList = configurationFile.getDiceList();
+        if (diceList != null && diceList.size() > 0) {
+            loadFromFile(diceList.getFirst());
         } else {
             diceConfig = new DieConfiguration[1];
             diceConfig[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
@@ -120,7 +122,34 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         drawSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
         drawSurfaceHolder.addCallback(new MySurfaceCallback(this));
 
-        resetFavorites();
+        resetDiceList();
+    }
+
+    void resetDiceList() {
+        configurationFile = new DiceConfigurationManager(this);
+        LinkedList<String> diceList = configurationFile.getDiceList();
+        LinearLayout layout = findViewById(R.id.diceList);
+        layout.removeAllViews();
+
+        for (String dice : diceList) {
+            Button button = new Button(this);
+            button.setBackgroundColor(0);
+            button.setText(dice);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Button b = (Button) v;
+                    joinDrawer();
+                    destroySurface();
+                    loadFromFile(b.getText().toString());
+                    SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+                    SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+                    startDrawing(drawSurfaceHolder);
+                    rollTheDice();
+                }
+            });
+            layout.addView(button);
+        }
     }
 
     @Override
@@ -156,53 +185,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         destroySurface();
     }
 
-    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-        // the user selected a dice configuration to roll.  We need to load it and roll the dice
-        /*
-        if (view == null) {
-            return;
-        }
-
-        TextView item = view.findViewById(R.id.list_item);
-        String filename = item.getText().toString();
-        if (filename.isEmpty()) {
-            return;
-        }
-
-        joinDrawer();
-        destroySurface();
-        loadFromFile(filename);
-        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        startDrawing(drawSurfaceHolder);
-        */
-    }
-
-    public void onNothingSelected(AdapterView<?> parent) {
-    }
-
-    public void onFavoriteClick(View view) {
-        String filename = ((Button)view).getText().toString();
-        if (filename.isEmpty()) {
-            return;
-        }
-
-        joinDrawer();
-        /*
-        destroyModels();
-        loadFromFile(filename);
-        loadModelsAndTextures();
-        recreateModels();
-        rollTheDice();
-        */
-        destroySurface();
-        loadFromFile(filename);
-        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        startDrawing(drawSurfaceHolder);
-        rollTheDice();
-    }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode != RESULT_OK) {
@@ -210,7 +192,7 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
             return;
         }
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
-            resetFavorites();
+            resetDiceList();
         } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
             String themeName = data.getStringExtra(themeNameConfigValue);
             if (themeName != null && !themeName.isEmpty()) {
@@ -241,35 +223,6 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
         joinDrawer();
         Intent intent = new Intent(this, DiceLogActivity.class);
         startActivityForResult(intent, Constants.DICE_LOG_FILE_ACTIVITY);
-    }
-
-    public void onRoll(View view) {
-        Spinner spinner = findViewById(R.id.mainOtherSpinner);
-        View viewSelected = spinner.getSelectedView();
-        if (viewSelected == null) {
-            // The user does not have any extra dice definitions in the drop down menu.
-            // Load the results text box with an error message.
-            TextView text = findViewById(R.id.rollResult);
-            text.setText(R.string.errorNoDiceDefinitions);
-            return;
-        }
-        TextView text = viewSelected.findViewById(R.id.list_item);
-        String filename = text.getText().toString();
-
-        joinDrawer();
-        /*
-        destroyModels();
-        loadFromFile(filename);
-        loadModelsAndTextures();
-        recreateModels();
-        rollTheDice();
-        */
-        destroySurface();
-        loadFromFile(filename);
-        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        startDrawing(drawSurfaceHolder);
-        rollTheDice();
     }
 
     public void onSelectTheme(MenuItem item) {
@@ -316,99 +269,46 @@ public class MainActivity extends AppCompatActivity  implements AdapterView.OnIt
     }
 
     private void createDefaults() {
-        File[] files = getFilesDir().listFiles();
-        int count = 0;
-        for (File file : files) {
-            String filename = file.getName();
-            if (!filename.equals(ConfigurationFile.configFile) &&
-                    !filename.equals(LogFile.diceLogFilename)) {
-                count++;
-            }
-        }
+        int count = configurationFile.getDiceList().size();
 
         if (count == 0) {
-            try {
-                String[] jsonStrings = new String[5];
-                String filename;
-                // There are no favorites or dice configuration defaults.  Add a few example dice
-                // configurations.
-                DieConfiguration[] dice = new DieConfiguration[1];
-                dice[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
-                filename = "1D6";
-                FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
-                configurationFile.setFavorite1(filename);
+            String[] jsonStrings = new String[5];
+            String filename;
+            // There are no favorites or dice configuration defaults.  Add a few example dice
+            // configurations.
+            DieConfiguration[] dice = new DieConfiguration[1];
+            dice[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
+            filename = "1D6";
+            configurationFile.addDice(filename, dice);
 
-                dice[0] = new DieConfiguration(2, 6, 1, 1, 0, true);
-                filename = "2D6";
-                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
-                configurationFile.setFavorite2(filename);
 
-                dice[0] = new DieConfiguration(1, 20, 1, 1, 0, true);
-                filename = "1D20";
-                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
-                configurationFile.setFavorite3(filename);
+            dice[0] = new DieConfiguration(2, 6, 1, 1, 0, true);
+            filename = "2D6";
+            configurationFile.addDice(filename, dice);
 
-                dice[0] = new DieConfiguration(1, 100, 0, 1, -1, true);
-                filename = "Percentile";
-                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
+            dice[0] = new DieConfiguration(1, 20, 1, 1, 0, true);
+            filename = "1D20";
+            configurationFile.addDice(filename, dice);
 
-                dice[0] = new DieConfiguration(4, 3, -1, 1, -2, true);
-                filename = "Fudge Dice";
-                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
+            dice[0] = new DieConfiguration(1, 100, 0, 1, -1, true);
+            filename = "Percentile";
+            configurationFile.addDice(filename, dice);
 
-                dice[0] = new DieConfiguration(12, 6, 1, 1, 0, true);
-                filename = "12D6";
-                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
+            dice[0] = new DieConfiguration(4, 3, -1, 1, -2, true);
+            filename = "Fudge Dice";
+            configurationFile.addDice(filename, dice);
 
-                dice = new DieConfiguration[2];
-                dice[0] = new DieConfiguration(1, 6, 1, 1, 6, true);
-                dice[1] = new DieConfiguration(1, 6, 1, 1, 6, false);
-                filename = "d6-d6(reroll 6's)";
-                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-                DieConfiguration.saveToFile(outputStream, dice);
-                outputStream.close();
-            } catch (IOException e) {
-                System.out.println("Exception on writing to file.  Message: " + e.getMessage());
-                return;
-            }
+            dice[0] = new DieConfiguration(12, 6, 1, 1, 0, true);
+            filename = "12D6";
+            configurationFile.addDice(filename, dice);
 
-            configurationFile.writeFile();
-            resetFavorites();
+            dice = new DieConfiguration[2];
+            dice[0] = new DieConfiguration(1, 6, 1, 1, 6, true);
+            dice[1] = new DieConfiguration(1, 6, 1, 1, 6, false);
+            filename = "d6-d6(reroll 6's)";
+            configurationFile.addDice(filename, dice);
+            configurationFile.save();
         }
-    }
-
-    private void resetFavorites() {
-        configurationFile = new ConfigurationFile(this);
-
-        String[] excludeFiles = new String[5];
-        excludeFiles[0] = ConfigurationFile.configFile;
-        excludeFiles[1] = configurationFile.getFavorite1();
-        excludeFiles[2] = configurationFile.getFavorite2();
-        excludeFiles[3] = configurationFile.getFavorite3();
-        excludeFiles[4] = LogFile.diceLogFilename;
-        Spinner other = findViewById(R.id.mainOtherSpinner);
-        FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
-        other.setAdapter(spinAdapter1);
-        other.setOnItemSelectedListener(this);
-
-        Button fav = findViewById(R.id.mainFavorite1);
-        fav.setText(configurationFile.getFavorite1());
-        fav = findViewById(R.id.mainFavorite2);
-        fav.setText(configurationFile.getFavorite2());
-        fav = findViewById(R.id.mainFavorite3);
-        fav.setText(configurationFile.getFavorite3());
     }
 
     private void rollTheDice() {

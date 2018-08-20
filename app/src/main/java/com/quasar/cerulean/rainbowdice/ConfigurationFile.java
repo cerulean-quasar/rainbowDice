@@ -52,6 +52,7 @@ public class ConfigurationFile {
 
     public ConfigurationFile(Context inCtx) {
         ctx = inCtx;
+        diceConfigList = new LinkedList<>();
         StringBuffer json = new StringBuffer();
 
         try {
@@ -162,6 +163,24 @@ public class ConfigurationFile {
         int i = diceConfigList.indexOf(oldName);
         diceConfigList.remove(i);
         diceConfigList.add(i, newName);
+    }
+
+    public void moveUp(String item) {
+        int i = diceConfigList.indexOf(item);
+        if (i == 0) {
+            return;
+        }
+        diceConfigList.remove(i);
+        diceConfigList.add(i-1, item);
+    }
+
+    public void moveDown(String item) {
+        int i = diceConfigList.indexOf(item);
+        if (i >= diceConfigList.size() - 1) {
+            return;
+        }
+        diceConfigList.remove(i);
+        diceConfigList.add(i+1, item);
     }
 
     public String getTheme() {

@@ -48,15 +48,16 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.io.File;
+import java.util.LinkedList;
 import java.util.Locale;
 
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_FILENAME;
 
 public class DiceConfigurationActivity extends AppCompatActivity {
-    DiceConfigurationManager configurationFile;
+    DiceConfigurationManager diceConfigManager;
     private class DeleteRequestedInfo {
-        public String filename;
+        public String name;
         public Dialog confirmDialog;
         public int layoutFileLocation;
     }
@@ -64,8 +65,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        configurationFile = new ConfigurationFile(this);
-        String theme = configurationFile.getTheme();
+        diceConfigManager = new DiceConfigurationManager(this);
+        String theme = diceConfigManager.getTheme();
         if (theme != null && !theme.isEmpty()) {
             int resID = getResources().getIdentifier(theme, "style", getPackageName());
             setTheme(resID);
@@ -87,73 +88,52 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         super.onResume();
 
         resetFileList();
-        resetFavoriteSpinners();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        diceConfigManager.save();
     }
 
     private void resetFileList() {
+        diceConfigManager = new DiceConfigurationManager(this);
         LinearLayout diceLayout = findViewById(R.id.dice_layout);
         diceLayout.removeAllViews();
         LayoutInflater inflater = getLayoutInflater();
-        File[] filearr = getFilesDir().listFiles();
-        for (File file : filearr) {
-            if (!file.getName().equals(ConfigurationFile.configFile) && !file.getName().equals(LogFile.diceLogFilename)) {
-                LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
-                EditText text = layout.findViewById(R.id.filename);
-                text.setText(file.getName());
-                diceLayout.addView(layout);
+        LinkedList<String> diceList = diceConfigManager.getDiceList();
+        for (String dice : diceList) {
+            LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
+            EditText text = layout.findViewById(R.id.filename);
+            text.setText(dice);
+            diceLayout.addView(layout);
 
-                final File currentFile = file;
-                final Context ctx = this;
-                final LinearLayout editDeleteLayout = layout;
-                final EditText edit = text;
-                text.addTextChangedListener(new TextWatcher() {
-                    public void afterTextChanged(Editable s) {
-                    }
+            final String diceName = dice;
+            final Context ctx = this;
+            final LinearLayout editDeleteLayout = layout;
+            final EditText edit = text;
+            text.addTextChangedListener(new TextWatcher() {
+                public void afterTextChanged(Editable s) {
+                }
 
-                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                    }
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
 
-                    public void onTextChanged(CharSequence s, int start, int before, int count) {
-                        if (editDeleteLayout.getChildCount() == 3) {
-                            ImageButton save = new ImageButton(ctx);
-                            save.setBackgroundColor(0);
-                            save.setImageDrawable(ctx.getDrawable(R.drawable.save));
-                            save.setOnClickListener(new View.OnClickListener() {
-                                public void onClick(View view) {
-                                    String newFileName = edit.getText().toString();
-                                    if (newFileName.length() > 0) {
-                                        String parent = currentFile.getParent();
-                                        if (parent != null) {
-                                            newFileName = parent.concat("/").concat(newFileName);
-                                        }
-                                        File newFile = new File(newFileName);
-                                        currentFile.renameTo(newFile);
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    if (editDeleteLayout.getChildCount() == 5) {
+                        ImageButton save = new ImageButton(ctx);
+                        save.setBackgroundColor(0);
+                        save.setImageDrawable(ctx.getDrawable(R.drawable.save));
+                        save.setOnClickListener(new View.OnClickListener() {
+                            public void onClick(View view) {
+                                String newName = edit.getText().toString();
+                                if (newName.length() > 0) {
+                                    diceConfigManager.renameDice(diceName, newName);
 
-                                        editDeleteLayout.removeViewAt(4);
-                                        editDeleteLayout.removeViewAt(3);
+                                    editDeleteLayout.removeViewAt(6);
+                                    editDeleteLayout.removeViewAt(5);
 
-                                        InputMethodManager imm =
-                                                (InputMethodManager)ctx.getSystemService(
-                                                        Activity.INPUT_METHOD_SERVICE);
-                                        IBinder tkn = edit.getWindowToken();
-                                        if (tkn != null) {
-                                            imm.hideSoftInputFromWindow(tkn, 0);
-                                        }
-                                        resetFavoriteSpinners();
-                                        resetFileList();
-                                    }
-                                }
-                            });
-                            editDeleteLayout.addView(save);
-
-                            ImageButton dropChanges = new ImageButton(ctx);
-                            dropChanges.setBackgroundColor(0);
-                            dropChanges.setImageDrawable(ctx.getDrawable(R.drawable.drop_changes));
-                            dropChanges.setOnClickListener(new View.OnClickListener() {
-                                public void onClick(View view) {
-                                    edit.setText(currentFile.getName());
-                                    editDeleteLayout.removeViewAt(4);
-                                    editDeleteLayout.removeViewAt(3);
                                     InputMethodManager imm =
                                             (InputMethodManager)ctx.getSystemService(
                                                     Activity.INPUT_METHOD_SERVICE);
@@ -162,55 +142,31 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                         imm.hideSoftInputFromWindow(tkn, 0);
                                     }
                                 }
-                            });
-                            editDeleteLayout.addView(dropChanges);
-                        }
+                            }
+                        });
+                        editDeleteLayout.addView(save);
+
+                        ImageButton dropChanges = new ImageButton(ctx);
+                        dropChanges.setBackgroundColor(0);
+                        dropChanges.setImageDrawable(ctx.getDrawable(R.drawable.drop_changes));
+                        dropChanges.setOnClickListener(new View.OnClickListener() {
+                            public void onClick(View view) {
+                                edit.setText(diceName);
+                                editDeleteLayout.removeViewAt(6);
+                                editDeleteLayout.removeViewAt(5);
+                                InputMethodManager imm =
+                                        (InputMethodManager)ctx.getSystemService(
+                                                Activity.INPUT_METHOD_SERVICE);
+                                IBinder tkn = edit.getWindowToken();
+                                if (tkn != null) {
+                                    imm.hideSoftInputFromWindow(tkn, 0);
+                                }
+                            }
+                        });
+                        editDeleteLayout.addView(dropChanges);
                     }
-                });
-
-            }
-        }
-    }
-
-    private void resetFavoriteSpinners() {
-        String[] excludeFiles = new String[2];
-        excludeFiles[0] = ConfigurationFile.configFile;
-        excludeFiles[1] = LogFile.diceLogFilename;
-        Spinner spinner1 = findViewById(R.id.favorite1);
-        FileAdapter spinAdapter1 = new FileAdapter(this, excludeFiles);
-        spinner1.setAdapter(spinAdapter1);
-
-        Spinner spinner2 = findViewById(R.id.favorite2);
-        FileAdapter spinAdapter2 = new FileAdapter(this, excludeFiles);
-        spinner2.setAdapter(spinAdapter2);
-
-        Spinner spinner3 = findViewById(R.id.favorite3);
-        FileAdapter spinAdapter3 = new FileAdapter(this, excludeFiles);
-        spinner3.setAdapter(spinAdapter3);
-
-        String fav1File = configurationFile.getFavorite1();
-        String fav2File = configurationFile.getFavorite2();
-        String fav3File = configurationFile.getFavorite3();
-
-        if (fav1File != null && !fav1File.isEmpty()) {
-            int pos = spinAdapter1.getPosition(fav1File);
-            if (pos != -1) {
-                spinner1.setSelection(pos);
-            }
-        }
-
-        if (fav2File != null && !fav2File.isEmpty()) {
-            int pos = spinAdapter2.getPosition(fav2File);
-            if (pos != -1) {
-                spinner2.setSelection(pos);
-            }
-        }
-
-        if (fav3File != null && !fav3File.isEmpty()) {
-            int pos = spinAdapter3.getPosition(fav3File);
-            if (pos != -1) {
-                spinner3.setSelection(pos);
-            }
+                }
+            });
         }
     }
 
@@ -229,36 +185,63 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                 return;
             }
 
-            resetFavoriteSpinners();
             resetFileList();
         }
     }
 
-    public void onDeleteFile(View view) {
-        // find the list item that created the delete event
+    private int getDicePositionForRowContainingView(View view, int rid) {
+        // find the list item that created the event
         LinearLayout layout = findViewById(R.id.dice_layout);
-        for (int i=0; i < layout.getChildCount(); i++) {
-            View item = layout.getChildAt(i);
-            ImageButton delete = item.findViewById(R.id.trash);
-            if (delete == view) {
-                // this is the row that caused the delete event
-                EditText text = item.findViewById(R.id.filename);
-                String filename = text.getText().toString();
-
-                if (filename.isEmpty()) {
-                    return;
-                }
-
-                LinearLayout confirmLayout = (LinearLayout) getLayoutInflater().inflate(R.layout.configuration_confirm_dialog, layout, false);
-                deleteRequestedInfo = new DeleteRequestedInfo();
-                deleteRequestedInfo.filename = filename;
-                deleteRequestedInfo.layoutFileLocation = i;
-                String confirmMessage = String.format(Locale.getDefault(), getString(R.string.confirm), filename);
-                deleteRequestedInfo.confirmDialog = new AlertDialog.Builder(this).setTitle(confirmMessage).setView(confirmLayout).show();
-
-                return;
+        for (int i = 0; i < layout.getChildCount(); i++) {
+            LinearLayout item = (LinearLayout) layout.getChildAt(i);
+            View edit = item.findViewById(rid);
+            if (edit == view) {
+                // this is the row that caused the event
+                return i;
             }
         }
+
+        return -1;
+    }
+
+    private EditText getDiceViewForRowContainingView(View view, int rid) {
+        // find the list item that created the event
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        for (int i = 0; i < layout.getChildCount(); i++) {
+            LinearLayout item = (LinearLayout) layout.getChildAt(i);
+            ImageButton edit = item.findViewById(rid);
+            if (edit == view) {
+                // this is the row that caused the event
+                EditText text = item.findViewById(R.id.filename);
+                return text;
+            }
+        }
+
+        return null;
+    }
+
+    public void onDeleteFile(View view) {
+        // find the list item that created the delete event
+        int i = getDicePositionForRowContainingView(view, R.id.trash);
+        EditText text = getDiceViewForRowContainingView(view, R.id.trash);
+        if (text == null) {
+            return;
+        }
+
+        String name = text.getText().toString();
+        if (name.isEmpty()) {
+            return;
+        }
+
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        LinearLayout confirmLayout = (LinearLayout) getLayoutInflater().inflate(R.layout.configuration_confirm_dialog, layout, false);
+        deleteRequestedInfo = new DeleteRequestedInfo();
+        deleteRequestedInfo.name = name;
+        deleteRequestedInfo.layoutFileLocation = i;
+        String confirmMessage = String.format(Locale.getDefault(), getString(R.string.confirm), name);
+        deleteRequestedInfo.confirmDialog = new AlertDialog.Builder(this).setTitle(confirmMessage).setView(confirmLayout).show();
+
+        return;
 
     }
 
@@ -266,10 +249,9 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         // delete the file
         LinearLayout layout = findViewById(R.id.dice_layout);
         layout.removeViewAt(deleteRequestedInfo.layoutFileLocation);
-        deleteFile(deleteRequestedInfo.filename);
+        diceConfigManager.deleteDice(deleteRequestedInfo.name);
         deleteRequestedInfo.confirmDialog.dismiss();
         deleteRequestedInfo = null;
-        resetFavoriteSpinners();
     }
 
     public void onCancelDeleteDiceConfig(View view) {
@@ -277,63 +259,67 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         deleteRequestedInfo = null;
     }
 
+    public void onMoveUp(View view) {
+        int position = getDicePositionForRowContainingView(view, R.id.upArrow);
+        if (position <= 0) {
+            return;
+        }
+        EditText text = getDiceViewForRowContainingView(view, R.id.upArrow);
+        if (text == null) {
+            return;
+        }
+        diceConfigManager.moveUp(text.getText().toString());
+
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        LinearLayout diceLayout = (LinearLayout)layout.getChildAt(position);
+
+        layout.removeViewAt(position);
+        layout.addView(diceLayout, position-1);
+    }
+
+    public void onMoveDown(View view) {
+        int position = getDicePositionForRowContainingView(view, R.id.downArrow);
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        if (position < 0 || position >= layout.getChildCount() - 1) {
+            return;
+        }
+        EditText text = getDiceViewForRowContainingView(view, R.id.downArrow);
+        if (text == null) {
+            return;
+        }
+        diceConfigManager.moveDown(text.getText().toString());
+
+        LinearLayout diceLayout = (LinearLayout)layout.getChildAt(position);
+        layout.removeViewAt(position);
+        layout.addView(diceLayout, position+1);
+    }
+
     public void onEdit(View view) {
         // find the list item that created the edit event
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        for (int i=0; i < layout.getChildCount(); i++) {
-            LinearLayout item = (LinearLayout)layout.getChildAt(i);
-            ImageButton edit = item.findViewById(R.id.editDice);
-            if (edit == view) {
-                // this is the row that caused the edit event
-                EditText text = item.findViewById(R.id.filename);
-                String filename = text.getText().toString();
-
-                // start the customization app with the file
-                if (!filename.isEmpty()) {
-                    Intent intent = new Intent(this, DiceCustomizationActivity.class);
-                    intent.putExtra(DICE_FILENAME, filename);
-                    startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
-                }
-            }
+        EditText text = getDiceViewForRowContainingView(view, R.id.editDice);
+        if (text == null) {
+            return;
         }
 
+        String filename = text.getText().toString();
+
+        // start the customization app with the file
+        if (!filename.isEmpty()) {
+            Intent intent = new Intent(this, DiceCustomizationActivity.class);
+            intent.putExtra(DICE_FILENAME, filename);
+            startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
+        }
     }
 
     public void onDone(MenuItem item) {
-        Spinner spinner = findViewById(R.id.favorite1);
-        TextView text = (TextView)spinner.getSelectedView();
-        if (text != null) {
-            String filename = text.getText().toString();
-            configurationFile.setFavorite1(filename);
-        } else {
-            configurationFile.setFavorite1(null);
-        }
-
-        spinner = findViewById(R.id.favorite2);
-        text = (TextView)spinner.getSelectedView();
-        if (text != null) {
-            String filename = text.getText().toString();
-            configurationFile.setFavorite2(filename);
-        } else {
-            configurationFile.setFavorite2(null);
-        }
-
-        spinner = findViewById(R.id.favorite3);
-        text = (TextView)spinner.getSelectedView();
-        if (text != null) {
-            String filename = text.getText().toString();
-            configurationFile.setFavorite3(filename);
-        } else {
-            configurationFile.setFavorite3(null);
-        }
-
-        configurationFile.writeFile();
+        diceConfigManager.save();
 
         setResult(RESULT_OK, null);
         finish();
     }
 
     public void onNewDiceConfiguration(MenuItem item) {
+        diceConfigManager.save();
         Intent intent = new Intent(this, DiceCustomizationActivity.class);
         startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
     }

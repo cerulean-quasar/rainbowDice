@@ -13,6 +13,8 @@ public class DiceConfigurationManager {
     LinkedList<String> diceFileList;
     public DiceConfigurationManager(Context inCtx) {
         ctx = inCtx;
+        config = new ConfigurationFile(ctx);
+        diceFileList = new LinkedList<>();
         String[] excludeFiles = new String[2];
         excludeFiles[0] = ConfigurationFile.configFile;
         excludeFiles[1] = LogFile.diceLogFilename;
@@ -33,20 +35,22 @@ public class DiceConfigurationManager {
         }
 
         LinkedList<String> diceConfigList = config.getDiceList();
-        for (String dice : diceConfigList) {
-            if (!diceFileList.contains(dice)) {
-                config.remove(dice);
+        if (diceConfigList != null && diceConfigList.size() > 0) {
+            for (String dice : diceConfigList) {
+                if (!diceFileList.contains(dice)) {
+                    config.remove(dice);
+                }
             }
-        }
 
-        for (String dice : diceFileList) {
-            if (!diceConfigList.contains(dice)) {
-                config.add(dice);
+            for (String dice : diceFileList) {
+                if (!diceConfigList.contains(dice)) {
+                    config.add(dice);
+                }
             }
         }
     }
 
-    public void addDice(String name, DieConfiguration[] configs){
+    public void addDice(String name, DieConfiguration[] configs) {
         try {
             FileOutputStream outputStream = ctx.openFileOutput(name, Context.MODE_PRIVATE);
             DieConfiguration.saveToFile(outputStream, configs);
@@ -69,6 +73,22 @@ public class DiceConfigurationManager {
         File newFile = new File(ctx.getFilesDir().getPath().concat("/").concat(newName));
 
         oldFile.renameTo(newFile);
+    }
+
+    public void moveUp(String item) {
+        config.moveUp(item);
+    }
+
+    public void moveDown(String item) {
+        config.moveDown(item);
+    }
+
+    public LinkedList<String> getDiceList() {
+        return config.getDiceList();
+    }
+
+    public String getTheme() {
+        return config.getTheme();
     }
 
     public void save() {

@@ -155,7 +155,7 @@ void DicePhysicsModel::resetPosition() {
     qTotalRotated = glm::quat();
     acceleration = glm::vec3();
     angularVelocity.setAngularSpeed(0);
-    angularVelocity.setSpinAxis(glm::vec3());
+    angularVelocity.setSpinAxis(glm::vec3(0.0f, 0.0f, 1.0f));
 
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
@@ -214,9 +214,6 @@ void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
 }
 
 void checkQuaternion(glm::quat &q) {
-    if (glm::length(q) == 0) {
-        q = glm::quat();
-    }
     if (q.x != q.x || q.y != q.y || q.z != q.z || q.w != q.w) {
         q = glm::quat();
     }
@@ -472,11 +469,21 @@ void DicePhysicsModel::randomizeUpFace() {
     glm::vec3 normalVector;
     glm::vec3 zaxis = glm::vec3(0.0, 0.0, 1.0);
     getAngleAxis(upFace, angle, normalVector);
-    glm::quat quaternian = glm::angleAxis(angle, glm::normalize(glm::cross(normalVector, zaxis)));
+    glm::vec3 cross = glm::cross(normalVector, zaxis);
+    if (glm::length(cross) == 0.0f) {
+        cross = normalVector;
+    }
+    if (glm::length(cross) == 0.0f) {
+        cross = zaxis;
+    }
 
-    glm::quat quaternian2 = glm::angleAxis(angle, zaxis);
+    if (angle != 0) {
+        glm::quat quaternian = glm::angleAxis(angle, glm::normalize(cross));
 
-    qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
+        glm::quat quaternian2 = glm::angleAxis(angle, zaxis);
+
+        qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
+    }
 
     position.x = random.getFloat(-screenWidth/2, screenWidth/2);
     position.y = random.getFloat(-screenHeight/2, screenHeight/2);

@@ -4,6 +4,20 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
     <ImageButton
+        android:id="@+id/upArrow"
+        android:src="@drawable/up_arrow"
+        android:background="@null"
+        android:onClick="onMoveUp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <ImageButton
+        android:id="@+id/downArrow"
+        android:src="@drawable/down_arrow"
+        android:background="@null"
+        android:onClick="onMoveDown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <ImageButton
         android:id="@+id/trash"
         android:src="@drawable/trash"
         android:background="@null"
@@ -14,13 +28,11 @@
         android:id="@+id/editDice"
         android:src="@drawable/pencil"
         android:background="@null"
-        android:layout_gravity="center"
         android:onClick="onEdit"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
     <EditText
         android:id="@+id/filename"
-        android:layout_gravity="center"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 </LinearLayout>
