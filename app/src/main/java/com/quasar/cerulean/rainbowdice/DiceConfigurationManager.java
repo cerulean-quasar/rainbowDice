@@ -75,12 +75,8 @@ public class DiceConfigurationManager {
         oldFile.renameTo(newFile);
     }
 
-    public void moveUp(String item) {
-        config.moveUp(item);
-    }
-
-    public void moveDown(String item) {
-        config.moveDown(item);
+    public void moveDice(String item, int to) {
+        config.moveDice(item, to);
     }
 
     public LinkedList<String> getDiceList() {

@@ -165,22 +165,13 @@ public class ConfigurationFile {
         diceConfigList.add(i, newName);
     }
 
-    public void moveUp(String item) {
+    public void moveDice(String item, int to) {
         int i = diceConfigList.indexOf(item);
-        if (i == 0) {
-            return;
+        if (i < to) {
+            to -= 1;
         }
         diceConfigList.remove(i);
-        diceConfigList.add(i-1, item);
-    }
-
-    public void moveDown(String item) {
-        int i = diceConfigList.indexOf(item);
-        if (i >= diceConfigList.size() - 1) {
-            return;
-        }
-        diceConfigList.remove(i);
-        diceConfigList.add(i+1, item);
+        diceConfigList.add(to, item);
     }
 
     public String getTheme() {

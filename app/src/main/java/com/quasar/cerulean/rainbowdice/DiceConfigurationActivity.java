@@ -21,6 +21,8 @@ package com.quasar.cerulean.rainbowdice;
 
 import android.app.Activity;
 import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -31,6 +33,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.TypedValue;
+import android.view.DragEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -80,7 +83,6 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             getTheme().resolveAttribute(R.attr.background_landscape, value, true);
             getWindow().setBackgroundDrawableResource(value.resourceId);
         }
-
     }
 
     @Override
@@ -99,7 +101,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
     private void resetFileList() {
         diceConfigManager = new DiceConfigurationManager(this);
-        LinearLayout diceLayout = findViewById(R.id.dice_layout);
+        final LinearLayout diceLayout = findViewById(R.id.dice_layout);
         diceLayout.removeAllViews();
         LayoutInflater inflater = getLayoutInflater();
         LinkedList<String> diceList = diceConfigManager.getDiceList();
@@ -113,6 +115,18 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             final Context ctx = this;
             final LinearLayout editDeleteLayout = layout;
             final EditText edit = text;
+            ImageButton button = layout.findViewById(R.id.moveDice);
+            button.setOnLongClickListener(new View.OnLongClickListener() {
+                public boolean onLongClick(View view) {
+                    ClipData.Item item = new ClipData.Item(diceName);
+                    String[] mimeTypes = new String[1];
+                    mimeTypes[0] = ClipDescription.MIMETYPE_TEXT_PLAIN;
+                    ClipData data = new ClipData(diceName, mimeTypes, item);
+
+                    view.startDrag(data, new View.DragShadowBuilder(editDeleteLayout), null, 0);
+                    return true;
+                }
+            });
             text.addTextChangedListener(new TextWatcher() {
                 public void afterTextChanged(Editable s) {
                 }
@@ -121,7 +135,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                 }
 
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    if (editDeleteLayout.getChildCount() == 5) {
+                    if (editDeleteLayout.getChildCount() == 4) {
                         ImageButton save = new ImageButton(ctx);
                         save.setBackgroundColor(0);
                         save.setImageDrawable(ctx.getDrawable(R.drawable.save));
@@ -131,8 +145,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                 if (newName.length() > 0) {
                                     diceConfigManager.renameDice(diceName, newName);
 
-                                    editDeleteLayout.removeViewAt(6);
                                     editDeleteLayout.removeViewAt(5);
+                                    editDeleteLayout.removeViewAt(4);
 
                                     InputMethodManager imm =
                                             (InputMethodManager)ctx.getSystemService(
@@ -152,8 +166,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                         dropChanges.setOnClickListener(new View.OnClickListener() {
                             public void onClick(View view) {
                                 edit.setText(diceName);
-                                editDeleteLayout.removeViewAt(6);
                                 editDeleteLayout.removeViewAt(5);
+                                editDeleteLayout.removeViewAt(4);
                                 InputMethodManager imm =
                                         (InputMethodManager)ctx.getSystemService(
                                                 Activity.INPUT_METHOD_SERVICE);
@@ -168,6 +182,72 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                 }
             });
         }
+
+        diceLayout.setOnDragListener(new View.OnDragListener() {
+            public boolean onDrag(View view, DragEvent event) {
+                int eventType = event.getAction();
+                switch (eventType) {
+                    case DragEvent.ACTION_DRAG_STARTED:
+                        if (event.getClipDescription().hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+                            return true;
+                        }
+                        break;
+                    case DragEvent.ACTION_DRAG_LOCATION:
+                    case DragEvent.ACTION_DRAG_ENTERED:
+                    case DragEvent.ACTION_DRAG_EXITED:
+                    case DragEvent.ACTION_DRAG_ENDED:
+                        return true;
+                    case DragEvent.ACTION_DROP:
+                        ClipData.Item item = event.getClipData().getItemAt(0);
+                        String text = item.getText().toString();
+                        LinearLayout diceItem;
+                        int dragAt = -1;
+                        LinearLayout draggedItem = null;
+                        int draggedItemAt = -1;
+
+                        float y = event.getY();
+
+                        for (int i = 0; i < diceLayout.getChildCount(); i++) {
+                            diceItem = (LinearLayout) diceLayout.getChildAt(i);
+                            EditText editText = diceItem.findViewById(R.id.filename);
+                            String text2 = editText.getText().toString();
+                            if (text.equals(text2)) {
+                                draggedItem = diceItem;
+                                draggedItemAt = i;
+                            }
+                            if (dragAt == -1 && y < diceItem.getY()) {
+                                dragAt = i - 1;
+                            }
+
+                            if (draggedItem != null && dragAt != -1) {
+                                break;
+                            }
+                        }
+
+                        if (draggedItem == null) {
+                            return false;
+                        }
+
+                        if (draggedItemAt == dragAt) {
+                            // the item didn't move.  just return false
+                            return false;
+                        }
+                        diceConfigManager.moveDice(text, dragAt);
+                        if (draggedItemAt < dragAt) {
+                            dragAt -= 1;
+                        }
+
+                        if (dragAt == -1) {
+                            dragAt = diceLayout.getChildCount();
+                        }
+
+                        diceLayout.removeView(draggedItem);
+                        diceLayout.addView(draggedItem, dragAt);
+                        return true;
+                }
+                return false;
+            }
+        });
     }
 
     @Override
@@ -240,9 +320,6 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         deleteRequestedInfo.layoutFileLocation = i;
         String confirmMessage = String.format(Locale.getDefault(), getString(R.string.confirm), name);
         deleteRequestedInfo.confirmDialog = new AlertDialog.Builder(this).setTitle(confirmMessage).setView(confirmLayout).show();
-
-        return;
-
     }
 
     public void onDeleteDiceConfig(View view) {
@@ -257,41 +334,6 @@ public class DiceConfigurationActivity extends AppCompatActivity {
     public void onCancelDeleteDiceConfig(View view) {
         deleteRequestedInfo.confirmDialog.dismiss();
         deleteRequestedInfo = null;
-    }
-
-    public void onMoveUp(View view) {
-        int position = getDicePositionForRowContainingView(view, R.id.upArrow);
-        if (position <= 0) {
-            return;
-        }
-        EditText text = getDiceViewForRowContainingView(view, R.id.upArrow);
-        if (text == null) {
-            return;
-        }
-        diceConfigManager.moveUp(text.getText().toString());
-
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        LinearLayout diceLayout = (LinearLayout)layout.getChildAt(position);
-
-        layout.removeViewAt(position);
-        layout.addView(diceLayout, position-1);
-    }
-
-    public void onMoveDown(View view) {
-        int position = getDicePositionForRowContainingView(view, R.id.downArrow);
-        LinearLayout layout = findViewById(R.id.dice_layout);
-        if (position < 0 || position >= layout.getChildCount() - 1) {
-            return;
-        }
-        EditText text = getDiceViewForRowContainingView(view, R.id.downArrow);
-        if (text == null) {
-            return;
-        }
-        diceConfigManager.moveDown(text.getText().toString());
-
-        LinearLayout diceLayout = (LinearLayout)layout.getChildAt(position);
-        layout.removeViewAt(position);
-        layout.addView(diceLayout, position+1);
     }
 
     public void onEdit(View view) {

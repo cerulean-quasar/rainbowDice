@@ -4,17 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
     <ImageButton
-        android:id="@+id/upArrow"
-        android:src="@drawable/up_arrow"
-        android:background="@null"
-        android:onClick="onMoveUp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-    <ImageButton
-        android:id="@+id/downArrow"
+        android:id="@+id/moveDice"
         android:src="@drawable/down_arrow"
         android:background="@null"
-        android:onClick="onMoveDown"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
     <ImageButton
