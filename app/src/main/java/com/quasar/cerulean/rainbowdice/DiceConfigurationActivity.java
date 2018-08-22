@@ -73,17 +73,11 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
     private static class MyDragShadowBuilder extends View.DragShadowBuilder {
 
-        // The drag shadow image, defined as a drawable thing
-        private static Drawable shadow;
-
         // Defines the constructor for myDragShadowBuilder
         public MyDragShadowBuilder(View v) {
 
             // Stores the View parameter passed to myDragShadowBuilder.
             super(v);
-
-            // Creates a draggable image that will fill the Canvas provided by the system.
-            shadow = new ColorDrawable(Color.LTGRAY);
         }
 
         // Defines a callback that sends the drag shadow dimensions and touch point back to the
@@ -95,11 +89,6 @@ public class DiceConfigurationActivity extends AppCompatActivity {
 
             width = getView().getWidth();
             height = getView().getHeight();
-
-            // The drag shadow is a ColorDrawable. This sets its dimensions to be the same as the
-            // Canvas that the system will provide. As a result, the drag shadow will fill the
-            // Canvas.
-            shadow.setBounds(0, 0, width, height);
 
             // Sets the size parameter's width and height values. These get back to the system
             // through the size parameter.
@@ -114,9 +103,11 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         // from the dimensions passed in onProvideShadowMetrics().
         @Override
         public void onDrawShadow(Canvas canvas) {
-
             // Draws the ColorDrawable in the Canvas passed in from the system.
-            shadow.draw(canvas);
+            View v = getView();
+            v.setBackgroundColor(Color.LTGRAY);
+            v.draw(canvas);
+            v.setBackgroundColor(0x0);
         }
     }
 
@@ -178,6 +169,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             final EditText edit = text;
             ImageButton button = layout.findViewById(R.id.moveDice);
             if (!focusRequested) {
+                button.setFocusableInTouchMode(true);
                 button.requestFocus();
                 focusRequested = true;
             }

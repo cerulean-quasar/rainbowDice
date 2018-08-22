@@ -105,6 +105,7 @@ public class ConfigurationFile {
             String dice = arr.getString(i);
             diceConfigList.add(dice);
         }
+        themeName = obj.getString(theme);
     }
 
     public void writeFile() {
