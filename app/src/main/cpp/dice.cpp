@@ -70,6 +70,15 @@ float const AngularVelocity::maxAngularSpeed = 10.0f;
 Filter DicePhysicsModel::filter;
 const float pi = glm::acos(-1.0f);
 
+void checkQuaternion(glm::quat &q) {
+    if (glm::length(q) == 0) {
+        q = glm::quat();
+    }
+    if (q.x != q.x || q.y != q.y || q.z != q.z || q.w != q.w) {
+        q = glm::quat();
+    }
+}
+
 VkVertexInputBindingDescription Vertex::getBindingDescription() {
     VkVertexInputBindingDescription bindingDescription = {};
 
@@ -163,6 +172,7 @@ void DicePhysicsModel::resetPosition() {
     ubo.model = translate * rotate * scale;
 
     randomizeUpFace();
+    checkQuaternion(qTotalRotated);
 }
 
 void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
@@ -210,12 +220,6 @@ void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
             }
         }
         other->velocity = other->velocity - norm * 2.0f * dot;
-    }
-}
-
-void checkQuaternion(glm::quat &q) {
-    if (q.x != q.x || q.y != q.y || q.z != q.z || q.w != q.w) {
-        q = glm::quat();
     }
 }
 
@@ -463,11 +467,12 @@ uint32_t DicePhysicsModel::calculateUpFace() {
 
 void DicePhysicsModel::randomizeUpFace() {
     Random random;
-    uint32_t upFace = random.getUInt(0, numberFaces);
+    uint32_t upFace = random.getUInt(0, numberFaces-1);
 
-    float angle = random.getFloat(0.0f, 2 * pi);
+    float angle2 = random.getFloat(0.0f, 2 * pi);
     glm::vec3 normalVector;
     glm::vec3 zaxis = glm::vec3(0.0, 0.0, 1.0);
+    float angle = 0;
     getAngleAxis(upFace, angle, normalVector);
     glm::vec3 cross = glm::cross(normalVector, zaxis);
     if (glm::length(cross) == 0.0f) {
@@ -479,10 +484,13 @@ void DicePhysicsModel::randomizeUpFace() {
 
     if (angle != 0) {
         glm::quat quaternian = glm::angleAxis(angle, glm::normalize(cross));
+        checkQuaternion(quaternian);
 
-        glm::quat quaternian2 = glm::angleAxis(angle, zaxis);
+        glm::quat quaternian2 = glm::angleAxis(angle2, zaxis);
+        checkQuaternion(quaternian2);
 
-        qTotalRotated = glm::normalize(quaternian2 * quaternian * qTotalRotated);
+        qTotalRotated = glm::normalize(quaternian2 * quaternian);
+        checkQuaternion(qTotalRotated);
     }
 
     position.x = random.getFloat(-screenWidth/2, screenWidth/2);

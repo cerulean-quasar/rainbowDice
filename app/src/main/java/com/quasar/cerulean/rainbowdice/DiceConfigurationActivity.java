@@ -211,7 +211,16 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                 }
             });
 
-            text.setOnDragListener(null);
+            // the default behavior is that text boxes accept dragging and dropping of text.
+            // but we don't like this behavior because it would mean that the dice can be dragged
+            // and dropped into another dice.  So, we assign a OnDragListener that just does not
+            // accept any data types.
+            text.setOnDragListener(new View.OnDragListener() {
+                public boolean onDrag(View view, DragEvent event) {
+                    return false;
+                }
+            });
+
             text.addTextChangedListener(new TextWatcher() {
                 public void afterTextChanged(Editable s) {
                 }
@@ -230,8 +239,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                 if (newName.length() > 0) {
                                     diceConfigManager.renameDice(diceName, newName);
 
-                                    editDeleteLayout.removeViewAt(5);
                                     editDeleteLayout.removeViewAt(4);
+                                    editDeleteLayout.removeViewAt(3);
 
                                     InputMethodManager imm =
                                             (InputMethodManager)ctx.getSystemService(
@@ -243,7 +252,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                 }
                             }
                         });
-                        editDeleteLayout.addView(save);
+                        editDeleteLayout.addView(save, 3);
 
                         ImageButton dropChanges = new ImageButton(ctx);
                         dropChanges.setBackgroundColor(0);
@@ -251,8 +260,8 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                         dropChanges.setOnClickListener(new View.OnClickListener() {
                             public void onClick(View view) {
                                 edit.setText(diceName);
-                                editDeleteLayout.removeViewAt(5);
                                 editDeleteLayout.removeViewAt(4);
+                                editDeleteLayout.removeViewAt(3);
                                 InputMethodManager imm =
                                         (InputMethodManager)ctx.getSystemService(
                                                 Activity.INPUT_METHOD_SERVICE);
@@ -262,7 +271,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                 }
                             }
                         });
-                        editDeleteLayout.addView(dropChanges);
+                        editDeleteLayout.addView(dropChanges, 4);
                     }
                 }
             });
