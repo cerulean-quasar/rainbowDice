@@ -26,6 +26,11 @@ import android.content.ClipDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Point;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.IBinder;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -66,6 +71,55 @@ public class DiceConfigurationActivity extends AppCompatActivity {
     }
     DeleteRequestedInfo deleteRequestedInfo = null;
 
+    private static class MyDragShadowBuilder extends View.DragShadowBuilder {
+
+        // The drag shadow image, defined as a drawable thing
+        private static Drawable shadow;
+
+        // Defines the constructor for myDragShadowBuilder
+        public MyDragShadowBuilder(View v) {
+
+            // Stores the View parameter passed to myDragShadowBuilder.
+            super(v);
+
+            // Creates a draggable image that will fill the Canvas provided by the system.
+            shadow = new ColorDrawable(Color.LTGRAY);
+        }
+
+        // Defines a callback that sends the drag shadow dimensions and touch point back to the
+        // system.
+        @Override
+        public void onProvideShadowMetrics (Point size, Point touch) {
+            // Defines local variables
+            int width, height;
+
+            width = getView().getWidth();
+            height = getView().getHeight();
+
+            // The drag shadow is a ColorDrawable. This sets its dimensions to be the same as the
+            // Canvas that the system will provide. As a result, the drag shadow will fill the
+            // Canvas.
+            shadow.setBounds(0, 0, width, height);
+
+            // Sets the size parameter's width and height values. These get back to the system
+            // through the size parameter.
+            size.set(width, height);
+
+            // Sets the touch point's position to be in the middle of the drag shadow in y and at
+            // the beginning in x
+            touch.set(0, height/2);
+        }
+
+        // Defines a callback that draws the drag shadow in a Canvas that the system constructs
+        // from the dimensions passed in onProvideShadowMetrics().
+        @Override
+        public void onDrawShadow(Canvas canvas) {
+
+            // Draws the ColorDrawable in the Canvas passed in from the system.
+            shadow.draw(canvas);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         diceConfigManager = new DiceConfigurationManager(this);
@@ -90,6 +144,12 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         super.onResume();
 
         resetFileList();
+        LinearLayout layout = findViewById(R.id.dice_layout);
+        InputMethodManager imm = (InputMethodManager)getSystemService(Activity.INPUT_METHOD_SERVICE);
+        IBinder tkn = layout.getWindowToken();
+        if (tkn != null && imm != null) {
+            imm.hideSoftInputFromWindow(tkn, 0);
+        }
     }
 
     @Override
@@ -105,6 +165,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
         diceLayout.removeAllViews();
         LayoutInflater inflater = getLayoutInflater();
         LinkedList<String> diceList = diceConfigManager.getDiceList();
+        boolean focusRequested = false;
         for (String dice : diceList) {
             LinearLayout layout = (LinearLayout) inflater.inflate(R.layout.edit_delete_row, diceLayout, false);
             EditText text = layout.findViewById(R.id.filename);
@@ -116,17 +177,41 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             final LinearLayout editDeleteLayout = layout;
             final EditText edit = text;
             ImageButton button = layout.findViewById(R.id.moveDice);
+            if (!focusRequested) {
+                button.requestFocus();
+                focusRequested = true;
+            }
             button.setOnLongClickListener(new View.OnLongClickListener() {
                 public boolean onLongClick(View view) {
-                    ClipData.Item item = new ClipData.Item(diceName);
+                    String rowText = null;
+                    for (int i = 0; i < diceLayout.getChildCount(); i++) {
+                        LinearLayout diceItem = (LinearLayout)diceLayout.getChildAt(i);
+                        ImageButton upDown = diceItem.findViewById(R.id.moveDice);
+                        if (upDown == view) {
+                            EditText dice = diceItem.findViewById(R.id.filename);
+                            if (dice == null) {
+                                return false;
+                            }
+                            rowText = dice.getText().toString();
+                            if (rowText.length() == 0) {
+                                return false;
+                            }
+                        }
+                    }
+                    if (rowText == null) {
+                        return false;
+                    }
+                    ClipData.Item item = new ClipData.Item(rowText);
                     String[] mimeTypes = new String[1];
                     mimeTypes[0] = ClipDescription.MIMETYPE_TEXT_PLAIN;
                     ClipData data = new ClipData(diceName, mimeTypes, item);
 
-                    view.startDrag(data, new View.DragShadowBuilder(editDeleteLayout), null, 0);
+                    view.startDrag(data, new MyDragShadowBuilder(editDeleteLayout), null, 0);
                     return true;
                 }
             });
+
+            text.setOnDragListener(null);
             text.addTextChangedListener(new TextWatcher() {
                 public void afterTextChanged(Editable s) {
                 }
@@ -172,7 +257,7 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                         (InputMethodManager)ctx.getSystemService(
                                                 Activity.INPUT_METHOD_SERVICE);
                                 IBinder tkn = edit.getWindowToken();
-                                if (tkn != null) {
+                                if (tkn != null && imm != null) {
                                     imm.hideSoftInputFromWindow(tkn, 0);
                                 }
                             }
@@ -183,66 +268,122 @@ public class DiceConfigurationActivity extends AppCompatActivity {
             });
         }
 
+        final Context ctx = this;
         diceLayout.setOnDragListener(new View.OnDragListener() {
+            ImageView dropDisplay = null;
+            int dropDisplayPosition = -1;
+            View draggedItem = null;
+            int draggedItemPosition = -1;
+            boolean dropped = false;
+
             public boolean onDrag(View view, DragEvent event) {
                 int eventType = event.getAction();
                 switch (eventType) {
+                    case DragEvent.ACTION_DRAG_ENTERED:
                     case DragEvent.ACTION_DRAG_STARTED:
+                        dropDisplay = new ImageView(ctx);
+                        TypedValue value = new TypedValue();
+                        getTheme().resolveAttribute(R.attr.divider, value, true);
+                        dropDisplay.setImageDrawable(getResources().getDrawable(value.resourceId,null));
+
                         if (event.getClipDescription().hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+                            // remove the item from the layout so it looks like it is being dragged around
                             return true;
                         }
                         break;
                     case DragEvent.ACTION_DRAG_LOCATION:
-                    case DragEvent.ACTION_DRAG_ENTERED:
-                    case DragEvent.ACTION_DRAG_EXITED:
-                    case DragEvent.ACTION_DRAG_ENDED:
-                        return true;
-                    case DragEvent.ACTION_DROP:
-                        ClipData.Item item = event.getClipData().getItemAt(0);
-                        String text = item.getText().toString();
-                        LinearLayout diceItem;
-                        int dragAt = -1;
-                        LinearLayout draggedItem = null;
-                        int draggedItemAt = -1;
+                        // move the dropDisplay to where the user has their finger so they know
+                        // that if they release here, that is where the view will be dropped into.
+                        int childCount = diceLayout.getChildCount();
+                        for (int i = 0; i < childCount; i++) {
+                            View diceItem = diceLayout.getChildAt(i);
+                            float y = event.getY();
+                            float diceItemY = diceItem.getY();
+                            float diceItemH = diceItem.getHeight();
+                            if (y >= diceItemY && y <= diceItemY + diceItemH) {
+                                if (draggedItem == null) {
+                                    draggedItem = diceLayout.getChildAt(i);
+                                    draggedItemPosition = i;
+                                    diceLayout.removeViewAt(i);
+                                    diceLayout.addView(dropDisplay, i);
+                                    dropDisplayPosition = i;
+                                    return true;
+                                }
 
-                        float y = event.getY();
-
-                        for (int i = 0; i < diceLayout.getChildCount(); i++) {
-                            diceItem = (LinearLayout) diceLayout.getChildAt(i);
-                            EditText editText = diceItem.findViewById(R.id.filename);
-                            String text2 = editText.getText().toString();
-                            if (text.equals(text2)) {
-                                draggedItem = diceItem;
-                                draggedItemAt = i;
-                            }
-                            if (dragAt == -1 && y < diceItem.getY()) {
-                                dragAt = i - 1;
-                            }
-
-                            if (draggedItem != null && dragAt != -1) {
-                                break;
+                                if (y > diceItemY + diceItemH/2) {
+                                    i++;
+                                }
+                                if (dropDisplayPosition >= 0 &&
+                                        (view == dropDisplay || i == dropDisplayPosition + 1)) {
+                                    return true;
+                                } else if (i == dropDisplayPosition) {
+                                    /* do nothing - the dropDisplayPosition is already at this position */
+                                    return true;
+                                } else {
+                                    if (dropDisplayPosition >= 0) {
+                                        diceLayout.removeViewAt(dropDisplayPosition);
+                                        if (dropDisplayPosition < i) {
+                                            i--;
+                                        }
+                                    }
+                                    diceLayout.addView(dropDisplay, i);
+                                    dropDisplayPosition = i;
+                                }
+                                return true;
                             }
                         }
-
+                        // trying to move to the last position...
+                        if (dropDisplayPosition >= 0) {
+                            diceLayout.removeViewAt(dropDisplayPosition);
+                        }
+                        dropDisplayPosition = diceLayout.getChildCount();
+                        diceLayout.addView(dropDisplay, dropDisplayPosition);
+                        return true;
+                    case DragEvent.ACTION_DRAG_EXITED:
+                        diceLayout.removeViewAt(dropDisplayPosition);
+                        dropDisplayPosition = -1;
+                        break;
+                    case DragEvent.ACTION_DRAG_ENDED:
+                        if (!dropped) {
+                            if (dropDisplayPosition >= 0) {
+                                diceLayout.removeViewAt(dropDisplayPosition);
+                            }
+                            if (draggedItem != null) {
+                                diceLayout.addView(draggedItem, draggedItemPosition);
+                            }
+                            dropDisplay = null;
+                            dropDisplayPosition = -1;
+                            draggedItem = null;
+                            draggedItemPosition = -1;
+                        }
+                        dropped = false;
+                        return true;
+                    case DragEvent.ACTION_DROP:
                         if (draggedItem == null) {
                             return false;
                         }
 
-                        if (draggedItemAt == dragAt) {
-                            // the item didn't move.  just return false
-                            return false;
-                        }
-                        diceConfigManager.moveDice(text, dragAt);
-                        if (draggedItemAt < dragAt) {
-                            dragAt -= 1;
+                        ClipData.Item item = event.getClipData().getItemAt(0);
+                        String text = item.getText().toString();
+
+                        // the view was removed from the layout but is still in the config list
+                        // therefore, if you want to move the dice in the config list and you are
+                        // moving the dice down, then you need to add 1 back into the position that
+                        // you pass to the moveDice list operation.
+                        if (draggedItemPosition < dropDisplayPosition) {
+                            diceConfigManager.moveDice(text, dropDisplayPosition+1);
+                        } else {
+                            diceConfigManager.moveDice(text, dropDisplayPosition);
                         }
 
-                        if (dragAt == -1) {
-                            dragAt = diceLayout.getChildCount();
-                        }
+                        diceLayout.addView(draggedItem, dropDisplayPosition);
 
-                        diceLayout.removeView(draggedItem);
-                        diceLayout.addView(draggedItem, dragAt);
+                        diceLayout.removeView(dropDisplay);
+                        dropDisplay = null;
+                        dropDisplayPosition = -1;
+                        draggedItem = null;
+                        draggedItemPosition = -1;
+                        dropped = true;
                         return true;
                 }
                 return false;

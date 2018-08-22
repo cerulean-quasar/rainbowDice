@@ -167,10 +167,13 @@ public class ConfigurationFile {
 
     public void moveDice(String item, int to) {
         int i = diceConfigList.indexOf(item);
+        if (i == -1) {
+            return;
+        }
+        diceConfigList.remove(i);
         if (i < to) {
             to -= 1;
         }
-        diceConfigList.remove(i);
         diceConfigList.add(to, item);
     }
 

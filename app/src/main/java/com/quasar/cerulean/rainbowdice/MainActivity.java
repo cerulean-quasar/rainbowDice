@@ -135,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
             Button button = new Button(this);
             button.setBackgroundColor(0);
             button.setText(dice);
+            button.setPadding(50,0,50,0);
             button.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
