@@ -26,22 +26,36 @@ layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec3 fragPosition;
 
 layout(binding = 1) uniform sampler2D texSampler;
+layout(set = 0, binding = 2) uniform UniformBufferObject {
+    vec3 pos;
+} viewPoint;
+
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
     vec3 color;
+    float alpha;
     if (texture(texSampler, fragTexCoord).r != 0) {
         color = vec3(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b);
+        alpha = 1.0;
     } else {
         color = fragColor;
+        alpha = 0.7;
     }
 
-    vec3 lightpos = vec3(0.0, 0.0, 5.0);
+    float shininess = 16.0;
+    vec3 lightColor = vec3(1.0, 1.0, 1.0);
+    vec3 lightpos = vec3(0.0, -5.0, 5.0);
     vec3 lightDirection = normalize(lightpos - fragPosition);
-    float diff = max(dot(fragNormal, lightDirection), 0.0);
-    vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
+    vec3 viewDirection = normalize(viewPoint.pos - fragPosition);
+    vec3 halfWayDirection = normalize(lightDirection + viewDirection);
+    float spec = pow(max(dot(fragNormal, halfWayDirection), 0.0), shininess);
+    vec3 specular = lightColor * spec;
 
-    vec3 ambient = vec3(0.3, 0.3, 0.3);
-    outColor = vec4((ambient + diffuse) * color, 1.0);
+    float diff = max(dot(fragNormal, lightDirection), 0.0);
+    vec3 diffuse = diff * color;
+
+    vec3 ambient = 0.5 * color;
+    outColor = vec4(ambient + diffuse + specular, alpha);
 }

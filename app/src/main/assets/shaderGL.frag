@@ -7,6 +7,7 @@ varying vec3 fragNormal;
 varying vec3 fragPosition;
 
 uniform sampler2D texSampler;
+uniform vec3 viewPosition;
 
 void main() {
     vec3 color;
@@ -16,11 +17,17 @@ void main() {
         color = fragColor;
     }
 
-    vec3 lightpos = vec3(0.0, 0.0, 5.0);
+    float shininess = 16.0;
+    vec3 lightpos = vec3(0.0, 5.0, 5.0);
+    vec3 lightColor = vec3(1.0, 1.0, 1.0);
     vec3 lightDirection = normalize(lightpos - fragPosition);
+    vec3 viewDirection = normalize(viewPosition - fragPosition);
+    vec3 halfWayDirection = normalize(lightDirection + viewDirection);
+    float spec = pow(max(dot(fragNormal, halfWayDirection), 0.0), shininess);
+    vec3 specular = lightColor * spec;
     float diff = max(dot(fragNormal, lightDirection), 0.0);
-    vec3 diffuse = diff * vec3(1.0, 1.0, 1.0);
+    vec3 diffuse = diff * color;
 
-    vec3 ambient = vec3(0.3, 0.3, 0.3);
-    gl_FragColor = vec4((ambient + diffuse) * color, 1.0);
+    vec3 ambient = 0.5 * color;
+    gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
 }

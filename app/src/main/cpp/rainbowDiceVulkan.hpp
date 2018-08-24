@@ -251,8 +251,11 @@ private:
     VkExtent2D swapChainExtent;
     VkRenderPass renderPass = VK_NULL_HANDLE;
 
+    VkBuffer viewPointBuffer;
+    VkDeviceMemory viewPointBufferMemory;
+
     struct Dice {
-        DicePhysicsModel *die;
+        std::shared_ptr<DicePhysicsModel> die;
 
         /* vertex buffer and index buffer. the index buffer indicates which vertices to draw and in
          * the specified order.  Note, vertices can be listed twice if they should be part of more
@@ -274,15 +277,15 @@ private:
             isBeingReRolled = false;
             long nbrSides = symbols.size();
             if (nbrSides == 4) {
-                die = new DiceModelTetrahedron(symbols, position);
+                die.reset(new DiceModelTetrahedron(symbols, position));
             } else if (nbrSides == 12) {
-                die = new DiceModelDodecahedron(symbols, position);
+                die.reset(new DiceModelDodecahedron(symbols, position));
             } else if (nbrSides == 20) {
-                die = new DiceModelIcosahedron(symbols, position);
+                die.reset(new DiceModelIcosahedron(symbols, position));
             } else if (6 % nbrSides == 0) {
-                die = new DiceModelCube(symbols, position);
+                die.reset(new DiceModelCube(symbols, position));
             } else {
-                die = new DiceModelHedron(symbols, position);
+                die.reset(new DiceModelHedron(symbols, position));
             }
         }
 
@@ -314,9 +317,6 @@ private:
 
             vkDestroyBuffer(logicalDevice, indexBuffer, nullptr);
             vkFreeMemory(logicalDevice, indexBufferMemory, nullptr);
-            if (die != nullptr) {
-                delete die;
-            }
         }
 
         void updateUniformBuffer() {
@@ -412,7 +412,7 @@ private:
     VkFormat findDepthFormat();
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     bool hasStencilComponent(VkFormat format);
-    void createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet);
+    void createDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer, VkDescriptorSet &descriptorSet);
     //void createDescriptorPool();
     void createDescriptorSetLayout(VkDescriptorSetLayout &descriptorSetLayout);
     void createTextureImages();

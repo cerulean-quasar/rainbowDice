@@ -197,6 +197,9 @@ void RainbowDiceGL::drawFrame() {
     glBindTexture(GL_TEXTURE_2D, texturetest);
     glUniform1i(textureID, 0);
 
+    GLint viewPos = glGetUniformLocation(programID, "viewPosition");
+    glUniform3fv(viewPos, 1, &viewPoint[0]);
+
     for (auto && die : dice) {
         // Send our transformation to the currently bound shader, in the "MVP"
         // uniform. This is done in the main loop since each model will have a

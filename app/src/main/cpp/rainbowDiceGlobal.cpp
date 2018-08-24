@@ -26,5 +26,7 @@ const std::string SHADER_FRAG_FILE = "fragmentShader";
 
 std::unique_ptr<TextureAtlas> texAtlas;
 
-float const screenWidth = 1.4f;
+float const screenWidth = 1.2f;
 float const screenHeight = 1.6f;
+
+glm::vec3 const viewPoint = {0.0f, 0.0f, 3.0f};

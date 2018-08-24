@@ -130,7 +130,7 @@ bool Vertex::operator==(const Vertex& other) const {
 
 void DicePhysicsModel::setView() {
     /* glm::lookAt takes the eye position, the center position, and the up axis as parameters */
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(viewPoint, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 }
 

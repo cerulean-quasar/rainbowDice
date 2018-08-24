@@ -83,6 +83,18 @@ void RainbowDiceVulkan::initPipeline() {
     createGraphicsPipeline();
     createCommandPool();
     createTextureImages();
+
+    // copy the view point of the scene into device memory to send to the fragment shader for the
+    // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
+    VkDeviceSize bufferSize = sizeof(glm::vec3);
+    createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 viewPointBuffer, viewPointBufferMemory);
+    void *data;
+    vkMapMemory(logicalDevice, viewPointBufferMemory, 0, sizeof(viewPoint), 0, &data);
+    memcpy(data, &viewPoint, sizeof(viewPoint));
+    vkUnmapMemory(logicalDevice, viewPointBufferMemory);
+
     for (auto && die : dice) {
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
@@ -96,7 +108,7 @@ void RainbowDiceVulkan::initPipeline() {
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
-        createDescriptorSet(uniformBuffer, descriptorSet);
+        createDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
         die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                       vertexBufferMemory, uniformBuffer, uniformBufferMemory);
     }
@@ -169,7 +181,7 @@ void RainbowDiceVulkan::recreateModels() {
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
-        createDescriptorSet(uniformBuffer, descriptorSet);
+        createDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
         die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                       vertexBufferMemory, uniformBuffer, uniformBufferMemory);
     }
@@ -1458,7 +1470,8 @@ bool RainbowDiceVulkan::hasStencilComponent(VkFormat format) {
 }
 
 /* descriptor set for the MVP matrix and texture samplers */
-void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet) {
+void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
+                                            VkDescriptorSet &descriptorSet) {
     descriptorSet = descriptorPools.allocateDescriptor();
 
     VkDescriptorBufferInfo bufferInfo = {};
@@ -1466,7 +1479,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptor
     bufferInfo.offset = 0;
     bufferInfo.range = sizeof(UniformBufferObject);
 
-    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet;
 
@@ -1499,6 +1512,20 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptor
     descriptorWrites[1].descriptorCount = imageInfos.size();
     descriptorWrites[1].pImageInfo = imageInfos.data();
 
+    VkDescriptorBufferInfo bufferInfoViewPoint = {};
+    bufferInfoViewPoint.buffer = viewPointBuffer;
+    bufferInfoViewPoint.offset = 0;
+    bufferInfoViewPoint.range = sizeof(glm::vec3);
+
+    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[2].dstSet = descriptorSet;
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pBufferInfo = &bufferInfoViewPoint;
+    descriptorWrites[2].pImageInfo = nullptr; // Optional
+    descriptorWrites[2].pTexelBufferView = nullptr; // Optional
     vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
@@ -1541,7 +1568,15 @@ void RainbowDiceVulkan::createDescriptorSetLayout(VkDescriptorSetLayout &descrip
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+    /* View Point vector */
+    VkDescriptorSetLayoutBinding viewPointLayoutBinding = {};
+    viewPointLayoutBinding.binding = 2;
+    viewPointLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    viewPointLayoutBinding.descriptorCount = 1;
+    viewPointLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    viewPointLayoutBinding.pImmutableSamplers = nullptr; // Optional
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings =
+            {uboLayoutBinding, samplerLayoutBinding, viewPointLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1898,7 +1933,7 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
         if (!iti->get()->die->isStopped()) {
             for (DiceList::iterator itj = iti; itj != dice.end(); itj++) {
                 if (!itj->get()->die->isStopped() && iti != itj) {
-                    iti->get()->die->calculateBounce(itj->get()->die);
+                    iti->get()->die->calculateBounce(itj->get()->die.get());
                 }
             }
         }
@@ -1977,7 +2012,7 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
-        createDescriptorSet(uniformBuffer, descriptorSet);
+        createDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
         die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                   vertexBufferMemory, uniformBuffer, uniformBufferMemory);
         die->die->resetPosition();
