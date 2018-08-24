@@ -260,8 +260,24 @@ public:
     bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
     void animateMove(float x, float y) {
-        doneX = x;
-        doneY = y;
+        // if doneX and doneY are not 0, then we have completed a previous stopped animation
+        // and are now moving the die because of a reroll.  So store the previous doneX and doneY
+        // as the current stoppedPositionX and stoppedPositionY. Also, make the stoppedAngle 0, so
+        // no additional rotation is done.
+        if (doneX != 0.0f && doneY != 0.0f) {
+            stoppedPositionX = doneX;
+            stoppedPositionY = doneY;
+            stoppedAngle = 0.0f;
+        }
+
+        // if the dice is to be moved, then set animationDone to false and animationTime to 0.
+        // otherwise just return so no animation is done.
+        if (doneX != x || doneY != y) {
+            doneX = x;
+            doneY = y;
+            animationDone = false;
+            animationTime = 0.0f;
+        }
     }
     bool isStopped() { return stopped; }
     bool isStoppedAnimationDone() { return animationDone; }

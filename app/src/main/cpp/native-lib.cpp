@@ -370,5 +370,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
     }
     env->ReleaseIntArrayElements(jIndices, cIndices, JNI_COMMIT);
     stopDrawing.store(false);
-    diceGraphics->resetPositions(indices);
+    diceGraphics->initThread();
+    diceGraphics->addRollingDiceAtIndices(indices);
+    diceGraphics->cleanupThread();
 }

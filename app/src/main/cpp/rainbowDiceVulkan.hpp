@@ -31,6 +31,7 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <list>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -94,6 +95,8 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
+    virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
+
     virtual ~RainbowDiceVulkan() { }
 private:
     struct QueueFamilyIndices {
@@ -111,6 +114,127 @@ private:
         std::vector<VkPresentModeKHR> presentModes;
     };
 
+    class DescriptorPools;
+    class DescriptorPool {
+        friend DescriptorPools;
+    private:
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        uint32_t totalDescriptorsAllocated;
+        uint32_t totalDescriptorsInPool;
+
+        DescriptorPool(VkDescriptorPool pool, uint32_t totalDescriptors)
+                : descriptorPool(pool), totalDescriptorsInPool(totalDescriptors),
+                  totalDescriptorsAllocated(0)
+        { }
+        VkDescriptorSet allocateDescriptor(VkDescriptorSetLayout layout) {
+            if (totalDescriptorsAllocated == totalDescriptorsInPool) {
+                return VK_NULL_HANDLE;
+            } else {
+                VkDescriptorSet descriptorSet;
+                VkDescriptorSetLayout layouts[] = {layout};
+                VkDescriptorSetAllocateInfo allocInfo = {};
+                allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+                allocInfo.descriptorPool = descriptorPool;
+                allocInfo.descriptorSetCount = 1;
+                allocInfo.pSetLayouts = layouts;
+
+                /* the descriptor sets don't need to be freed because they are freed when the
+                 * descriptor pool is freed
+                 */
+                int rc = vkAllocateDescriptorSets(logicalDevice, &allocInfo, &descriptorSet);
+                if (rc != VK_SUCCESS) {
+                    throw std::runtime_error("failed to allocate descriptor set!");
+                }
+                totalDescriptorsAllocated++;
+                return descriptorSet;
+            }
+        }
+
+        bool hasAvailableDescriptorSets() { return totalDescriptorsAllocated < totalDescriptorsInPool; }
+
+    };
+
+    /* for passing data other than the vertex data to the vertex shader */
+    class DescriptorPools {
+    private:
+        uint32_t const numberOfDescriptorSetsInPool = 128;
+        VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+        std::vector<DescriptorPool> descriptorPools;
+        std::vector<VkDescriptorSet> unusedDescriptors;
+    public:
+        DescriptorPools() : descriptorSetLayout(VK_NULL_HANDLE) { }
+        ~DescriptorPools() { destroyResources(); }
+
+        void setDescriptorSetLayout(VkDescriptorSetLayout layout) {
+            descriptorSetLayout = layout;
+        }
+        VkDescriptorSetLayout getDescriptorSetLayout() { return descriptorSetLayout; }
+        void destroyResources() {
+            unusedDescriptors.clear();
+
+            for (auto &&descriptorPool: descriptorPools) {
+                vkDestroyDescriptorPool(logicalDevice, descriptorPool.descriptorPool, nullptr);
+            }
+
+            descriptorPools.clear();
+
+            if (descriptorSetLayout != VK_NULL_HANDLE) {
+                vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
+                descriptorSetLayout = VK_NULL_HANDLE;
+            }
+
+        }
+        void freeDescriptor(VkDescriptorSet descriptorSet) {
+            unusedDescriptors.push_back(descriptorSet);
+        }
+
+        VkDescriptorSet allocateDescriptor() {
+            if (descriptorSetLayout == VK_NULL_HANDLE) {
+                throw (std::runtime_error("DescriptorPool::allocateDescriptor - no descriptor set layout"));
+            }
+
+            if (unusedDescriptors.size() > 0) {
+                VkDescriptorSet descriptorSet = unusedDescriptors.back();
+                unusedDescriptors.pop_back();
+                return descriptorSet;
+            } else {
+                for (auto &&descriptorPool : descriptorPools) {
+                    if (descriptorPool.hasAvailableDescriptorSets()) {
+                        return descriptorPool.allocateDescriptor(descriptorSetLayout);
+                    }
+                }
+
+                // no more descriptors in all the descriptor pools.  create another descriptor pool...
+                std::array<VkDescriptorPoolSize, 3> poolSizes = {};
+
+                // one for each wall and +3 for the floor, ball, and hole.
+                poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                poolSizes[0].descriptorCount = numberOfDescriptorSetsInPool;
+                poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                poolSizes[1].descriptorCount = numberOfDescriptorSetsInPool;
+                poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                poolSizes[2].descriptorCount = numberOfDescriptorSetsInPool;
+                VkDescriptorPoolCreateInfo poolInfo = {};
+                poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+                poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+                poolInfo.pPoolSizes = poolSizes.data();
+                poolInfo.maxSets = numberOfDescriptorSetsInPool;
+
+                VkDescriptorPool descriptorPool;
+                if (vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+                    throw std::runtime_error("failed to create descriptor pool!");
+                }
+
+                DescriptorPool newDescriptorPool(descriptorPool, numberOfDescriptorSetsInPool);
+
+                descriptorPools.push_back(newDescriptorPool);
+                return newDescriptorPool.allocateDescriptor(descriptorSetLayout);
+            }
+        }
+    };
+    /* for passing data other than the vertex data to the vertex shader */
+    DescriptorPools descriptorPools;
+
     static VkDevice logicalDevice;
     VkInstance instance = VK_NULL_HANDLE;
     VkDebugReportCallbackEXT callback = VK_NULL_HANDLE;
@@ -119,10 +243,6 @@ private:
     VkQueue presentQueue = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
-
-    /* for passing data other than the vertex data to the vertex shader */
-    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
@@ -148,8 +268,10 @@ private:
         VkBuffer uniformBuffer;
         VkDeviceMemory uniformBufferMemory;
 
+        bool isBeingReRolled;
         Dice(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
         {
+            isBeingReRolled = false;
             long nbrSides = symbols.size();
             if (nbrSides == 4) {
                 die = new DiceModelTetrahedron(symbols, position);
@@ -206,7 +328,8 @@ private:
 
     };
 
-    std::vector<Dice*> dice;
+    typedef std::list<std::shared_ptr<Dice> > DiceList;
+    DiceList dice;
 
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
@@ -290,8 +413,8 @@ private:
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     bool hasStencilComponent(VkFormat format);
     void createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet);
-    void createDescriptorPool();
-    void createDescriptorSetLayout();
+    //void createDescriptorPool();
+    void createDescriptorSetLayout(VkDescriptorSetLayout &descriptorSetLayout);
     void createTextureImages();
     void createTextureImage(VkImage &textureImage, VkDeviceMemory &textureImageMemory);
     void createTextureSampler(VkSampler &textureSampler);

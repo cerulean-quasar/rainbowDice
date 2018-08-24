@@ -76,12 +76,14 @@ void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
 }
 
 void RainbowDiceVulkan::initPipeline() {
-    createDescriptorSetLayout();
+    VkDescriptorSetLayout layout;
+    createDescriptorSetLayout(layout);
+    descriptorPools.setDescriptorSetLayout(layout);
+
     createGraphicsPipeline();
     createCommandPool();
     createTextureImages();
-    createDescriptorPool();
-    for (size_t i = 0; i < dice.size(); i++) {
+    for (auto && die : dice) {
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
         VkBuffer vertexBuffer;
@@ -90,12 +92,12 @@ void RainbowDiceVulkan::initPipeline() {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        dice[i]->loadModel(swapChainExtent.width, swapChainExtent.height);
-        createVertexBuffer(dice[i], vertexBuffer, vertexBufferMemory);
-        createIndexBuffer(dice[i], indexBuffer, indexBufferMemory);
+        die->loadModel(swapChainExtent.width, swapChainExtent.height);
+        createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
+        createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
         createDescriptorSet(uniformBuffer, descriptorSet);
-        dice[i]->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
+        die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                       vertexBufferMemory, uniformBuffer, uniformBufferMemory);
     }
     createDepthResources();
@@ -108,9 +110,6 @@ void RainbowDiceVulkan::initPipeline() {
 void RainbowDiceVulkan::cleanup() {
     cleanupSwapChain();
 
-    for (auto die : dice) {
-        delete die;
-    }
     dice.clear();
 
     if (texAtlas.get() != nullptr && logicalDevice != VK_NULL_HANDLE) {
@@ -118,9 +117,7 @@ void RainbowDiceVulkan::cleanup() {
     }
 
     if (logicalDevice != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
-
+        descriptorPools.destroyResources();
         vkDestroySemaphore(logicalDevice, renderFinishedSemaphore, nullptr);
         vkDestroySemaphore(logicalDevice, imageAvailableSemaphore, nullptr);
         vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
@@ -154,11 +151,12 @@ void RainbowDiceVulkan::recreateSwapChain() {
 // it is assumed that the caller will first destroy the old models with destroyModels, then
 // create the new ones, then call this function to recreate all the associated Vulkan resources.
 void RainbowDiceVulkan::recreateModels() {
-    createDescriptorSetLayout();
+    VkDescriptorSetLayout layout;
+    createDescriptorSetLayout(layout);
     createCommandPool();
     createTextureImages();
-    createDescriptorPool();
-    for (size_t i = 0; i < dice.size(); i++) {
+    descriptorPools.setDescriptorSetLayout(layout);
+    for (auto && die : dice) {
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
         VkBuffer vertexBuffer;
@@ -167,12 +165,12 @@ void RainbowDiceVulkan::recreateModels() {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        dice[i]->loadModel(swapChainExtent.width, swapChainExtent.height);
-        createVertexBuffer(dice[i], vertexBuffer, vertexBufferMemory);
-        createIndexBuffer(dice[i], indexBuffer, indexBufferMemory);
+        die->loadModel(swapChainExtent.width, swapChainExtent.height);
+        createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
+        createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
         createDescriptorSet(uniformBuffer, descriptorSet);
-        dice[i]->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
+        die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                       vertexBufferMemory, uniformBuffer, uniformBufferMemory);
     }
 
@@ -180,14 +178,10 @@ void RainbowDiceVulkan::recreateModels() {
 }
 
 void RainbowDiceVulkan::destroyModels() {
-    for (auto die : dice) {
-        delete die;
-    }
     dice.clear();
 
     ((TextureAtlasVulkan*)texAtlas.get())->destroy(logicalDevice);
-    vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
+    descriptorPools.destroyResources();
 
     vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 }
@@ -1045,6 +1039,7 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
 
     /* the descriptor set layout for the MVP matrix */
     pipelineLayoutInfo.setLayoutCount = 1;
+    VkDescriptorSetLayout descriptorSetLayout = descriptorPools.getDescriptorSetLayout();
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
     pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
@@ -1464,19 +1459,7 @@ bool RainbowDiceVulkan::hasStencilComponent(VkFormat format) {
 
 /* descriptor set for the MVP matrix and texture samplers */
 void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptorSet &descriptorSet) {
-    VkDescriptorSetLayout layouts[] = {descriptorSetLayout};
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = layouts;
-
-    /* the descriptor sets don't need to be freed because they are freed when the
-     * descriptor pool is freed
-     */
-    if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, &descriptorSet) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor set!");
-    }
+    descriptorSet = descriptorPools.allocateDescriptor();
 
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = uniformBuffer;
@@ -1520,7 +1503,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkDescriptor
 }
 
 
-/* descriptor pool for the MVP matrix and image sampler */
+/* descriptor pool for the MVP matrix and image sampler *//*
 void RainbowDiceVulkan::createDescriptorPool() {
     std::array<VkDescriptorPoolSize, 2> poolSizes = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1536,10 +1519,10 @@ void RainbowDiceVulkan::createDescriptorPool() {
     if (vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
-}
+}*/
 
 /* for accessing data other than the vertices from the shaders */
-void RainbowDiceVulkan::createDescriptorSetLayout() {
+void RainbowDiceVulkan::createDescriptorSetLayout(VkDescriptorSetLayout &descriptorSetLayout) {
     /* MVP matrix */
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
     uboLayoutBinding.binding = 0;
@@ -1906,16 +1889,16 @@ void RainbowDiceVulkan::copyBufferToImage(VkBuffer buffer, VkImage image, uint32
 }
 
 void RainbowDiceVulkan::loadObject(std::vector<std::string> &symbols) {
-    Dice *o = new Dice(symbols, glm::vec3(0.0f, 0.0f, -1.0f));
+    std::shared_ptr<Dice> o(new Dice(symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
     dice.push_back(o);
 }
 
 bool RainbowDiceVulkan::updateUniformBuffer() {
-    for (int i = 0; i < dice.size(); i++) {
-        if (!dice[i]->die->isStopped()) {
-            for (int j = i + 1; j < dice.size(); j++) {
-                if (!dice[j]->die->isStopped()) {
-                    dice[i]->die->calculateBounce(dice[j]->die);
+    for (DiceList::iterator iti = dice.begin(); iti != dice.end(); iti++) {
+        if (!iti->get()->die->isStopped()) {
+            for (DiceList::iterator itj = iti; itj != dice.end(); itj++) {
+                if (!itj->get()->die->isStopped() && iti != itj) {
+                    iti->get()->die->calculateBounce(itj->get()->die);
                 }
             }
         }
@@ -1923,7 +1906,7 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
 
     bool needsRedraw = false;
     uint32_t i=0;
-    for (auto die : dice) {
+    for (auto && die : dice) {
         if (die->die->updateModelMatrix()) {
             needsRedraw = true;
         }
@@ -1945,25 +1928,85 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
 }
 
 void RainbowDiceVulkan::updateAcceleration(float x, float y, float z) {
-    for (auto die : dice) {
+    for (auto &&die : dice) {
         die->die->updateAcceleration(x, y, z);
     }
 }
 
 void RainbowDiceVulkan::resetPositions() {
-    for (auto die: dice) {
+    for (auto &&die: dice) {
         die->die->resetPosition();
     }
 }
 
 void RainbowDiceVulkan::resetPositions(std::set<int> &diceIndices) {
-    for (auto i : diceIndices) {
-        dice[i]->die->resetPosition();
+    int i = 0;
+    for (auto &&die : dice) {
+        if (diceIndices.find(i) != diceIndices.end()) {
+            die->die->resetPosition();
+        }
+        i++;
+    }
+}
+
+void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
+    int i = 0;
+    DiceList::iterator diceIt = dice.begin();
+    for (std::set<int>::iterator it = diceIndices.begin(); it != diceIndices.end(); it++) {
+        for (; i < *it; i++, diceIt++) {
+            while (diceIt->get()->isBeingReRolled) {
+                diceIt++;
+            }
+        }
+        while (diceIt->get()->isBeingReRolled) {
+            diceIt++;
+        }
+
+        std::shared_ptr<Dice> die(new Dice(diceIt->get()->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+        diceIt->get()->isBeingReRolled = true;
+
+        VkBuffer indexBuffer;
+        VkDeviceMemory indexBufferMemory;
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexBufferMemory;
+        VkBuffer uniformBuffer;
+        VkDeviceMemory uniformBufferMemory;
+        VkDescriptorSet descriptorSet;
+
+        die->loadModel(swapChainExtent.width, swapChainExtent.height);
+        createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
+        createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
+        createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        createDescriptorSet(uniformBuffer, descriptorSet);
+        die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
+                  vertexBufferMemory, uniformBuffer, uniformBufferMemory);
+        die->die->resetPosition();
+
+        diceIt++;
+        dice.insert(diceIt, die);
+        diceIt--;
+    }
+
+    createCommandBuffers();
+
+    i=0;
+    for (auto &&die : dice) {
+        if (die->die->isStopped()) {
+            float width = screenWidth;
+            float height = screenHeight;
+            uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
+            float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die->animateMove(x, y);
+        }
+        i++;
     }
 }
 
 bool RainbowDiceVulkan::allStopped() {
-    for (auto die : dice) {
+    for (auto &&die : dice) {
         if (!die->die->isStopped() || !die->die->isStoppedAnimationDone()) {
             return false;
         }
@@ -1973,12 +2016,14 @@ bool RainbowDiceVulkan::allStopped() {
 
 std::vector<std::string> RainbowDiceVulkan::getDiceResults() {
     std::vector<std::string> results;
-    for (auto die : dice) {
+    for (auto &&die : dice) {
         if (!die->die->isStopped()) {
             // Should not happen
             throw std::runtime_error("Not all die are stopped!");
         }
-        results.push_back(die->die->getResult());
+        if (!die->isBeingReRolled) {
+            results.push_back(die->die->getResult());
+        }
     }
 
     return results;

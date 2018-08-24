@@ -46,6 +46,8 @@ public:
 
     virtual void resetPositions(std::set<int> &dice)=0;
 
+    virtual void addRollingDiceAtIndices(std::set<int> &diceIndices)=0;
+
     virtual void cleanupThread()=0;
 
     virtual ~RainbowDice() { }

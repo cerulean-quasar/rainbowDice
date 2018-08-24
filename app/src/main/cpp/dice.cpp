@@ -290,7 +290,7 @@ bool DicePhysicsModel::updateModelMatrix() {
                 checkQuaternion(q);
                 rotate = glm::toMat4(glm::normalize(q*qTotalRotated));
             } else {
-                rotate = glm::mat4(1);
+                rotate = glm::toMat4(qTotalRotated);
             }
             glm::mat4 scale = glm::scale(glm::vec3(r, r, r));
             glm::mat4 translate = glm::translate(position);

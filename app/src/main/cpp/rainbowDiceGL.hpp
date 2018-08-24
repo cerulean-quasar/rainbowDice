@@ -20,6 +20,7 @@
 
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
+#include <list>
 #include "rainbowDice.hpp"
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
@@ -60,6 +61,8 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
+    virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
+
     virtual ~RainbowDiceGL() {}
 private:
     WindowType *window;
@@ -75,8 +78,14 @@ private:
         GLuint indexBuffer;
         std::shared_ptr<DicePhysicsModel> die;
 
+        // If the die is being rerolled, then don't count it in the results list returned because
+        // the GUI is expecting a new list of results that only contains one set of rolls for a die
+        // and then uses the index to determine what the reroll value was.
+        bool isBeingReRolled;
+
         Dice(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
         {
+            isBeingReRolled = false;
             long nbrSides = symbols.size();
             if (nbrSides == 4) {
                 die.reset((DicePhysicsModel*)new DiceModelTetrahedron(symbols, position, true));
@@ -96,8 +105,15 @@ private:
             die->setView();
             die->updatePerspectiveMatrix(width, height);
         }
+
+        ~Dice() {
+            glDeleteBuffers(1, &vertexBuffer);
+            glDeleteBuffers(1, &indexBuffer);
+        }
     };
-    std::vector<Dice> dice;
+
+    typedef std::list<std::shared_ptr<Dice> > DiceList;
+    DiceList dice;
 
     GLuint loadShaders();
 };

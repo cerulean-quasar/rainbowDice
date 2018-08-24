@@ -125,22 +125,22 @@ void RainbowDiceGL::initPipeline() {
 
     int32_t w = ANativeWindow_getWidth(window);
     int32_t h = ANativeWindow_getHeight(window);
-    for (auto die : dice) {
-        die.loadModel(w, h);
+    for (auto &&die : dice) {
+        die->loadModel(w, h);
     }
 
-    for (int i=0; i < dice.size(); i++) {
+    for (auto &&die : dice) {
         // the vertex buffer
-        glGenBuffers(1, &dice[i].vertexBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, dice[i].vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * dice[i].die->vertices.size(),
-                     dice[i].die->vertices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &die->vertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * die->die->vertices.size(),
+                     die->die->vertices.data(), GL_STATIC_DRAW);
 
         // the index buffer
-        glGenBuffers(1, &dice[i].indexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, dice[i].indexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * dice[i].die->indices.size(),
-                     dice[i].die->indices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &die->indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * die->die->indices.size(),
+                     die->die->indices.data(), GL_STATIC_DRAW);
     }
 
     // set the shader to use
@@ -184,10 +184,7 @@ void RainbowDiceGL::cleanupThread() {
 }
 
 void RainbowDiceGL::cleanup() {
-    for (auto die : dice) {
-        glDeleteBuffers(1, &die.vertexBuffer);
-        glDeleteBuffers(1, &die.indexBuffer);
-    }
+    dice.clear();
     glDeleteTextures(1, &texturetest);
     destroyWindow();
 }
@@ -200,35 +197,35 @@ void RainbowDiceGL::drawFrame() {
     glBindTexture(GL_TEXTURE_2D, texturetest);
     glUniform1i(textureID, 0);
 
-    for (int i=0; i<dice.size(); i++) {
+    for (auto && die : dice) {
         // Send our transformation to the currently bound shader, in the "MVP"
         // uniform. This is done in the main loop since each model will have a
         // different MVP matrix (At least for the M part)
 
         // the projection matrix
         GLint MatrixID = glGetUniformLocation(programID, "proj");
-        glm::mat4 matrix = dice[i].die->ubo.proj;
+        glm::mat4 matrix = die->die->ubo.proj;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // view matrix
         MatrixID = glGetUniformLocation(programID, "view");
-        matrix = dice[i].die->ubo.view;
+        matrix = die->die->ubo.view;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // model matrix
         MatrixID = glGetUniformLocation(programID, "model");
-        matrix = dice[i].die->ubo.model;
+        matrix = die->die->ubo.model;
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // the model matrix for the normal vector
         MatrixID = glGetUniformLocation(programID, "normalMatrix");
-        matrix = glm::transpose(glm::inverse(dice[i].die->ubo.model));
+        matrix = glm::transpose(glm::inverse(die->die->ubo.model));
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // 1st attribute buffer : colors
         GLint colorID = glGetAttribLocation(programID, "inColor");
-        glBindBuffer(GL_ARRAY_BUFFER, dice[i].vertexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, dice[i].indexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer);
         glVertexAttribPointer(
                 colorID,                          // The position of the attribute in the shader.
                 3,                                // size
@@ -277,7 +274,7 @@ void RainbowDiceGL::drawFrame() {
 
         // Draw the triangles !
         //glDrawArrays(GL_TRIANGLES, 0, dice[0].die->vertices.size() /* total number of vertices*/);
-        glDrawElements(GL_TRIANGLES, dice[i].die->indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, die->die->indices.size(), GL_UNSIGNED_INT, 0);
 
         glDisableVertexAttribArray(position);
         glDisableVertexAttribArray(colorID);
@@ -369,30 +366,31 @@ GLuint RainbowDiceGL::loadShaders() {
 }
 
 bool RainbowDiceGL::updateUniformBuffer() {
-    for (int i = 0; i < dice.size(); i++) {
-        if (!dice[i].die->isStopped()) {
-            for (int j = i + 1; j < dice.size(); j++) {
-                if (!dice[j].die->isStopped()) {
-                    dice[i].die->calculateBounce(dice[j].die.get());
+    for (DiceList::iterator iti = dice.begin(); iti != dice.end(); iti++) {
+        if (!iti->get()->die->isStopped()) {
+            for (DiceList::iterator itj = iti; itj != dice.end(); itj++) {
+                if (!itj->get()->die->isStopped() && iti != itj) {
+                    iti->get()->die->calculateBounce(itj->get()->die.get());
                 }
             }
         }
     }
+
     bool needsRedraw = false;
     uint32_t i = 0;
-    for (auto die : dice) {
-        if (die.die->updateModelMatrix()) {
+    for (auto &&die : dice) {
+        if (die->die->updateModelMatrix()) {
             needsRedraw = true;
         }
-        if (die.die->isStopped() && !die.die->isStoppedAnimationStarted()) {
+        if (die->die->isStopped() && !die->die->isStoppedAnimationStarted()) {
             float width = screenWidth;
             float height = screenHeight;
             uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
             uint32_t stoppedX = i%nbrX;
             uint32_t stoppedY = i/nbrX;
-            float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
+            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
             float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die.die->animateMove(x, y);
+            die->die->animateMove(x, y);
         }
         i++;
     }
@@ -401,8 +399,8 @@ bool RainbowDiceGL::updateUniformBuffer() {
 }
 
 bool RainbowDiceGL::allStopped() {
-    for (auto die : dice) {
-        if (!die.die->isStopped() || !die.die->isStoppedAnimationDone()) {
+    for (auto &&die : dice) {
+        if (!die->die->isStopped() || !die->die->isStoppedAnimationDone()) {
             return false;
         }
     }
@@ -429,19 +427,21 @@ void RainbowDiceGL::destroyWindow() {
 
 std::vector<std::string> RainbowDiceGL::getDiceResults() {
     std::vector<std::string> results;
-    for (auto die : dice) {
-        if (!die.die->isStopped()) {
+    for (auto &&die : dice) {
+        if (!die->die->isStopped()) {
             // Should not happen
             throw std::runtime_error("Not all die are stopped!");
         }
-        results.push_back(die.die->getResult());
+        if (!die->isBeingReRolled) {
+            results.push_back(die->die->getResult());
+        }
     }
 
     return results;
 }
 
 void RainbowDiceGL::loadObject(std::vector<std::string> &symbols) {
-    Dice o(symbols, glm::vec3(0.0f, 0.0f, -1.0f));
+    std::shared_ptr<Dice> o(new Dice(symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
     dice.push_back(o);
 }
 
@@ -452,14 +452,14 @@ void RainbowDiceGL::destroyModels() {
 void RainbowDiceGL::recreateModels() {
     for (auto die : dice) {
         // create 1 buffer for the vertices (includes color and texture coordinates and which texture to use too).
-        glGenBuffers(1, &die.vertexBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, die.vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof (Vertex) * die.die->vertices.size(), die.die->vertices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &die->vertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof (Vertex) * die->die->vertices.size(), die->die->vertices.data(), GL_STATIC_DRAW);
 
         // create 1 buffer for the indices
-        glGenBuffers(1, &die.indexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die.indexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof (Vertex) * die.die->indices.size(), die.die->indices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &die->indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof (Vertex) * die->die->indices.size(), die->die->indices.data(), GL_STATIC_DRAW);
     }
 }
 
@@ -468,19 +468,76 @@ void RainbowDiceGL::recreateSwapChain() {
 }
 
 void RainbowDiceGL::updateAcceleration(float x, float y, float z) {
-    for (auto die : dice) {
-        die.die->updateAcceleration(x, y, z);
+    for (auto && die : dice) {
+        die->die->updateAcceleration(x, y, z);
     }
 }
 
 void RainbowDiceGL::resetPositions() {
-    for (auto die: dice) {
-        die.die->resetPosition();
+    for (auto && die: dice) {
+        die->die->resetPosition();
     }
 }
 
 void RainbowDiceGL::resetPositions(std::set<int> &diceIndices) {
-    for (auto i : diceIndices) {
-        dice[i].die->resetPosition();
+    int i = 0;
+    for (auto &&die : dice) {
+        if (diceIndices.find(i) != diceIndices.end()) {
+            die->die->resetPosition();
+        }
+        i++;
+    }
+}
+void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
+    int i = 0;
+    DiceList::iterator diceIt = dice.begin();
+    for (std::set<int>::iterator it = diceIndices.begin(); it != diceIndices.end(); it++) {
+        for (; i < *it; i++, diceIt++) {
+            while (diceIt->get()->isBeingReRolled) {
+                diceIt++;
+            }
+        }
+        while (diceIt->get()->isBeingReRolled) {
+            diceIt++;
+        }
+
+        Dice *currentDie = diceIt->get();
+        std::shared_ptr<Dice> die(new Dice(currentDie->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+        diceIt->get()->isBeingReRolled = true;
+        int32_t w = ANativeWindow_getWidth(window);
+        int32_t h = ANativeWindow_getHeight(window);
+        die->loadModel(w, h);
+
+        // the vertex buffer
+        glGenBuffers(1, &die->vertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * die->die->vertices.size(),
+                     die->die->vertices.data(), GL_STATIC_DRAW);
+
+        // the index buffer
+        glGenBuffers(1, &die->indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * die->die->indices.size(),
+                     die->die->indices.data(), GL_STATIC_DRAW);
+        die->die->resetPosition();
+
+        diceIt++;
+        dice.insert(diceIt, die);
+        diceIt--;
+    }
+
+    i=0;
+    for (auto &&die : dice) {
+        if (die->die->isStopped()) {
+            float width = screenWidth;
+            float height = screenHeight;
+            uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
+            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die->animateMove(x, y);
+        }
+        i++;
     }
 }
