@@ -275,6 +275,78 @@ void RainbowDiceGL::drawFrame() {
         );
         glEnableVertexAttribArray(normalID);
 
+        // attribute buffer : vertices for die
+        GLint cornerNormalID = glGetAttribLocation(programID, "inCornerNormal");
+        glVertexAttribPointer(
+                cornerNormalID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, cornerNormal)) // array buffer offset
+        );
+        glEnableVertexAttribArray(cornerNormalID);
+
+        // attribute buffer : vertices for die
+        GLint corner1ID = glGetAttribLocation(programID, "inCorner1");
+        glVertexAttribPointer(
+                corner1ID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, corner1)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner1ID);
+
+        // attribute buffer : vertices for die
+        GLint corner2ID = glGetAttribLocation(programID, "inCorner2");
+        glVertexAttribPointer(
+                corner2ID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, corner2)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner2ID);
+
+        // attribute buffer : vertices for die
+        GLint corner3ID = glGetAttribLocation(programID, "inCorner3");
+        glVertexAttribPointer(
+                corner3ID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, corner3)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner3ID);
+
+        // attribute buffer : vertices for die
+        GLint corner4ID = glGetAttribLocation(programID, "inCorner4");
+        glVertexAttribPointer(
+                corner4ID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, corner4)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner4ID);
+
+        // attribute buffer : vertices for die
+        GLint corner5ID = glGetAttribLocation(programID, "inCorner5");
+        glVertexAttribPointer(
+                corner5ID,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, corner5)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner5ID);
+
         // Draw the triangles !
         //glDrawArrays(GL_TRIANGLES, 0, dice[0].die->vertices.size() /* total number of vertices*/);
         glDrawElements(GL_TRIANGLES, die->die->indices.size(), GL_UNSIGNED_INT, 0);
@@ -282,6 +354,13 @@ void RainbowDiceGL::drawFrame() {
         glDisableVertexAttribArray(position);
         glDisableVertexAttribArray(colorID);
         glDisableVertexAttribArray(texCoordID);
+        glDisableVertexAttribArray(normalID);
+        glDisableVertexAttribArray(cornerNormalID);
+        glDisableVertexAttribArray(corner1ID);
+        glDisableVertexAttribArray(corner2ID);
+        glDisableVertexAttribArray(corner3ID);
+        glDisableVertexAttribArray(corner4ID);
+        glDisableVertexAttribArray(corner5ID);
     }
     eglSwapBuffers(display, surface);
 }

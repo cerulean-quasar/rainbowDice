@@ -169,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        //String result = drawOnce();
         diceResult = null;
     }
 
@@ -361,6 +362,7 @@ public class MainActivity extends AppCompatActivity {
         }
         int TEXWIDTH = 64;
         int TEXHEIGHT = 64;
+        int TEX_BLANK_HEIGHT = 56;
 
         TreeSet<String> symbolSet = new TreeSet<>();
 
@@ -393,7 +395,7 @@ public class MainActivity extends AppCompatActivity {
 
         Bitmap bitmap;
         try {
-            bitmap = Bitmap.createBitmap(TEXWIDTH, TEXHEIGHT * symbolSet.size(), ALPHA_8);
+            bitmap = Bitmap.createBitmap(TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT) * symbolSet.size(), ALPHA_8);
         } catch (Exception e) {
             if (e.getMessage() != null) {
                 publishError(e.getMessage());
@@ -405,16 +407,17 @@ public class MainActivity extends AppCompatActivity {
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
         paint.setUnderlineText(true);
+        paint.setFakeBoldText(true);
         paint.setTextAlign(Paint.Align.CENTER);
         canvas.drawARGB(0,0,0,0);
         int i = 0;
         for (String symbol : symbolSet) {
             if (symbol.length() < 3) {
-                paint.setTextSize(50.0f);
+                paint.setTextSize(48.0f);
             } else {
                 paint.setTextSize(25.0f);
             }
-            canvas.drawText(symbol, 40, i*TEXHEIGHT + 40, paint);
+            canvas.drawText(symbol, 28, i*(TEXHEIGHT+TEX_BLANK_HEIGHT) + 47, paint);
             i++;
         }
         int bitmapSize = bitmap.getAllocationByteCount();
@@ -429,7 +432,8 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
         String err = addSymbols(symbolSet.toArray(new String[symbolSet.size()]), symbolSet.size(),
-                TEXWIDTH, TEXHEIGHT*symbolSet.size(), TEXHEIGHT, bitmapSize, bytes);
+                TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
+                TEX_BLANK_HEIGHT, bitmapSize, bytes);
         if (err != null && err.length() != 0) {
             publishError(err);
             return false;
@@ -593,8 +597,9 @@ public class MainActivity extends AppCompatActivity {
     private native void recreateModels();
     private native void recreateSwapChain();
     private native void loadModel(String[] symbols);
-    private native String addSymbols(String[] symbols, int nbrSymbols, int width, int height, int heightImage, int bitmapSize, byte[] bitmap);
+    private native String addSymbols(String[] symbols, int nbrSymbols, int width, int height, int heightImage, int heightBlankSpace, int bitmapSize, byte[] bitmap);
     private native void roll();
     private native void reRoll(int[] indices);
+    private native String drawOnce();
     private native String initSensors();
 }

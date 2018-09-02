@@ -60,8 +60,10 @@ std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
         {1.0f, 0.5f, 0.0f}, // orange
         {1.0f, 1.0f, 0.0f}, // yellow
+        {0.5f, 1.0f, 0.0f}, // yellow-green
         {0.0f, 1.0f, 0.0f}, // green
         {0.0f, 0.0f, 1.0f}, // blue
+        {0.0f, 0.0f, 0.5f}, // indigo
         {1.0f, 0.0f, 1.0f}  // purple
 };
 unsigned long const Filter::highPassAccelerationMaxSize = 512;
@@ -94,8 +96,8 @@ VkVertexInputBindingDescription Vertex::getBindingDescription() {
     return bindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions = {};
+std::array<VkVertexInputAttributeDescription, 10> Vertex::getAttributeDescriptions() {
+    std::array<VkVertexInputAttributeDescription, 10> attributeDescriptions = {};
 
     /* position */
     attributeDescriptions[0].binding = 0; /* binding description to use */
@@ -120,6 +122,41 @@ std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescription
     attributeDescriptions[3].location = 3;
     attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
     attributeDescriptions[3].offset = offsetof(Vertex, normal);
+
+    /* normal to the corner */
+    attributeDescriptions[4].binding = 0;
+    attributeDescriptions[4].location = 4;
+    attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[4].offset = offsetof(Vertex, cornerNormal);
+
+    attributeDescriptions[5].binding = 0;
+    attributeDescriptions[5].location = 5;
+    attributeDescriptions[5].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[5].offset = offsetof(Vertex, corner1);
+
+
+    attributeDescriptions[6].binding = 0;
+    attributeDescriptions[6].location = 6;
+    attributeDescriptions[6].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[6].offset = offsetof(Vertex, corner2);
+
+
+    attributeDescriptions[7].binding = 0;
+    attributeDescriptions[7].location = 7;
+    attributeDescriptions[7].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[7].offset = offsetof(Vertex, corner3);
+
+
+    attributeDescriptions[8].binding = 0;
+    attributeDescriptions[8].location = 8;
+    attributeDescriptions[8].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[8].offset = offsetof(Vertex, corner4);
+
+
+    attributeDescriptions[9].binding = 0;
+    attributeDescriptions[9].location = 9;
+    attributeDescriptions[9].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[9].offset = offsetof(Vertex, corner5);
 
     return attributeDescriptions;
 }
@@ -507,51 +544,84 @@ void DiceModelCube::loadModel() {
     Vertex vertex = {};
 
     uint32_t totalNbrImages = texAtlas->getNbrImages();
-
+    float paddingTotal = totalNbrImages * (float)texAtlas->getPaddingHeight()/(float)texAtlas->getTextureHeight();
+    glm::vec3 normals[6] = {{0.0f, 1.0f, 0.0f},
+                            {0.0f, -1.0f, 0.0f},
+                            {sqrtf(2) / 2, 0.0f, sqrtf(2) / 2},
+                            {-sqrtf(2) / 2, 0.0f, sqrtf(2) / 2},
+                            {-sqrtf(2) / 2, 0.0f, -sqrtf(2) / 2},
+                            {sqrtf(2) / 2, 0.0f, -sqrtf(2) / 2} };
     // vertices
     for (uint32_t i = 0; i < 4; i ++) {
         // top (y is "up")
-        vertex.normal = {0.0f, 1.0f, 0.0f};
+        vertex.normal = normals[0];
+        cubeTop(vertex.corner1, 0);
+        cubeTop(vertex.corner2, 3);
+        cubeTop(vertex.corner3, 2);
+        cubeTop(vertex.corner4, 1);
+        // set to something that the shaders can check for to see if this is a valid corner.  The
+        // fragment shader will check to see if the length is greater than 1000 since that is outside
+        // of our display area.
+        vertex.corner5 = {1000.0,1000.0,1000.0};
+
         uint32_t textureToUse = texAtlas->getImageIndex(symbols[0]);
+        float paddingHeight = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse + 1)};
+            vertex.texCoord = {0, ((1.0f - paddingTotal)/ totalNbrImages) * (textureToUse + 1) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[0] + normals[2] + normals[5]);
             break;
         case 1:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse)};
+            vertex.texCoord = {0, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[0] + normals[3] + normals[2]);
             break;
         case 2:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse)};
+            vertex.texCoord = {1, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[0] + normals[4] + normals[3]);
             break;
         case 3:
         default:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse + 1)};
+            vertex.texCoord = {1, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse + 1) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[0] + normals[5] + normals[4]);
             break;
         }
         vertex.color = colors[i%colors.size()];
-        cubeTop(vertex, i);
+        cubeTop(vertex.pos, i);
         vertices.push_back(vertex);
 
         //bottom
-        vertex.normal = {0.0f, -1.0f, 0.0f};
+        vertex.normal = normals[1];
+        cubeBottom(vertex.corner1, 0);
+        cubeBottom(vertex.corner2, 1);
+        cubeBottom(vertex.corner3, 2);
+        cubeBottom(vertex.corner4, 3);
+        // set to something that the shaders can check for to see if this is a valid corner.  The
+        // fragment shader will check to see if the length is greater than 1000 since that is outside
+        // of our display area.
+        vertex.corner5 = {1000.0,1000.0,1000.0};
         textureToUse = texAtlas->getImageIndex(symbols[1%symbols.size()]);
+        paddingHeight = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse);
         switch (i) {
         case 0:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse)};
+            vertex.texCoord = {0, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[1] + normals[2] + normals[5]);
             break;
         case 1:
-            vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse + 1)};
+            vertex.texCoord = {0, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse + 1) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[1] + normals[3] + normals[2]);
             break;
         case 2:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse + 1)};
+            vertex.texCoord = {1, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse + 1) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[1] + normals[4] + normals[3]);
             break;
         case 3:
         default:
-            vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse)};
+            vertex.texCoord = {1, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
+            vertex.cornerNormal = glm::normalize(normals[1] + normals[5] + normals[4]);
             break;
         }
         vertex.color = colors[(i+3) %colors.size()];
-        cubeBottom(vertex, i);
+        cubeBottom(vertex.pos, i);
         vertices.push_back(vertex);
     }
 
@@ -578,31 +648,37 @@ void DiceModelCube::loadModel() {
     for (uint32_t i = 0; i < 4; i ++) {
         vertex.color = colors[i%colors.size()];
         uint32_t textureToUse = texAtlas->getImageIndex(symbols[(i+2)%symbols.size()]);
+        float paddingHeight = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight() *(textureToUse);
 
-        if (i == 0) {
-            vertex.normal = {sqrtf(2) / 2, 0.0f, sqrtf(2) / 2};
-        } else if (i == 1) {
-            vertex.normal = {-sqrtf(2) / 2, 0.0f, sqrtf(2) / 2};
-        } else if (i == 2) {
-            vertex.normal = {-sqrtf(2) / 2, 0.0f, -sqrtf(2) / 2};
-        } else { // i == 3
-            vertex.normal = {sqrtf(2) / 2, 0.0f, -sqrtf(2) / 2};
-        }
+        vertex.normal = normals[i+2];
+        cubeTop(vertex.corner1, i);
+        cubeTop(vertex.corner2, (i+1)%4);
+        cubeBottom(vertex.corner3, (i+1)%4);
+        cubeBottom(vertex.corner4, i);
 
-        cubeTop(vertex, i);
-        vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse)};
+        // set to something that the shaders can check for to see if this is a valid corner.  The
+        // fragment shader will check to see if the length is greater than 1000 since that is outside
+        // of our display area.
+        vertex.corner5 = {1000.0,1000.0,1000.0};
+
+        cubeTop(vertex.pos, i);
+        vertex.texCoord = {0, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
+        vertex.cornerNormal = glm::normalize(normals[i+2] + normals[0] + normals[(i+3)%4+2]);
         vertices.push_back(vertex);
 
-        cubeTop(vertex, (i+1)%4);
-        vertex.texCoord = {0, (1.0f / totalNbrImages) * (textureToUse + 1)};
+        cubeTop(vertex.pos, (i+1)%4);
+        vertex.texCoord = {0, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse + 1) + paddingHeight};
+        vertex.cornerNormal = glm::normalize(normals[i+2] + normals[0] + normals[(i+1)%4+2]);
         vertices.push_back(vertex);
 
-        cubeBottom(vertex, i);
-        vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse)};
+        cubeBottom(vertex.pos, i);
+        vertex.texCoord = {1, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
+        vertex.cornerNormal = glm::normalize(normals[i+2] + normals[1] + normals[(i+3)%4+2]);
         vertices.push_back(vertex);
 
-        cubeBottom(vertex, (i+1)%4);
-        vertex.texCoord = {1, (1.0f / totalNbrImages) * (textureToUse + 1)};
+        cubeBottom(vertex.pos, (i+1)%4);
+        vertex.texCoord = {1, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse + 1) + paddingHeight};
+        vertex.cornerNormal = glm::normalize(normals[i+2] + normals[1] + normals[(i+1)%4+2]);
         vertices.push_back(vertex);
 
         indices.push_back(9+4*i);
@@ -615,12 +691,12 @@ void DiceModelCube::loadModel() {
     }
 }
 
-void DiceModelCube::cubeTop(Vertex &vertex, uint32_t i) {
-    vertex.pos = {glm::cos(2*i*pi/4), sqrtf(2)/2, glm::sin(2*i*pi/4)};
+void DiceModelCube::cubeTop(glm::vec3 &pos, uint32_t i) {
+    pos = {glm::cos(2*i*pi/4), sqrtf(2)/2, glm::sin(2*i*pi/4)};
 }
 
-void DiceModelCube::cubeBottom(Vertex &vertex, uint32_t i) {
-    vertex.pos = {glm::cos(2*i*pi/4), -sqrtf(2)/2, glm::sin(2*i*pi/4)};
+void DiceModelCube::cubeBottom(glm::vec3 &pos, uint32_t i) {
+    pos = {glm::cos(2*i*pi/4), -sqrtf(2)/2, glm::sin(2*i*pi/4)};
 }
 
 void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
@@ -698,19 +774,62 @@ void DiceModelCube::yAlign(uint32_t faceIndex) {
 }
 
 void DiceModelHedron::loadModel() {
-    // top
+    glm::vec3 p0TopCornerNormal = {};
+    glm::vec3 p0BottomCornerNormal = {};
     for (uint32_t i = 0; i < numberFaces/2; i ++) {
+        glm::vec3 p0, q, r;
+        topCorners(p0,q,r,i);
+        p0TopCornerNormal += glm::normalize(glm::cross(r-q, p0-q));
+
+        bottomCorners(p0,q,r,i);
+        p0BottomCornerNormal += glm::normalize(glm::cross(r-q, p0-q));
+    }
+
+    p0TopCornerNormal = glm::normalize(p0TopCornerNormal);
+    p0BottomCornerNormal = glm::normalize(p0BottomCornerNormal);
+
+    for (uint32_t i = 0; i < numberFaces/2; i ++) {
+        glm::vec3 p0, q, r;
+        glm::vec3 qNormal = {};
+        glm::vec3 rNormal = {};
+
+        // corner normal for q(top)/r(bottom)
+        if (i==0) {
+            topCorners(p0,q,r,numberFaces/2-1);
+            qNormal += glm::normalize(glm::cross(r-q, p0-q));
+            bottomCorners(p0,q,r,numberFaces/2-1);
+            qNormal += glm::normalize(glm::cross(r-q, p0-q));
+        } else {
+            topCorners(p0, q, r, i-1);
+            qNormal += glm::normalize(glm::cross(r-q, p0-q));
+            bottomCorners(p0, q, r, i-1);
+            qNormal += glm::normalize(glm::cross(r-q, p0-q));
+        }
+
+        topCorners(p0, q, r, i);
+        qNormal += glm::normalize(glm::cross(r-q, p0-q));
+        bottomCorners(p0, q, r, i);
+        qNormal += glm::normalize(glm::cross(r-q, p0-q));
+        qNormal = glm::normalize(qNormal);
+
+        // corner normal for r(top)/q(bottom)
+        topCorners(p0, q, r, i);
+        rNormal += glm::normalize(glm::cross(r-q, p0-q));
+        bottomCorners(p0, q, r, i);
+        rNormal += glm::normalize(glm::cross(r-q, p0-q));
+        topCorners(p0, q, r, i+1);
+        rNormal += glm::normalize(glm::cross(r-q, p0-q));
+        bottomCorners(p0, q, r, i+1);
+        rNormal += glm::normalize(glm::cross(r-q, p0-q));
+        rNormal = glm::normalize(rNormal);
+
         // bottom
-        glm::vec3 p0 = {0.0f, -1.0f, 0.0f};
-        glm::vec3 q = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
-        glm::vec3 r = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
-        addVertices(p0, q, r, i);
+        bottomCorners(p0, q, r, i);
+        addVertices(p0, q, r, p0BottomCornerNormal, rNormal, qNormal, i);
 
         // top
-        p0 = {0.0f, 1.0f, 0.0f};
-        q = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
-        r = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
-        addVertices(p0, q, r, i+numberFaces/2);
+        topCorners(p0, q, r, i);
+        addVertices(p0, q, r, p0TopCornerNormal, qNormal, rNormal, i+numberFaces/2);
     }
 
     // indices - not really using these
@@ -719,10 +838,26 @@ void DiceModelHedron::loadModel() {
     }
 }
 
-void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i) {
-    uint32_t textureToUse = texAtlas->getImageIndex(symbols[i%symbols.size()]);
-    uint32_t totalNbrImages = texAtlas->getNbrImages();
+void DiceModelHedron::topCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i) {
+    p0 = {0.0f, 1.0f, 0.0f};
+    q = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
+    r = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
+}
+
+void DiceModelHedron::bottomCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i) {
+    p0 = {0.0f, -1.0f, 0.0f};
+    q = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
+    r = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
+}
+
+void DiceModelHedron::addVertices(glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
+                                  glm::vec3 const &p0Normal, glm::vec3 const &qNormal, glm::vec3 const &rNormal,
+                                  uint32_t i) {
+    float textureToUse = texAtlas->getImageIndex(symbols[i%symbols.size()]);
+    float totalNbrImages = texAtlas->getNbrImages();
     float a = (float)texAtlas->getImageWidth()/(float)texAtlas->getImageHeight();
+    float heightPadding = (float)texAtlas->getPaddingHeight()/(float)texAtlas->getTextureHeight();
+    float paddingTotal = totalNbrImages * heightPadding;
 
     Vertex vertex = {};
 
@@ -736,97 +871,43 @@ void DiceModelHedron::addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32
     // the vector normal to this face
     vertex.normal = glm::normalize(glm::cross(r-q, p0-q));
 
-    // Top triangle
-    // not really using textures for this triangle
+    vertex.corner1 = p0;
+    vertex.corner2 = q;
+    vertex.corner3 = r;
+    vertex.corner4 = {1000.0, 1000.0, 1000.0};
+    vertex.corner5 = {1000.0, 1000.0, 1000.0};
+
+    // Top point
     vertex.pos = p0;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.cornerNormal = p0Normal;
+    vertex.texCoord = {0.5 * glm::length(p2-p3),
+        ((textureToUse - glm::length(0.5f*(r+q) - p0) + glm::length(p1-p2))*(1.0f-paddingTotal)/totalNbrImages)+heightPadding*textureToUse};
     vertex.color = colors[i%colors.size()];
     vertices.push_back(vertex);
 
-    vertex.pos = p1prime;
-    vertex.texCoord = {0.0f, 0.0f};
-    vertex.color = colors[(i+1)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p1;
-    vertex.texCoord = {0.0f, 0.0f};
-    vertex.color = colors[(i+1)%colors.size()];
-    vertices.push_back(vertex);
-
-    // bottom left triangle
-    // not really using textures for this triangle
+    // left point
     vertex.pos = q;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.cornerNormal = qNormal;
+    vertex.texCoord = {0.0f - glm::length(q-p3)/glm::length(p2-p3),
+                       (textureToUse + 1)*(1.0f - paddingTotal)/totalNbrImages+heightPadding*textureToUse};
     vertex.color = colors[(i+2) %colors.size()];
     vertices.push_back(vertex);
 
-    vertex.pos = p3;
-    vertex.texCoord = {0.0f, 0.0f};
-    vertex.color = colors[(i+2) %colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p1prime;
-    vertex.texCoord = {0.0f, 0.0f};
-    vertex.color = colors[(i+1)%colors.size()];
-    vertices.push_back(vertex);
-
-    // bottom right triangle
-    // not really using textures for this triangle
+    // right point
     vertex.pos = r;
-    vertex.texCoord = {0.0f, 0.0f};
+    vertex.cornerNormal = rNormal;
+    vertex.texCoord = {1.0f + glm::length(r-p2)/glm::length(p2-p3),
+                       (textureToUse+1)*(1.0f-paddingTotal)/totalNbrImages +heightPadding*textureToUse};
     vertex.color = colors[(i+2)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p1;
-    vertex.texCoord = {0.0f, 0.0f};
-    vertex.color = colors[(i+1)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p2;
-    vertex.texCoord = {0.0f, 0.0f};
-    vertex.color = colors[(i+2)%colors.size()];
-    vertices.push_back(vertex);
-
-    // bottom text triangle
-    vertex.pos = p1prime;
-    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
-    vertex.color = colors[(i+1)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p3;
-    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
-    vertex.color = colors[(i+2)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p2;
-    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
-    vertex.color = colors[(i+2)%colors.size()];
-    vertices.push_back(vertex);
-
-    // top text triangle
-    vertex.pos = p1prime;
-    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
-    vertex.color = colors[(i+1)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p2;
-    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
-    vertex.color = colors[(i+2)%colors.size()];
-    vertices.push_back(vertex);
-
-    vertex.pos = p1;
-    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse)};
-    vertex.color = colors[(i+1)%colors.size()];
     vertices.push_back(vertex);
 }
 
 void DiceModelHedron::getAngleAxis(uint32_t face, float &angle, glm::vec3 &axis) {
     const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
-
     glm::vec4 p04 = ubo.model * glm::vec4(vertices[face * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 q4 = ubo.model * glm::vec4(vertices[3 + face * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 r4 = ubo.model * glm::vec4(vertices[6 + face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 q4 = ubo.model * glm::vec4(vertices[1 + face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 r4 = ubo.model * glm::vec4(vertices[2 + face * nbrVerticesPerFace].pos, 1.0f);
     glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
     glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
     glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
@@ -855,11 +936,13 @@ void DiceModelHedron::yAlign(uint32_t faceIndex) {
     }
     glm::vec3 axis;
 
-    glm::vec4 p1prime4 = ubo.model * glm::vec4(vertices[1 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
-    glm::vec4 p34 = ubo.model * glm::vec4(vertices[4 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
-    glm::vec3 p1prime = {p1prime4.x, p1prime4.y, p1prime4.z};
-    glm::vec3 p3 = {p34.x, p34.y, p34.z};
-    axis = p1prime - p3;
+    glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 q4 = ubo.model * glm::vec4(vertices[1 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 r4 = ubo.model * glm::vec4(vertices[2 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec3 p0 = {p04.x, p04.y, p04.z};
+    glm::vec3 q = {q4.x, q4.y, q4.z};
+    glm::vec3 r = {r4.x, r4.y, r4.z};
+    axis = p0 - (0.5f * (r + q));
 
     float angle = glm::acos(glm::dot(glm::normalize(axis), yaxis));
     if (axis.x < 0) {
@@ -870,23 +953,79 @@ void DiceModelHedron::yAlign(uint32_t faceIndex) {
 }
 
 void DiceModelTetrahedron::loadModel() {
-    glm::vec3 p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
-    glm::vec3 q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
-    glm::vec3 r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 0);
+    glm::vec3 p0Normal = {};
+    glm::vec3 qNormal = {};
+    glm::vec3 rNormal = {};
 
-    q = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
-    r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 1);
+    glm::vec3 p0, r, q;
+    corners(p0,q,r,0);
+    p0Normal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,1);
+    p0Normal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,2);
+    p0Normal += glm::normalize(glm::cross(r-q, p0-q));
+    p0Normal = glm::normalize(p0Normal);
 
-    q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
-    r = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 2);
+    corners(p0,q,r,0);
+    qNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,3);
+    qNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,2);
+    qNormal += glm::normalize(glm::cross(r-q, p0-q));
+    qNormal = glm::normalize(qNormal);
 
-    p0 = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
-    q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
-    r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
-    addVertices(p0, q, r, 3);
+    corners(p0,q,r,0);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,1);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,3);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    rNormal = glm::normalize(rNormal);
+
+    corners(p0,q,r,0);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 0);
+
+    // p0Normal stays the same, r becomes q.
+    qNormal = rNormal;
+    rNormal = {};
+    corners(p0,q,r,1);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,2);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,3);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    rNormal = glm::normalize(rNormal);
+
+    corners(p0,q,r,1);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 1);
+
+    // p0Normal stays the same, r becomes q.
+    qNormal = rNormal;
+    rNormal = {};
+    corners(p0,q,r,0);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,2);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,3);
+    rNormal += glm::normalize(glm::cross(r-q, p0-q));
+    rNormal = glm::normalize(rNormal);
+
+    corners(p0,q,r,2);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 2);
+
+    // rNormal stays the same, q becomes p0.
+    p0Normal = qNormal;
+    qNormal = {};
+    corners(p0,q,r,0);
+    qNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,1);
+    qNormal += glm::normalize(glm::cross(r-q, p0-q));
+    corners(p0,q,r,3);
+    qNormal += glm::normalize(glm::cross(r-q, p0-q));
+    qNormal = glm::normalize(qNormal);
+
+    corners(p0,q,r,3);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 3);
 
     // indices - not really using these
     for (uint32_t i = 0; i < numberFaces*15; i ++) {
@@ -894,112 +1033,166 @@ void DiceModelTetrahedron::loadModel() {
     }
 }
 
+void DiceModelTetrahedron::corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, uint32_t i) {
+    if (i==0) {
+        p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
+        q = {0.0f, -1.0f, 1.0f / sqrtf(2)};
+        r = {1.0f, 0.0f, -1.0f / sqrtf(2)};
+    } else if (i==1) {
+        p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
+        q = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
+        r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
+    } else if (i==2) {
+        p0 = {0.0f, 1.0f, 1.0f / sqrtf(2)};
+        q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
+        r = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
+    } else { // i == 3
+        p0 = {-1.0f, 0.0f, -1.0f / sqrtf(2)};
+        q = {1.0f, 0.0f, -1.0f / sqrtf(2)};
+        r = {0.0f, -1.0f, 1.0f / sqrtf(2)};
+    }
+}
+
 void DiceModelIcosahedron::loadModel() {
-    float phi = (1+sqrtf(5.0f))/2;
-    float scaleFactor = 2;
     uint32_t i = 0;
+    glm::vec3 p0, q, r;
+    glm::vec3 p0Normal = {};
+    glm::vec3 qNormal = {};
+    glm::vec3 rNormal = {};
+
+    glm::vec3 faceNormals[20];
+    // get all of the face normals.
+    for (uint32_t j = 0; j < 20; j++) {
+        corners(p0,q,r,j);
+        faceNormals[j] = glm::normalize(glm::cross(r-q, p0-q));
+    }
 
     // we'll divide it into top middle and bottom.  First the top:
-    glm::vec3 p0 = {0.0f, 1.0f/scaleFactor, phi/scaleFactor};
-    glm::vec3 q = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    glm::vec3 r = {-1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    p0Normal = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[2] + faceNormals[3] + faceNormals[4]);
 
-    q = r;
-    r = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = glm::normalize(faceNormals[0] + faceNormals[4] + faceNormals[12] + faceNormals[13] + faceNormals[14]);
+    rNormal = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[10] + faceNormals[11] + faceNormals[12]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10] + faceNormals[18] + faceNormals[19]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = {phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[2] + faceNormals[3] + faceNormals[16] + faceNormals[17] + faceNormals[18]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[14] + faceNormals[15] + faceNormals[16]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[0] + faceNormals[4] + faceNormals[12] + faceNormals[13] + faceNormals[14]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     // now for the bottom
-    p0 = {0.0f, -1.0f/scaleFactor, -phi/scaleFactor};
-    q = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    r = {-1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    // the normal for p0.
+    p0Normal = glm::normalize(faceNormals[5] + faceNormals[6] + faceNormals[7] + faceNormals[8] + faceNormals[9]);
 
-    q = r;
-    r = {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = glm::normalize(faceNormals[5] + faceNormals[9] + faceNormals[15] + faceNormals[16] + faceNormals[17]);
+    rNormal = glm::normalize(faceNormals[5] + faceNormals[6] + faceNormals[17] + faceNormals[18] + faceNormals[19]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[6] + faceNormals[7] + faceNormals[10] + faceNormals[11] + faceNormals[19]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = {phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[7] + faceNormals[8] + faceNormals[11] + faceNormals[12] + faceNormals[13]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[8] + faceNormals[9] + faceNormals[13] + faceNormals[14] + faceNormals[15]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+
+    qNormal = rNormal;
+    rNormal = glm::normalize(faceNormals[5] + faceNormals[9] + faceNormals[15] + faceNormals[16] + faceNormals[17]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     // now the middle
-    p0 = {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    q = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    r = {-1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    p0Normal = glm::normalize(faceNormals[6] + faceNormals[7] + faceNormals[10] + faceNormals[11] + faceNormals[19]);
+    qNormal = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10] + faceNormals[18] + faceNormals[19]);
+    rNormal = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[10] + faceNormals[11] + faceNormals[12]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = p0;
-    p0 = q;
-    q = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = p0Normal;
+    p0Normal = qNormal;
+    qNormal = glm::normalize(faceNormals[7] + faceNormals[8] + faceNormals[11] + faceNormals[12] + faceNormals[13]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    r = q;
-    q = p0;
-    p0 = r;
-    r = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    rNormal = qNormal;
+    qNormal = p0Normal;
+    p0Normal = rNormal;
+    rNormal = glm::normalize(faceNormals[0] + faceNormals[4] + faceNormals[12] + faceNormals[13] + faceNormals[14]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    p0 = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
-    q =  {phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    r = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = p0Normal;
+    p0Normal = qNormal;
+    qNormal = glm::normalize(faceNormals[8] + faceNormals[9] + faceNormals[13] + faceNormals[14] + faceNormals[15]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    r = q;
-    q = p0;
-    p0 = r;
-    r = {phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    rNormal = qNormal;
+    qNormal = p0Normal;
+    p0Normal = rNormal;
+    rNormal = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[14] + faceNormals[15] + faceNormals[16]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = p0;
-    p0 = q;
-    q =  {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = p0Normal;
+    p0Normal = qNormal;
+    qNormal = glm::normalize(faceNormals[5] + faceNormals[9] + faceNormals[15] + faceNormals[16] + faceNormals[17]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    r = q;
-    q = p0;
-    p0 = r;
-    r = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
-    addVertices(p0, q, r, i++);
+    rNormal = qNormal;
+    qNormal = p0Normal;
+    p0Normal = rNormal;
+    rNormal = glm::normalize(faceNormals[2] + faceNormals[3] + faceNormals[16] + faceNormals[17] + faceNormals[18]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    p0 = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
-    r = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    q =  {-1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = p0Normal;
+    p0Normal = qNormal;
+    qNormal = glm::normalize(faceNormals[5] + faceNormals[6] + faceNormals[17] + faceNormals[18] + faceNormals[19]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    r = q;
-    q = p0;
-    p0 = r;
-    r = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    rNormal = qNormal;
+    qNormal = p0Normal;
+    p0Normal = rNormal;
+    rNormal = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10] + faceNormals[18] + faceNormals[19]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
-    q = r;
-    r = p0;
-    p0 = q;
-    q =  {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
-    addVertices(p0, q, r, i++);
+    qNormal = rNormal;
+    rNormal = p0Normal;
+    p0Normal = qNormal;
+    qNormal = glm::normalize(faceNormals[6] + faceNormals[7] + faceNormals[10] + faceNormals[11] + faceNormals[19]);
+    corners(p0,q,r,i);
+    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     // indices - not really using these
     for (i = 0; i < numberFaces*15; i ++) {
@@ -1007,9 +1200,159 @@ void DiceModelIcosahedron::loadModel() {
     }
 }
 
-void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i) {
-    uint32_t textureToUse = texAtlas->getImageIndex(symbols[i % symbols.size()]);
+void DiceModelIcosahedron::corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, uint32_t i) {
+    float phi = (1+sqrtf(5.0f))/2;
+    float scaleFactor = 1.8f;
+
+    // we'll divide it into top middle and bottom.  First the top:
+    p0 = {0.0f, 1.0f/scaleFactor, phi/scaleFactor};
+    q = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
+    r = {-1.0f/scaleFactor, phi/scaleFactor, 0.0f};
+    if (i == 0) {
+        return;
+    }
+
+    q = r;
+    r = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
+    if (i == 1) {
+        return;
+    }
+
+    q = r;
+    r = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
+    if (i == 2) {
+        return;
+    }
+
+    q = r;
+    r = {phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
+    if (i == 3) {
+        return;
+    }
+
+    q = r;
+    r = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
+    if (i == 4) {
+        return;
+    }
+
+    // now for the bottom
+    p0 = {0.0f, -1.0f/scaleFactor, -phi/scaleFactor};
+    q = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
+    r = {-1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
+    if (i == 5) {
+        return;
+    }
+
+    q = r;
+    r = {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
+    if (i == 6) {
+        return;
+    }
+
+    q = r;
+    r = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
+    if (i == 7) {
+        return;
+    }
+
+    q = r;
+    r = {phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
+    if (i == 8) {
+        return;
+    }
+
+    q = r;
+    r = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
+    if (i == 9) {
+        return;
+    }
+
+    // now the middle
+    p0 = {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
+    q = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
+    r = {-1.0f/scaleFactor, phi/scaleFactor, 0.0f};
+    if (i == 10) {
+        return;
+    }
+
+    q = r;
+    r = p0;
+    p0 = q;
+    q = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
+    if (i == 11) {
+        return;
+    }
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
+    if (i == 12) {
+        return;
+    }
+
+    p0 = {1.0f/scaleFactor, phi/scaleFactor, 0.0f};
+    q =  {phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
+    r = {0.0f, 1.0f/scaleFactor, -phi/scaleFactor};
+    if (i == 13) {
+        return;
+    }
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
+    if (i == 14) {
+        return;
+    }
+
+    q = r;
+    r = p0;
+    p0 = q;
+    q =  {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
+    if (i == 15) {
+        return;
+    }
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
+    if (i == 16) {
+        return;
+    }
+
+    p0 = {0.0f, -1.0f/scaleFactor, phi/scaleFactor};
+    r = {1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
+    q =  {-1.0f/scaleFactor, -phi/scaleFactor, 0.0f};
+    if (i == 17) {
+        return;
+    }
+
+    r = q;
+    q = p0;
+    p0 = r;
+    r = {-phi/scaleFactor, 0.0f, 1.0f/scaleFactor};
+    if (i == 18) {
+        return;
+    }
+
+    q = r;
+    r = p0;
+    p0 = q;
+    q =  {-phi/scaleFactor, 0.0f, -1.0f/scaleFactor};
+    // i == 19
+}
+
+void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e,
+                                        glm::vec3 cornerNormalA, glm::vec3 cornerNormalB, glm::vec3 cornerNormalC,
+                                        glm::vec3 cornerNormalD, glm::vec3 cornerNormalE, uint32_t i) {
     uint32_t totalNbrImages = texAtlas->getNbrImages();
+    float paddingTotal = totalNbrImages * (float)texAtlas->getPaddingHeight()/(float)texAtlas->getTextureHeight();
+
+    uint32_t textureToUse = texAtlas->getImageIndex(symbols[i % symbols.size()]);
+    float paddingHeight = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse);
 
     Vertex vertex = {};
 
@@ -1018,20 +1361,28 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
 
     // normal vector to the face
     vertex.normal = glm::normalize(glm::cross(d-c, b-c));
+    vertex.corner1 = a;
+    vertex.corner2 = b;
+    vertex.corner3 = c;
+    vertex.corner4 = d;
+    vertex.corner5 = e;
 
     // Top triangle
     // not really using textures for this triangle
     vertex.pos = a;
+    vertex.cornerNormal = cornerNormalA;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[i % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = b;
+    vertex.cornerNormal = cornerNormalB;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = e;
+    vertex.cornerNormal = cornerNormalE;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
@@ -1039,16 +1390,19 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     // right bottom triangle
     // not really using textures for this triangle
     vertex.pos = b;
+    vertex.cornerNormal = cornerNormalB;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = c;
+    vertex.cornerNormal = cornerNormalC;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 2) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = p1;
+    vertex.cornerNormal = vertex.normal;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
@@ -1056,77 +1410,219 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     // left bottom triangle
     // not really using textures for this triangle
     vertex.pos = e;
+    vertex.cornerNormal = cornerNormalE;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = p2;
+    vertex.cornerNormal = vertex.normal;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = d;
+    vertex.cornerNormal = cornerNormalD;
     vertex.texCoord = {0.0f, 0.0f};
     vertex.color = colors[(i + 2) % colors.size()];
     vertices.push_back(vertex);
 
     // bottom texture triangle
     vertex.pos = p1;
-    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
+    vertex.cornerNormal = vertex.normal;
+    vertex.texCoord = {0.0f, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = c;
-    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
+    vertex.cornerNormal = cornerNormalC;
+    vertex.texCoord = {0.0f, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse+1) + paddingHeight};
     vertex.color = colors[(i + 2) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = d;
-    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
+    vertex.cornerNormal = cornerNormalD;
+    vertex.texCoord = {1.0f, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse+1) + paddingHeight};
     vertex.color = colors[(i + 2) % colors.size()];
     vertices.push_back(vertex);
 
     // top texture triangle
     vertex.pos = p1;
-    vertex.texCoord = {0.0f, (1.0f/totalNbrImages)*(textureToUse)};
+    vertex.cornerNormal = vertex.normal;
+    vertex.texCoord = {0.0f, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = d;
-    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse+1)};
+    vertex.cornerNormal = cornerNormalD;
+    vertex.texCoord = {1.0f, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse+1) + paddingHeight};
     vertex.color = colors[(i + 2) % colors.size()];
     vertices.push_back(vertex);
 
     vertex.pos = p2;
-    vertex.texCoord = {1.0f, (1.0f/totalNbrImages)*(textureToUse)};
+    vertex.cornerNormal = vertex.normal;
+    vertex.texCoord = {1.0f, ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight};
     vertex.color = colors[(i + 1) % colors.size()];
     vertices.push_back(vertex);
 }
 
 void DiceModelDodecahedron::loadModel() {
-    float phi = (1+sqrtf(5.0f))/2;
     uint32_t i = 0;
     float scaleFactor = 2.0f;
+    glm::vec3 a,b,c,d,e;
+    glm::vec3 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE;
+    glm::vec3 faceNormals[12];
+
+    // get all the face normal vectors.
+    for (uint32_t j = 0; j < 12; j++) {
+        corners(a,b,c,d,e,j);
+        faceNormals[j] = glm::normalize(glm::cross(d-c, b-c));
+    }
 
     // one side
-    glm::vec3 a = {-1.0f, 1.0f, 1.0f};
-    glm::vec3 b = {-phi, 1.0f/phi, 0.0f};
-    glm::vec3 c = {-phi, -1.0f/phi, 0.0f};
-    glm::vec3 d = {-1.0f, -1.0f, 1.0f};
-    glm::vec3 e = {-1.0f/phi, 0.0f, phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+    corners(a,b,c,d,e,i);
+    cornerNormalA = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[2]);
+    cornerNormalB = glm::normalize(faceNormals[0] + faceNormals[2] + faceNormals[6]);
+    cornerNormalC = glm::normalize(faceNormals[0] + faceNormals[6] + faceNormals[7]);
+    cornerNormalD = glm::normalize(faceNormals[0] + faceNormals[7] + faceNormals[8]);
+    cornerNormalE = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[8]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[8]);
+    cornerNormalC = glm::normalize(faceNormals[1] + faceNormals[8] + faceNormals[9]);
+    cornerNormalD = glm::normalize(faceNormals[1] + faceNormals[9] + faceNormals[10]);
+    cornerNormalE = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10]);
+    cornerNormalC = glm::normalize(faceNormals[2] + faceNormals[10] + faceNormals[11]);
+    cornerNormalD = glm::normalize(faceNormals[2] + faceNormals[6] + faceNormals[11]);
+    cornerNormalE = glm::normalize(faceNormals[0] + faceNormals[2] + faceNormals[6]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    // the other side
+    corners(a,b,c,d,e,i);
+    cornerNormalA = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[5]);
+    cornerNormalB = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[11]);
+    cornerNormalC = glm::normalize(faceNormals[3] + faceNormals[10] + faceNormals[11]);
+    cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[9] + faceNormals[10]);
+    cornerNormalE = glm::normalize(faceNormals[3] + faceNormals[5] + faceNormals[9]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = glm::normalize(faceNormals[4] + faceNormals[5] + faceNormals[7]);
+    cornerNormalC = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[7]);
+    cornerNormalD = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[11]);
+    cornerNormalE = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[11]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = glm::normalize(faceNormals[3] + faceNormals[5] + faceNormals[9]);
+    cornerNormalC = glm::normalize(faceNormals[5] + faceNormals[8] + faceNormals[9]);
+    cornerNormalD = glm::normalize(faceNormals[5] + faceNormals[7] + faceNormals[8]);
+    cornerNormalE = glm::normalize(faceNormals[4] + faceNormals[5] + faceNormals[7]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    // the middle
+    corners(a,b,c,d,e,i);
+    cornerNormalA = glm::normalize(faceNormals[0] + faceNormals[2] + faceNormals[6]);
+    cornerNormalB = glm::normalize(faceNormals[2] + faceNormals[6] + faceNormals[11]);
+    cornerNormalC = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[11]);
+    cornerNormalD = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[7]);
+    cornerNormalE = glm::normalize(faceNormals[0] + faceNormals[6] + faceNormals[7]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = cornerNormalE;
+    cornerNormalC = cornerNormalD;
+    cornerNormalA = glm::normalize(faceNormals[0] + faceNormals[7] + faceNormals[8]);
+    cornerNormalD = glm::normalize(faceNormals[4] + faceNormals[5] + faceNormals[7]);
+    cornerNormalE = glm::normalize(faceNormals[5] + faceNormals[7] + faceNormals[8]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = cornerNormalA;
+    cornerNormalC = cornerNormalE;
+    cornerNormalA = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[8]);
+    cornerNormalD = glm::normalize(faceNormals[5] + faceNormals[8] + faceNormals[9]);
+    cornerNormalE = glm::normalize(faceNormals[1] + faceNormals[8] + faceNormals[9]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = cornerNormalE;
+    cornerNormalC = cornerNormalD;
+    cornerNormalA = glm::normalize(faceNormals[1] + faceNormals[9] + faceNormals[10]);
+    cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[5] + faceNormals[9]);
+    cornerNormalE = glm::normalize(faceNormals[3] + faceNormals[9] + faceNormals[10]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = cornerNormalA;
+    cornerNormalC = cornerNormalE;
+    cornerNormalA = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10]);
+    cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[10] + faceNormals[11]);
+    cornerNormalE = glm::normalize(faceNormals[2] + faceNormals[10] + faceNormals[11]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    corners(a,b,c,d,e,i);
+    cornerNormalB = cornerNormalE;
+    cornerNormalC = cornerNormalD;
+    cornerNormalA = glm::normalize(faceNormals[2] + faceNormals[6] + faceNormals[11]);
+    cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[11]);
+    cornerNormalE = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[11]);
+    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+                cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
+
+    // indices - not really using these
+    for (i = 0; i < numberFaces*5*3; i ++) {
+        indices.push_back(i);
+    }
+}
+
+void DiceModelDodecahedron::corners(glm::vec3 &a, glm::vec3 &b, glm::vec3 &c, glm::vec3 &d, glm::vec3 &e, uint32_t i) {
+    float phi = (1+sqrtf(5.0f))/2;
+
+    // one side
+    a = {-1.0f, 1.0f, 1.0f};
+    b = {-phi, 1.0f/phi, 0.0f};
+    c = {-phi, -1.0f/phi, 0.0f};
+    d = {-1.0f, -1.0f, 1.0f};
+    e = {-1.0f/phi, 0.0f, phi};
+
+    if (i==0) {
+        return;
+    }
 
     b = e;
     c = {1.0/phi, 0.0f, phi};
     d = {1.0f, 1.0f, 1.0f};
     e = {0.0f, phi, 1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==1) {
+        return;
+    }
 
     b = e;
     c = {0.0f, phi, -1.0f/phi};
     d = {-1.0f, 1.0f, -1.0f};
     e = {-phi, 1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==2) {
+        return;
+    }
 
     // the other side
     a = {1.0f, -1.0f, -1.0f};
@@ -1134,19 +1630,28 @@ void DiceModelDodecahedron::loadModel() {
     d = {phi, 1.0f/phi, 0.0f};
     c = {1.0f, 1.0f, -1.0f};
     b = {1.0f/phi, 0.0f, -phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==3) {
+        return;
+    }
 
     e = b;
     d = {-1.0/phi, 0.0f, -phi};
     c = {-1.0f, -1.0f, -1.0f};
     b = {0.0f, -phi, -1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==4) {
+        return;
+    }
 
     e = b;
     d = {0.0f, -phi, 1.0f/phi};
     c = {1.0f, -1.0f, 1.0f};
     b = {phi, -1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==5) {
+        return;
+    }
 
     // the middle
     a = {-phi, 1.0f/phi, 0.0f};
@@ -1154,47 +1659,56 @@ void DiceModelDodecahedron::loadModel() {
     c = {-1.0f/phi, 0.0f, -phi};
     d = {-1.0f, -1.0f, -1.0f};
     e = {-phi, -1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==6) {
+        return;
+    }
 
     b = e;
     c = d;
     a = {-1.0f, -1.0f, 1.0f};
     d = {0.0f, -phi, -1.0f/phi};
     e = {0.0f, -phi, 1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==7) {
+        return;
+    }
 
     b = a;
     c = e;
     a = {-1.0f/phi, 0.0f, phi};
     d = {1.0f, -1.0f, 1.0f};
     e = {1.0f/phi, 0.0f, phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==8) {
+        return;
+    }
 
     b = e;
     c = d;
     a = {1.0f, 1.0f, 1.0f};
     d = {phi, -1.0f/phi, 0.0f};
     e = {phi, 1.0f/phi, 0.0f};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==9) {
+        return;
+    }
 
     b = a;
     c = e;
     a = {0.0f, phi, 1.0f/phi};
     d = {1.0f, 1.0f, -1.0f};
     e = {0.0f, phi, -1.0f/phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
+
+    if (i==10) {
+        return;
+    }
 
     b = e;
     c = d;
     a = {-1.0f, 1.0f, -1.0f};
     d = {1.0/phi, 0.0f, -phi};
     e = {-1.0/phi, 0.0f, -phi};
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor, i++);
-
-    // indices - not really using these
-    for (i = 0; i < numberFaces*5*3; i ++) {
-        indices.push_back(i);
-    }
 }
 
 void DiceModelDodecahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {

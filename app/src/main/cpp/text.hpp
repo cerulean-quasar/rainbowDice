@@ -33,6 +33,7 @@ typedef std::map<std::string, TextureImage>::iterator texture_iterator;
 class TextureAtlas {
 private:
     uint32_t heightImage;
+    uint32_t heightBlankSpace;
     uint32_t width;
     uint32_t heightTexture;
     std::vector<char> bitmap;
@@ -43,6 +44,7 @@ public:
     uint32_t getImageHeight() { return heightImage; }
     uint32_t getImageWidth() { return width; }
     uint32_t getTextureHeight() {return heightTexture; }
+    uint32_t getPaddingHeight() {return heightBlankSpace; }
     uint32_t getImageIndex(std::string &symbol) {
         std::map<std::string, TextureImage>::iterator it = textureImages.find(symbol);
         if (it == textureImages.end()) {
@@ -56,8 +58,10 @@ public:
         return (uint32_t)textureImages.size();
     }
 
-    TextureAtlas(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture, uint32_t inHeightImage,  std::vector<char> &inBitmap)
-        :heightImage(inHeightImage), width(inWidth), heightTexture(inHeightTexture), bitmap(inBitmap), textureImages()
+    TextureAtlas(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                 uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
+        :heightImage(inHeightImage), heightBlankSpace(inHeightBlankSpace), width(inWidth),
+         heightTexture(inHeightTexture), bitmap(inBitmap), textureImages()
     {
         for (uint32_t i=0; i < symbols.size(); i++) {
             TextureImage tex = { i };

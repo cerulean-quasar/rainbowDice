@@ -17,8 +17,9 @@ class TextureAtlasVulkan : public TextureAtlas {
     VkSampler textureSampler;
 
 public:
-    TextureAtlasVulkan(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture, uint32_t inHeightImage,  std::vector<char> &inBitmap)
-        : TextureAtlas(symbols, inWidth, inHeightTexture, inHeightImage, inBitmap), hasTexture(false){}
+    TextureAtlasVulkan(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                       uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
+        : TextureAtlas(symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap), hasTexture(false){}
 
     bool hasVulkanTexture(std::string symbol) {return hasTexture;}
     void destroy(VkDevice logicalDevice) {

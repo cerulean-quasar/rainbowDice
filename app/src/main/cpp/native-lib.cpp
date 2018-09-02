@@ -147,6 +147,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
         jint width,
         jint height,
         jint imageHeight,
+        jint heightBlankSpace,
         jint bitmapSize,
         jbyteArray jbitmap) {
     jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
@@ -165,7 +166,9 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
 #ifdef RAINBOWDICE_GLONLY
         texAtlas.reset(new TextureAtlas(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight), bitmap));
 #else
-        texAtlas.reset(new TextureAtlasVulkan(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight), bitmap));
+        texAtlas.reset(new TextureAtlasVulkan(symbols, static_cast<uint32_t>(width),
+                                              static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
+                                              static_cast<uint32_t>(heightBlankSpace), bitmap));
 #endif
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
@@ -373,4 +376,23 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
     diceGraphics->initThread();
     diceGraphics->addRollingDiceAtIndices(indices);
     diceGraphics->cleanupThread();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_quasar_cerulean_rainbowdice_MainActivity_drawOnce(
+        JNIEnv *env,
+        jobject jthis)
+{
+    try {
+        if (diceGraphics.get() == nullptr) {
+            return env->NewStringUTF("No dice being rolled.");
+        }
+        diceGraphics->initThread();
+        diceGraphics->drawFrame();
+        return env->NewStringUTF("");
+    } catch (std::runtime_error &e) {
+        // no need to draw another frame - we are failing.
+        diceGraphics->cleanupThread();
+        return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+    }
 }

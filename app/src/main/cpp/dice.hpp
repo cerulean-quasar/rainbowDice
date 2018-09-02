@@ -40,9 +40,15 @@ struct Vertex {
     glm::vec3 color;
     glm::vec2 texCoord;
     glm::vec3 normal;
+    glm::vec3 cornerNormal;
+    glm::vec3 corner1;
+    glm::vec3 corner2;
+    glm::vec3 corner3;
+    glm::vec3 corner4;
+    glm::vec3 corner5;
 
     static VkVertexInputBindingDescription getBindingDescription();
-    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
+    static std::array<VkVertexInputAttributeDescription, 10> getAttributeDescriptions();
     bool operator==(const Vertex& other) const;
 };
 
@@ -294,8 +300,8 @@ public:
 
 class DiceModelCube : public DicePhysicsModel {
 private:
-    void cubeTop(Vertex &vertex, uint32_t i);
-    void cubeBottom(Vertex &vertex, uint32_t i);
+    void cubeTop(glm::vec3 &pos, uint32_t i);
+    void cubeBottom(glm::vec3 &pos, uint32_t i);
 public:
     DiceModelCube(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
         : DicePhysicsModel(inSymbols, 6, inIsOpenGl)
@@ -318,7 +324,10 @@ public:
 // loadModel will have to be changed of course.
 class DiceModelHedron : public DicePhysicsModel {
 protected:
-    void addVertices(glm::vec3 p0, glm::vec3 q, glm::vec3 r, uint32_t i);
+    void addVertices(glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
+                     glm::vec3 const &p0Normal, glm::vec3 const &qNormal, glm::vec3 const &rNormal, uint32_t i);
+    void bottomCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i);
+    void topCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i);
 public:
     DiceModelHedron(std::vector<std::string> &inSymbols, uint32_t inNumberFaces = 0, bool inIsOpenGl = false)
         : DicePhysicsModel(inSymbols, inNumberFaces, inIsOpenGl)
@@ -344,6 +353,7 @@ public:
 };
 
 class DiceModelTetrahedron : public DiceModelHedron {
+    void corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, uint32_t i);
 public:
     DiceModelTetrahedron(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
         : DiceModelHedron(inSymbols, 4, inIsOpenGl)
@@ -360,6 +370,7 @@ public:
 };
 
 class DiceModelIcosahedron : public DiceModelHedron {
+    void corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, uint32_t i);
 public:
     DiceModelIcosahedron(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
             : DiceModelHedron(inSymbols, 20, inIsOpenGl)
@@ -377,8 +388,10 @@ public:
 
 class DiceModelDodecahedron : public DicePhysicsModel {
 private:
-    void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e, uint32_t i);
-
+    void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e,
+                     glm::vec3 cornerNormalA, glm::vec3 cornerNormalB, glm::vec3 cornerNormalC,
+                     glm::vec3 cornerNormalD, glm::vec3 cornerNormalE, uint32_t i);
+    void corners(glm::vec3 &a, glm::vec3 &b, glm::vec3 &c, glm::vec3 &d, glm::vec3 &e, uint32_t i);
 public:
     DiceModelDodecahedron(std::vector<std::string> &inSymbols, bool inIsOpenGl = false)
     : DicePhysicsModel(inSymbols, 12, inIsOpenGl)
