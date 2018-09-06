@@ -30,6 +30,10 @@
         <item name="android:textSize">20sp</item>
     </style>
 
+    <style name="Space.Launcher" parent="Space">
+        <item name="android:windowBackground">@drawable/launch_screen</item>
+    </style>
+
     <style name="Sky" parent="Theme.AppCompat.Light">
         <item name="android:textColor">#0000aa</item>
         <item name="android:background">@null</item>

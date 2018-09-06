@@ -83,11 +83,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         ConfigurationFile configurationFile = new ConfigurationFile(this);
-        String theme = configurationFile.getTheme();
-        if (theme != null && !theme.isEmpty()) {
-            int resID = getResources().getIdentifier(theme, "style", getPackageName());
-            setTheme(resID);
+        String themeName = configurationFile.getTheme();
+        if (themeName == null || themeName.isEmpty()) {
+            themeName = "Space";
         }
+        int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
+        setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
 

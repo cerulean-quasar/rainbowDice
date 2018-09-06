@@ -42,10 +42,11 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         configurationFile = new ConfigurationFile(this);
         int currentThemeId = getApplicationInfo().theme;
         String themeName = configurationFile.getTheme();
-        if (themeName != null && !themeName.isEmpty()) {
-            currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
-            setTheme(currentThemeId);
+        if (themeName == null || themeName.isEmpty()) {
+            themeName = "Space";
         }
+        currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
+        setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
 

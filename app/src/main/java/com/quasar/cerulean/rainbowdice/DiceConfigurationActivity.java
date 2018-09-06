@@ -114,11 +114,12 @@ public class DiceConfigurationActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         diceConfigManager = new DiceConfigurationManager(this);
-        String theme = diceConfigManager.getTheme();
-        if (theme != null && !theme.isEmpty()) {
-            int resID = getResources().getIdentifier(theme, "style", getPackageName());
-            setTheme(resID);
+        String themeName = diceConfigManager.getTheme();
+        if (themeName == null || themeName.isEmpty()) {
+            themeName = "Space";
         }
+        int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
+        setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dice_configuration);

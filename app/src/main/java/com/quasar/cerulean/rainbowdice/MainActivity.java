@@ -95,10 +95,11 @@ public class MainActivity extends AppCompatActivity {
         configurationFile = new DiceConfigurationManager(this);
 
         String themeName = configurationFile.getTheme();
-        if (themeName != null && !themeName.isEmpty()) {
-            int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
-            setTheme(currentThemeId);
+        if (themeName == null || themeName.isEmpty()) {
+            themeName = "Space";
         }
+        int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
+        setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
         createDefaults();
