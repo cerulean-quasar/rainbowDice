@@ -95,6 +95,8 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
+    virtual void resetToStoppedPositions(std::vector<std::string> const &symbols);
+
     virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
 
     virtual ~RainbowDiceVulkan() { }

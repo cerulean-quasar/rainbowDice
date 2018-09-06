@@ -623,3 +623,16 @@ void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         i++;
     }
 }
+
+void RainbowDiceGL::resetToStoppedPositions(std::vector<std::string> const &symbols) {
+    uint32_t i = 0;
+    for (auto &&die : dice) {
+        uint32_t nbrX = static_cast<uint32_t>(screenWidth/(2*DicePhysicsModel::stoppedRadius));
+        uint32_t stoppedX = i%nbrX;
+        uint32_t stoppedY = i/nbrX;
+        float x = -screenWidth/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+        float y = -screenHeight/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+
+        die->die->positionDice(symbols[i++], x, y);
+    }
+}

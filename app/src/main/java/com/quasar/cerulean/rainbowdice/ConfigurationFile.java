@@ -75,7 +75,13 @@ public class ConfigurationFile {
 
         try {
             JSONObject obj = new JSONObject(json.toString());
-            int versionNbr = obj.getInt(version);
+            int versionNbr;
+            try {
+                versionNbr = obj.getInt(version);
+            } catch (JSONException e) {
+                // if there is no version, then we are using version 0.
+                versionNbr = 0;
+            }
 
             if (versionNbr == 0) {
                 loadVersion0(obj);

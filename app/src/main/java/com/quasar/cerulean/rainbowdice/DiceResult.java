@@ -19,10 +19,19 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 
 public class DiceResult {
-    private class DieResult {
+    public class DieResult {
+        private static final String result_name = "die_result";
+        private static final String needsReRoll_name = "die_needs_reroll";
+        private static final String isAddOperation_name = "is_add_operation";
+        private static final String isConstant_name = "is_constant";
+
         // What the die rolled
         public int result;
 
@@ -41,9 +50,30 @@ public class DiceResult {
             isAddOperation = inIsAddOperation;
             isConstant = inIsConstant;
         }
+
+        public JSONObject toJSON() throws JSONException {
+            JSONObject obj = new JSONObject();
+            obj.put(result_name, result);
+            obj.put(needsReRoll_name, needsReRoll);
+            obj.put(isAddOperation_name, isAddOperation);
+            obj.put(isConstant_name, isConstant);
+
+            return obj;
+        }
+
+        public DieResult(JSONObject obj) throws JSONException {
+            result = obj.getInt(result_name);
+            needsReRoll = obj.getBoolean(needsReRoll_name);
+            isAddOperation = obj.getBoolean(isAddOperation_name);
+            isConstant = obj.getBoolean(isConstant_name);
+        }
     }
 
     private ArrayList<ArrayList<DieResult>> diceResults;
+
+    private DiceResult() {
+        diceResults = null;
+    }
 
     public DiceResult(String result, DieConfiguration[] diceConfigurations) {
         diceResults = new ArrayList<>();
@@ -87,6 +117,34 @@ public class DiceResult {
                     i++;
                 }
             }
+        }
+    }
+
+    public JSONArray toJSON() throws JSONException {
+        JSONArray arrDiceResults = new JSONArray();
+        for (ArrayList<DieResult> diceResult : diceResults) {
+            JSONArray arrDiceResult = new JSONArray();
+            for (DieResult dieResult : diceResult) {
+                JSONObject obj = dieResult.toJSON();
+                arrDiceResult.put(obj);
+            }
+            arrDiceResults.put(arrDiceResult);
+        }
+
+        return arrDiceResults;
+    }
+
+    public DiceResult(JSONArray arr) throws JSONException {
+        diceResults = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            ArrayList<DieResult> diceResult = new ArrayList<>();
+            JSONArray arr2 = arr.getJSONArray(i);
+            for (int j = 0; j < arr2.length(); j++) {
+                JSONObject obj = arr2.getJSONObject(j);
+                DieResult result = new DieResult(obj);
+                diceResult.add(result);
+            }
+            diceResults.add(diceResult);
         }
     }
 
@@ -164,5 +222,27 @@ public class DiceResult {
             }
         }
         return String.format(resultFormat, resultString.toString(), total);
+    }
+
+    ArrayList<ArrayList<DieResult>> getDiceResults() {
+        return diceResults;
+    }
+
+    String[] getResultSymbolList() {
+        int len = 0;
+        for (ArrayList<DieResult> dieResults : diceResults) {
+            len += dieResults.size();
+        }
+
+        String[] symbols = new String[len];
+
+        int i = 0;
+        for (ArrayList<DieResult> dieResults : diceResults) {
+            for (DieResult dieResult : dieResults) {
+                symbols[i++] = Integer.toString(dieResult.result, 10);
+            }
+        }
+
+        return symbols;
     }
 }

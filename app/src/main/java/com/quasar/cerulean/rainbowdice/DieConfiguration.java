@@ -96,6 +96,15 @@ public class DieConfiguration implements Parcelable {
         }
     }
 
+    public static DieConfiguration[] fromJsonArray(JSONArray arr) throws org.json.JSONException {
+        DieConfiguration[] dice = new DieConfiguration[arr.length()];
+        for (int i = 0; i < arr.length(); i ++) {
+            JSONObject obj = arr.getJSONObject(i);
+            dice[i] = fromJson(obj);
+        }
+
+        return dice;
+    }
 
     public static DieConfiguration fromJson(JSONObject obj) throws org.json.JSONException {
         int inNumberOfDice = obj.getInt("NumberOfDice");
@@ -106,6 +115,15 @@ public class DieConfiguration implements Parcelable {
         boolean inIsAdditionOperation = obj.getBoolean("IsAddOperation");
         return new DieConfiguration(inNumberOfDice, inNumberOfSides, inStartAt, inIncrement,
                 inReRollOn, inIsAdditionOperation);
+    }
+
+    public static JSONArray toJSON(DieConfiguration[] dice) throws JSONException {
+        JSONArray arr = new JSONArray();
+        for (DieConfiguration die : dice) {
+            JSONObject obj = die.toJSON();
+            arr.put(obj);
+        }
+        return arr;
     }
 
     public JSONObject toJSON() throws org.json.JSONException {
@@ -156,6 +174,15 @@ public class DieConfiguration implements Parcelable {
         increment = inIncrement;
         reRollOn = inReRollOn;
         isAdditionOperation = inIsAdditionOperation;
+    }
+
+    public DieConfiguration(DieConfiguration other, int inNumberOfDice) {
+        numberOfDice = inNumberOfDice;
+        numberOfSides = other.numberOfSides;
+        startAt = other.startAt;
+        increment = other.increment;
+        reRollOn = other.reRollOn;
+        isAdditionOperation = other.isAdditionOperation;
     }
 
     private DieConfiguration(Parcel in) {

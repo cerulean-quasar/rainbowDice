@@ -15,7 +15,9 @@
                 <LinearLayout
                     android:id="@+id/diceList"
                     android:orientation="horizontal"
-                    android:layout_width="match_parent"
+                    android:divider="@drawable/button_divider"
+                    android:showDividers="middle"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </HorizontalScrollView>
             <ImageView

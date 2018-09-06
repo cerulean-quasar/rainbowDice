@@ -18,21 +18,139 @@ import java.util.Date;
 
 public class LogFile {
     public static final String diceLogFilename = "diceRollResultLogFileName";
-
-    private static final String jsonTime = "time";
-    private static final String jsonDiceName = "name";
-    private static final String jsonDiceRepresentation = "representation";
-    private static final String jsonRollResult = "result";
+    public static final String version_name = "version";
     private static final int MAX_SIZE = 10;
 
     private ArrayList<LogItem> logItems;
     private Context ctx;
 
-    public class LogItem {
-        String logTime;
-        String diceName;
-        String diceRepresentation;
-        String rollResults;
+    public abstract class LogItem {
+        protected static final String jsonTime = "time";
+        protected static final String jsonDiceName = "name";
+        protected String logTime;
+        protected String diceName;
+
+        public String getLogTime() {
+            return logTime;
+        }
+
+        public String getDiceName() {
+            return diceName;
+        }
+
+        public abstract JSONObject toJSON() throws JSONException;
+        public abstract int getVersion();
+        public abstract String getDiceRepresentation();
+        public abstract String getRollResultsString();
+        public abstract DiceResult getRollResults();
+        public abstract DieConfiguration[] getDiceConfiguration();
+    }
+
+    private class LogItemV0 extends LogItem {
+        private static final String jsonDiceRepresentation = "representation";
+        private static final String jsonRollResultString = "result";
+        private String diceRepresentation;
+        private String rollResults;
+
+        public LogItemV0(JSONObject obj) throws JSONException {
+            logTime = obj.getString(jsonTime);
+            diceName = obj.getString(jsonDiceName);
+            diceRepresentation = obj.getString(jsonDiceRepresentation);
+            rollResults = obj.getString(jsonRollResultString);
+        }
+
+        public JSONObject toJSON() throws JSONException {
+            JSONObject obj = new JSONObject();
+            obj.put(version_name, 0);
+            obj.put(jsonTime, logTime);
+            obj.put(jsonDiceName, diceName);
+            obj.put(jsonDiceRepresentation, diceRepresentation);
+            obj.put(jsonRollResultString, rollResults);
+            return obj;
+        }
+
+        @Override
+        public String getDiceRepresentation() {
+            return diceRepresentation;
+        }
+
+        @Override
+        public String getRollResultsString() {
+            return rollResults;
+        }
+
+        @Override
+        public DieConfiguration[] getDiceConfiguration() {
+            return null;
+        }
+
+        @Override
+        public DiceResult getRollResults() {
+            return null;
+        }
+
+        @Override
+        public int getVersion() { return 0; }
+    }
+
+    private class LogItemV1 extends LogItem {
+        private static final String diceList_name = "diceConfigurationList";
+        private static final String diceResult_name = "diceResults";
+        private DieConfiguration[] dice;
+        private DiceResult result;
+
+        public LogItemV1(String inLogTime, String inDiceName, DieConfiguration[] inDice, DiceResult inResult) {
+            logTime = inLogTime;
+            diceName = inDiceName;
+            dice = inDice;
+            result = inResult;
+        }
+
+        public LogItemV1(JSONObject obj) throws JSONException {
+            logTime = obj.getString(jsonTime);
+            diceName = obj.getString(jsonDiceName);
+            JSONArray arr = obj.getJSONArray(diceList_name);
+            dice = DieConfiguration.fromJsonArray(arr);
+            JSONArray arr2 = obj.getJSONArray(diceResult_name);
+            result = new DiceResult(arr2);
+        }
+
+        public JSONObject toJSON() throws JSONException {
+            JSONObject obj = new JSONObject();
+            obj.put(version_name, 1);
+            obj.put(jsonTime, logTime);
+            obj.put(jsonDiceName, diceName);
+            JSONArray diceArr = DieConfiguration.toJSON(dice);
+            obj.put(diceList_name, diceArr);
+            JSONArray resultArr = result.toJSON();
+            obj.put(diceResult_name, resultArr);
+            return obj;
+        }
+
+        @Override
+        public String getDiceRepresentation() {
+            return DieConfiguration.arrayToString(dice);
+        }
+
+        @Override
+        public String getRollResultsString() {
+            Resources res = ctx.getResources();
+            return result.generateResultsString(res.getString(R.string.diceMessageResult),
+                    res.getString(R.string.addition), res.getString(R.string.subtraction));
+        }
+
+        @Override
+        public DieConfiguration[] getDiceConfiguration() {
+            return dice;
+        }
+
+        @Override
+        public DiceResult getRollResults() {
+            return result;
+        }
+
+        @Override
+        public int getVersion() { return 1; }
     }
 
     public LogFile(Context inCtx) {
@@ -66,11 +184,22 @@ public class LogFile {
             JSONArray arr = new JSONArray(json.toString());
             for (int i=0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
-                LogItem item = new LogItem();
-                item.logTime = obj.getString(jsonTime);
-                item.diceName = obj.getString(jsonDiceName);
-                item.diceRepresentation = obj.getString(jsonDiceRepresentation);
-                item.rollResults = obj.getString(jsonRollResult);
+                int version;
+                try {
+                    version = obj.getInt(version_name);
+                } catch (JSONException e) {
+                    // if there is no version, then we are using version 0.
+                    version = 0;
+                }
+                LogItem item;
+                if (version == 0) {
+                    item = new LogItemV0(obj);
+                } else if (version == 1) {
+                    item = new LogItemV1(obj);
+                } else {
+                    // not a valid entry...
+                    continue;
+                }
                 logItems.add(item);
             }
         } catch (JSONException e) {
@@ -84,11 +213,7 @@ public class LogFile {
         try {
             JSONArray arr = new JSONArray();
             for (LogItem logItem: logItems) {
-                JSONObject obj = new JSONObject();
-                obj.put(jsonTime, logItem.logTime);
-                obj.put(jsonDiceName, logItem.diceName);
-                obj.put(jsonDiceRepresentation, logItem.diceRepresentation);
-                obj.put(jsonRollResult, logItem.rollResults);
+                JSONObject obj = logItem.toJSON();
                 arr.put(obj);
             }
             json = arr.toString();
@@ -113,17 +238,7 @@ public class LogFile {
 
     public void addRoll(String diceName, DiceResult result, DieConfiguration[] diceConfigurations) {
         DateFormat time = SimpleDateFormat.getDateTimeInstance();
-        LogItem logItem = new LogItem();
-        logItem.logTime = time.format(new Date());
-
-        logItem.diceName = diceName;
-
-        logItem.diceRepresentation = DieConfiguration.arrayToString(diceConfigurations);
-
-        Resources res = ctx.getResources();
-        logItem.rollResults = result.generateResultsString(res.getString(R.string.diceMessageResult),
-                res.getString(R.string.addition), res.getString(R.string.subtraction));
-
+        LogItem logItem = new LogItemV1(time.format(new Date()), diceName, diceConfigurations, result);
         logItems.add(logItem);
 
         if (logItems.size() > MAX_SIZE) {

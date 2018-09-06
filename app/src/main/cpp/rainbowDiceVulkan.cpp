@@ -1529,25 +1529,6 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer vie
     vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-
-/* descriptor pool for the MVP matrix and image sampler *//*
-void RainbowDiceVulkan::createDescriptorPool() {
-    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = dice.size();
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = dice.size();
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = dice.size();
-
-    if (vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool!");
-    }
-}*/
-
 /* for accessing data other than the vertices from the shaders */
 void RainbowDiceVulkan::createDescriptorSetLayout(VkDescriptorSetLayout &descriptorSetLayout) {
     /* MVP matrix */
@@ -2062,4 +2043,18 @@ std::vector<std::string> RainbowDiceVulkan::getDiceResults() {
     }
 
     return results;
+}
+
+void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::string> const &symbols) {
+    uint32_t i = 0;
+    for (auto &&die : dice) {
+        uint32_t nbrX = static_cast<uint32_t>(screenWidth/(2*DicePhysicsModel::stoppedRadius));
+        uint32_t stoppedX = i%nbrX;
+        uint32_t stoppedY = i/nbrX;
+        float x = -screenWidth/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+        float y = screenHeight/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+
+        die->die->positionDice(symbols[i++], x, y);
+        die->updateUniformBuffer();
+    }
 }

@@ -285,6 +285,7 @@ public:
             animationTime = 0.0f;
         }
     }
+    void positionDice(std::string const &symbol, float x, float y);
     bool isStopped() { return stopped; }
     bool isStoppedAnimationDone() { return animationDone; }
     bool isStoppedAnimationStarted() { return doneY != 0.0f; }
@@ -294,6 +295,16 @@ public:
     uint32_t calculateUpFace();
     void randomizeUpFace();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
+    virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
+        uint32_t i=0;
+        for (auto &&s : symbols) {
+            if (symbol == s) {
+                return i;
+            }
+            i++;
+        }
+        return 0;  // shouldn't be reached.
+    }
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) = 0;
     virtual void yAlign(uint32_t faceIndex) = 0;
 };
@@ -350,6 +361,7 @@ public:
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual uint32_t getUpFaceIndex(uint32_t i);
     virtual void yAlign(uint32_t faceIndex);
+    virtual uint32_t getFaceIndexForSymbol(std::string symbol);
 };
 
 class DiceModelTetrahedron : public DiceModelHedron {
@@ -366,6 +378,10 @@ public:
     }
 
     virtual void loadModel();
+    virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
+        return DicePhysicsModel::getFaceIndexForSymbol(symbol);
+    }
+
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
 };
 
@@ -384,6 +400,9 @@ public:
 
     virtual void loadModel();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
+    virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
+        return DicePhysicsModel::getFaceIndexForSymbol(symbol);
+    }
 };
 
 class DiceModelDodecahedron : public DicePhysicsModel {

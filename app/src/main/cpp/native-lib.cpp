@@ -303,12 +303,14 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_tellDrawerStop(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyVulkan(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyResources(
         JNIEnv *env,
         jobject jthis) {
     // If this function is being called, it is assumed that the caller already stopped
     // and joined the draw thread.
-    diceGraphics->cleanup();
+    if (diceGraphics.get() != nullptr) {
+        diceGraphics->cleanup();
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -381,17 +383,29 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_drawOnce(
         JNIEnv *env,
-        jobject jthis)
+        jobject jthis,
+        jobjectArray jsymbols)
 {
+    int count = env->GetArrayLength(jsymbols);
+    std::vector<std::string> symbols;
+    for (int i = 0; i < count; i++) {
+        jstring jsymbol = (jstring) env->GetObjectArrayElement(jsymbols, i);
+        char const *csymbol = env->GetStringUTFChars(jsymbol, nullptr);
+        symbols.push_back(csymbol);
+        env->ReleaseStringUTFChars(jsymbol, csymbol);
+    }
+
     try {
         if (diceGraphics.get() == nullptr) {
             return env->NewStringUTF("No dice being rolled.");
         }
+
         diceGraphics->initThread();
+        diceGraphics->resetToStoppedPositions(symbols);
         diceGraphics->drawFrame();
+        diceGraphics->cleanupThread();
         return env->NewStringUTF("");
     } catch (std::runtime_error &e) {
-        // no need to draw another frame - we are failing.
         diceGraphics->cleanupThread();
         return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
     }

@@ -55,7 +55,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Locale;
 import java.util.TreeSet;
@@ -80,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
+    private boolean stoppedDiceDrawn = false;
     private Thread drawer = null;
     private DieConfiguration[] diceConfig = null;
     private DiceResult diceResult = null;
@@ -99,18 +102,10 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
         createDefaults();
-        initGui();
 
         logFile = new LogFile(this);
-        TextView text = findViewById(R.id.rollResult);
-        text.setText(R.string.diceMessageStartup);
-        LinkedList<String> diceList = configurationFile.getDiceList();
-        if (diceList != null && diceList.size() > 0) {
-            loadFromFile(diceList.getFirst());
-        } else {
-            diceConfig = new DieConfiguration[1];
-            diceConfig[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
-        }
+
+        initGui();
     }
 
     void initGui() {
@@ -133,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
 
         for (String dice : diceList) {
             Button button = new Button(this);
-            button.setBackgroundColor(0);
+            button.setBackgroundColor(0xa0a0a0a0);
             button.setText(dice);
             button.setPadding(50,0,50,0);
             button.setOnClickListener(new View.OnClickListener() {
@@ -163,14 +158,22 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+        stoppedDiceDrawn = false;
         joinDrawer();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        //String result = drawOnce();
-        diceResult = null;
+        if (!stoppedDiceDrawn && surfaceReady) {
+            if (loadFromLog()) {
+                destroySurface();
+                SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+                SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+                startDrawing(drawSurfaceHolder);
+                drawStoppedDice();
+            }
+        }
     }
 
     @Override
@@ -189,10 +192,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode != RESULT_OK) {
-            // The user cancelled editing
-            return;
-        }
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
             resetDiceList();
         } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
@@ -233,6 +232,93 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
     }
 
+    public void setSurfaceReady(boolean inIsReady) {
+        surfaceReady = inIsReady;
+    }
+
+    public void drawStoppedDice() {
+        if (stoppedDiceDrawn) {
+            return;
+        }
+        ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
+        int len = 0;
+        for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
+            len += dieResults.size();
+        }
+
+        String[] symbols = new String[len];
+
+        int i = 0;
+        for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
+            for (DiceResult.DieResult dieResult : dieResults) {
+                symbols[i++] = Integer.toString(dieResult.result, 10);
+            }
+        }
+
+        drawOnce(symbols);
+        stoppedDiceDrawn = true;
+    }
+
+    public boolean loadFromLog() {
+        TextView text = findViewById(R.id.rollResult);
+        LogFile.LogItem item = null;
+        int logFileSize = logFile.size();
+        if (logFileSize > 0) {
+            item = logFile.get(logFileSize - 1);
+        }
+
+        if (item == null || item.getVersion() != 1) {
+            text.setText(R.string.diceMessageStartup);
+            return false;
+        }
+
+        diceResult = item.getRollResults();
+        ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
+        int len = 0;
+        for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
+            len += dieResults.size();
+        }
+
+        DieConfiguration[] configs = item.getDiceConfiguration();
+        diceConfig = new DieConfiguration[len];
+
+        int k = 0;
+        int l = 0;
+        int m = 0;
+        for (int j = 0; j < diceResultList.size(); j++) {
+            ArrayList<DiceResult.DieResult> dieResults = diceResultList.get(j);
+            for (int i=0; i < dieResults.size(); i++) {
+                DiceResult.DieResult dieResult = dieResults.get(i);
+                if (configs[l].isRepresentableByTwoTenSided()) {
+                    if (configs[l].getStartAt() == 0) {
+                        diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
+                                configs[l].getReRollOn(), configs[l].isAddOperation());
+                        diceConfig[k++] = new DieConfiguration(1, 10, 0, 1,
+                                configs[l].getReRollOn(), configs[l].isAddOperation());
+                    } else {
+                        diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
+                                configs[l].getReRollOn(), configs[l].isAddOperation());
+                        diceConfig[k++] = new DieConfiguration(1, 10, 1, 1,
+                                configs[l].getReRollOn(), configs[l].isAddOperation());
+                    }
+                    j++;
+                } else {
+                    diceConfig[k++] = new DieConfiguration(configs[l], 1);
+                }
+            }
+            if (m == configs[l].getNumberOfDice()-1) {
+                l++;
+                m = 0;
+            } else {
+                m++;
+            }
+        }
+
+        text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
+                getString(R.string.addition), getString(R.string.subtraction)));
+        return true;
+    }
+
     private void loadFromFile(String filename) {
         StringBuilder json = new StringBuilder();
 
@@ -256,13 +342,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             JSONArray jsonArray = new JSONArray(json.toString());
-            int length = jsonArray.length();
-            diceConfig = new DieConfiguration[length];
-            for (int i = 0; i < length; i++) {
-                JSONObject jsonDieConfig = jsonArray.getJSONObject(i);
-                DieConfiguration dieConfig = DieConfiguration.fromJson(jsonDieConfig);
-                diceConfig[i] = dieConfig;
-            }
+            diceConfig = DieConfiguration.fromJsonArray(jsonArray);
         } catch (JSONException e) {
             System.out.println("Exception on reading JSON from file: " + filename + " message: " + e.getMessage());
             return;
@@ -327,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
     public void destroySurface() {
         if (surfaceReady) {
             surfaceReady = false;
-            destroyVulkan();
+            destroyResources();
         }
     }
 
@@ -591,7 +671,7 @@ public class MainActivity extends AppCompatActivity {
     private native String sendFragmentShader(byte[] shader, int length);
     private native String initWindow(boolean useVulkan, Surface surface);
     private native String initPipeline();
-    private native void destroyVulkan();
+    private native void destroyResources();
     private native void tellDrawerStop();
     private native void destroyModels();
     private native void recreateModels();
@@ -600,6 +680,6 @@ public class MainActivity extends AppCompatActivity {
     private native String addSymbols(String[] symbols, int nbrSymbols, int width, int height, int heightImage, int heightBlankSpace, int bitmapSize, byte[] bitmap);
     private native void roll();
     private native void reRoll(int[] indices);
-    private native String drawOnce();
+    private native String drawOnce(String[] symbols);
     private native String initSensors();
 }

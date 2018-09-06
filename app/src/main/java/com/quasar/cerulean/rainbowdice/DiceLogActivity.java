@@ -42,16 +42,16 @@ public class DiceLogActivity extends AppCompatActivity {
             LinearLayout layoutItem = (LinearLayout)inflater.inflate(R.layout.dice_log_item, layout, false);
 
             TextView text = layoutItem.findViewById(R.id.dice_log_time);
-            text.setText(item.logTime);
+            text.setText(item.getLogTime());
 
             text = layoutItem.findViewById(R.id.dice_log_name);
-            text.setText(item.diceName);
+            text.setText(item.getDiceName());
 
             text = layoutItem.findViewById(R.id.dice_log_representation);
-            text.setText(item.diceRepresentation);
+            text.setText(item.getDiceRepresentation());
 
             text = layoutItem.findViewById(R.id.dice_log_result);
-            text.setText(item.rollResults);
+            text.setText(item.getRollResultsString());
 
             layout.addView(layoutItem);
         }

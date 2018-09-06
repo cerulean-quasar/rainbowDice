@@ -502,6 +502,57 @@ uint32_t DicePhysicsModel::calculateUpFace() {
     return upFace;
 }
 
+void DicePhysicsModel::positionDice(std::string const &symbol, float x, float y) {
+    uint32_t faceIndex = getFaceIndexForSymbol(symbol);
+    glm::vec3 zaxis = glm::vec3(0.0, 0.0, 1.0);
+
+    position.x = x;
+    position.y = y;
+    position.z = maxposz;
+
+    velocity = { 0.0, 0.0, 0.0 };
+
+    angularVelocity.setAngularSpeed(0.0);
+    angularVelocity.setSpinAxis(glm::vec3(0.0,0.0,0.0));
+
+    glm::vec3 normalVector;
+    float angle = 0;
+    getAngleAxis(faceIndex, angle, normalVector);
+    glm::vec3 cross = glm::cross(normalVector, zaxis);
+    if (glm::length(cross) == 0.0f) {
+        cross = normalVector;
+    }
+    if (glm::length(cross) == 0.0f) {
+        cross = zaxis;
+    }
+
+    if (angle != 0) {
+        glm::quat quaternian = glm::angleAxis(angle, glm::normalize(cross));
+        checkQuaternion(quaternian);
+
+        qTotalRotated = glm::normalize(quaternian);
+        checkQuaternion(qTotalRotated);
+    }
+
+    glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
+    glm::mat4 rotate = glm::toMat4(qTotalRotated);
+    glm::mat4 translate = glm::translate(position);
+    ubo.model = translate * rotate * scale;
+
+    yAlign(faceIndex);
+    if (stoppedAngle != 0) {
+        glm::quat q = glm::angleAxis(stoppedAngle, stoppedRotationAxis);
+        checkQuaternion(qTotalRotated);
+        checkQuaternion(q);
+        qTotalRotated = glm::normalize(q*qTotalRotated);
+    }
+
+    scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
+    rotate = glm::toMat4(qTotalRotated);
+    translate = glm::translate(position);
+    ubo.model = translate * rotate * scale;
+}
+
 void DicePhysicsModel::randomizeUpFace() {
     Random random;
     uint32_t upFace = random.getUInt(0, numberFaces-1);
@@ -921,6 +972,22 @@ uint32_t DiceModelHedron::getUpFaceIndex(uint32_t i) {
     } else {
         return i/2 + numberFaces/2;
     }
+}
+
+uint32_t DiceModelHedron::getFaceIndexForSymbol(std::string symbol) {
+    uint32_t i=0;
+    for (auto &&s : symbols) {
+        if (symbol == s) {
+            if (i >= numberFaces/2) {
+                return (i%(numberFaces/2)) * 2 + 1;
+            } else {
+                return i*2;
+            }
+            return i;
+        }
+        i++;
+    }
+    return 0;  // shouldn't be reached.
 }
 
 void DiceModelHedron::yAlign(uint32_t faceIndex) {
