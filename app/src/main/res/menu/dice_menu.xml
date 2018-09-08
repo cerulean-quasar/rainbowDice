@@ -2,21 +2,21 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:title="@string/openLogFile"
-        android:onClick="onOpenLogFile"
-        />
-    <item
         android:id="@+id/updateMenuItem"
         android:title="@string/configureDice"
         app:showAsAction="ifRoom"
         android:onClick="onConfigure"
         />
     <item
-        android:title="@string/selectTheme"
-        android:onClick="onSelectTheme"
-        />
-    <item
         android:title="@string/new_dice"
         android:onClick="onNewDice"
+        />
+    <item
+        android:title="@string/openLogFile"
+        android:onClick="onOpenLogFile"
+        />
+    <item
+        android:title="@string/selectTheme"
+        android:onClick="onSelectTheme"
         />
 </menu>
