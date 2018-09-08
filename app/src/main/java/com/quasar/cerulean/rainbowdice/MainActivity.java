@@ -197,7 +197,8 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
             resetDiceList();
         } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
-            if (data == null) {
+            if (resultCode != RESULT_OK) {
+                // The user cancelled theme selection
                 return;
             }
             String themeName = data.getStringExtra(themeNameConfigValue);
