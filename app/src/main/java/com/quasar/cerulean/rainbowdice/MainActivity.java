@@ -196,6 +196,9 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
             resetDiceList();
         } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
+            if (data == null) {
+                return;
+            }
             String themeName = data.getStringExtra(themeNameConfigValue);
             if (themeName != null && !themeName.isEmpty()) {
                 int resID = getResources().getIdentifier(themeName, "style", getPackageName());
