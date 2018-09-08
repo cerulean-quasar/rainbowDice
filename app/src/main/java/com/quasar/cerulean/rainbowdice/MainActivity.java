@@ -65,6 +65,7 @@ import java.util.TreeSet;
 import static android.graphics.Bitmap.Config.ALPHA_8;
 import static android.graphics.Bitmap.Config.ARGB_4444;
 import static android.graphics.Bitmap.Config.ARGB_8888;
+import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.themeNameConfigValue;
 
@@ -208,6 +209,8 @@ public class MainActivity extends AppCompatActivity {
                 getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
                 getWindow().setBackgroundDrawableResource(value.resourceId);
             }
+        } else if (requestCode == DICE_CUSTOMIZATION_ACTIVITY) {
+            resetDiceList();
         }
     }
 
@@ -234,6 +237,12 @@ public class MainActivity extends AppCompatActivity {
         joinDrawer();
         Intent intent = new Intent(this, ActivityThemeSelector.class);
         startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
+    }
+
+    public void onNewDice(MenuItem item) {
+        joinDrawer();
+        Intent intent = new Intent(this, DiceCustomizationActivity.class);
+        startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
     }
 
     public void setSurfaceReady(boolean inIsReady) {

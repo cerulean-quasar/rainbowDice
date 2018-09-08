@@ -15,4 +15,8 @@
         android:title="@string/selectTheme"
         android:onClick="onSelectTheme"
         />
+    <item
+        android:title="@string/new_dice"
+        android:onClick="onNewDice"
+        />
 </menu>
