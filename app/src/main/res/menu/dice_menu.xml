@@ -16,7 +16,7 @@
         android:onClick="onOpenLogFile"
         />
     <item
-        android:title="@string/selectTheme"
+        android:title="@string/selectThemeMenuItem"
         android:onClick="onSelectTheme"
         />
 </menu>

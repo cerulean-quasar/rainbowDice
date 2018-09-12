@@ -77,7 +77,19 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     ArrayList<DiceGuiConfig> diceConfigs;
-    Button[] diceSidesButtons;
+
+    private class DiceSidesInfo {
+        DiceSidesInfo(Button inButton, int inDrawableClicked, int inDrawableUnclicked) {
+            button = inButton;
+            drawableClicked = inDrawableClicked;
+            drawableUnclicked = inDrawableUnclicked;
+        }
+        public Button button;
+        public int drawableClicked;
+        public int drawableUnclicked;
+    }
+    DiceSidesInfo[] diceSidesInfos;
+
     int configBeingEdited = -1;
 
     @Override
@@ -103,19 +115,19 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             setContentView(R.layout.activity_dice_customization);
         }
 
-        diceSidesButtons = new Button[11];
+        diceSidesInfos = new DiceSidesInfo[11];
         int i = 0;
-        diceSidesButtons[i++] = findViewById(R.id.d1Button);
-        diceSidesButtons[i++] = findViewById(R.id.d3Button);
-        diceSidesButtons[i++] = findViewById(R.id.d4Button);
-        diceSidesButtons[i++] = findViewById(R.id.d6Button);
-        diceSidesButtons[i++] = findViewById(R.id.d8Button);
-        diceSidesButtons[i++] = findViewById(R.id.d10Button);
-        diceSidesButtons[i++] = findViewById(R.id.d12Button);
-        diceSidesButtons[i++] = findViewById(R.id.d20Button);
-        diceSidesButtons[i++] = findViewById(R.id.d30Button);
-        diceSidesButtons[i++] = findViewById(R.id.d100Button);
-        diceSidesButtons[i++] = findViewById(R.id.otherButton);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d1Button), R.drawable.constant, R.drawable.constant_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d3Button), R.drawable.d6, R.drawable.d6_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d4Button), R.drawable.d4, R.drawable.d4_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d6Button), R.drawable.d6, R.drawable.d6_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d8Button), R.drawable.d8, R.drawable.d8_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d10Button), R.drawable.d10, R.drawable.d10_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d12Button), R.drawable.d12, R.drawable.d12_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d20Button), R.drawable.d20, R.drawable.d20_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d30Button), R.drawable.d30, R.drawable.d30_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d100Button), R.drawable.percentile, R.drawable.percentile_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.otherButton), R.drawable.d10, R.drawable.d10_grayscale);
 
         DieConfiguration[] configs = null;
         Parcelable[] parcelableConfigs = null;
@@ -158,9 +170,15 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         configsToView(configs);
-        TypedValue value = new TypedValue();
-        getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
-        ((LinearLayout)diceConfigs.get(0).button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
+        DiceGuiConfig cfg = diceConfigs.get(0);
+        DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
+        ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
+        int length = diceConfigs.size();
+        for (int j = 1; j < length; j++) {
+            cfg = diceConfigs.get(j);
+            info = getInfoForDieSides(cfg.config.getNumberOfSides());
+            ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
+        }
 
         TextView text = findViewById(R.id.otherText);
         text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
@@ -223,39 +241,40 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     private void repopulateCurrentListItemFromConfig() {
-        DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
+        DiceGuiConfig guiCfg = diceConfigs.get(configBeingEdited);
+        DieConfiguration cfg = guiCfg.config;
 
         // Set the text that specifies the numbers on the die in the format: 1,2,...,6
         LinearLayout layout = findViewById(R.id.dice_list);
         View item = layout.getChildAt(configBeingEdited * 2);
-        TextView nbrsOnDice = item.findViewById(R.id.numbers_on_die);
-        TextView reroll = item.findViewById(R.id.die_reroll_text);
         Button dieConfigButton = item.findViewById(R.id.die_config_button);
 
+        DiceSidesInfo info = getInfoForDieSides(cfg.getNumberOfSides());
+        item.setBackground(getResources().getDrawable(info.drawableClicked, null));
+
         if (cfg.getNumberOfSides() == 1) {
-            nbrsOnDice.setText("");
-            reroll.setText("");
             dieConfigButton.setText(String.format(Locale.getDefault(),
                     getString(R.string.constantConfigStringRepresentation),
                     cfg.getStartAt()));
         } else {
-            nbrsOnDice.setText(String.format(Locale.getDefault(),
+            String nbrsOnDiceString = String.format(Locale.getDefault(),
                     getString(R.string.diceNumbersString),
                     cfg.getStartAt(), cfg.getStartAt() + cfg.getIncrement(),
-                    cfg.getStartAt() + cfg.getIncrement() * (cfg.getNumberOfSides() - 1)));
+                    cfg.getStartAt() + cfg.getIncrement() * (cfg.getNumberOfSides() - 1));
 
             // Set the text that specifies the dice being rolled in the format: 1D6
-            dieConfigButton.setText(String.format(Locale.getDefault(),
+            String diceRepresentation = String.format(Locale.getDefault(),
                     getString(R.string.diceConfigStringRepresentation),
-                    cfg.getNumberOfDice(), cfg.getNumberOfSides()));
+                    cfg.getNumberOfDice(), cfg.getNumberOfSides());
 
+            String rerollString = "";
             if (cfg.getReRollOn() > cfg.getStartAt()) {
                 // update the re-roll text
-                reroll.setText(String.format(Locale.getDefault(), getString(R.string.rerollText),
-                        cfg.getReRollOn()));
-            } else {
-                reroll.setText("");
+                rerollString = String.format(Locale.getDefault(), getString(R.string.rerollText),
+                        cfg.getReRollOn());
             }
+
+            dieConfigButton.setText(rerollString + "\n" + nbrsOnDiceString + "\n" + diceRepresentation);
         }
     }
 
@@ -269,8 +288,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         updateConfigFromScreen();
 
         // next set the number of sides in the config to the new value
-        for (int i = 0; i < diceSidesButtons.length; i++) {
-            if (view == diceSidesButtons[i]) {
+        for (int i = 0; i < diceSidesInfos.length; i++) {
+            if (view == diceSidesInfos[i].button) {
                 diceConfigs.get(configBeingEdited).config.setNumberOfSides(
                         nbrSidesForDiceSidesButton(i));
                 break;
@@ -456,16 +475,13 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         // now switch the active dice set.
         int i = 0;
         for (DiceGuiConfig cfg : diceConfigs) {
+            DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
             if (cfg.button == view) {
-                TypedValue value = new TypedValue();
-                getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
-                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
+                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
                 configBeingEdited = i;
-                editConfig(i, getButtonForDieSides(cfg.config.getNumberOfSides()) == diceSidesButtons[OTHER_BUTTON_INDEX]);
+                editConfig(i, info == diceSidesInfos[OTHER_BUTTON_INDEX]);
             } else {
-                TypedValue value = new TypedValue();
-                getTheme().resolveAttribute(R.attr.rounded_rectangle_unclicked, value, true);
-                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
+                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
             }
             i++;
         }
@@ -494,11 +510,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         configBeingEdited = 0;
-        editConfig(configBeingEdited,
-                getButtonForDieSides(diceConfigs.get(configBeingEdited).config.getNumberOfSides()) == diceSidesButtons[OTHER_BUTTON_INDEX]);
-        TypedValue value = new TypedValue();
-        getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
-        ((LinearLayout)diceConfigs.get(configBeingEdited).button.getParent()).setBackground(getResources().getDrawable(value.resourceId,null));
+        DiceGuiConfig cfg = diceConfigs.get(configBeingEdited);
+        DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
+        editConfig(configBeingEdited, info == diceSidesInfos[OTHER_BUTTON_INDEX]);
+        ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
     }
 
     public void onNew(View view) {
@@ -514,9 +529,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         // Unset the currently highlighted item so that it is not shown as being edited any longer
         for (int i=0; i < layoutDiceList.getChildCount(); i+=2) {
-            TypedValue value = new TypedValue();
-            getTheme().resolveAttribute(R.attr.rounded_rectangle_unclicked, value, true);
-            layoutDiceList.getChildAt(i).setBackground(getResources().getDrawable(value.resourceId,null));
+            View diceItem = layoutDiceList.getChildAt(i);
+            Button button = diceItem.findViewById(R.id.die_config_button);
+            DiceSidesInfo info = getInfoForButton(button);
+            diceItem.setBackground(getResources().getDrawable(info.drawableUnclicked,null));
         }
 
         // first add the divider (which contains the operation...
@@ -533,20 +549,18 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         // then add the new dice item and set up the fields
         layoutNew = (LinearLayout)inflater.inflate(R.layout.dice_list_item, layoutDiceList, false);
-        TypedValue value = new TypedValue();
-        getTheme().resolveAttribute(R.attr.rounded_rectangle_clicked, value, true);
-        layoutNew.setBackground(getResources().getDrawable(value.resourceId,null));
 
         Button button = layoutNew.findViewById(R.id.die_config_button);
         DieConfiguration config = new DieConfiguration(DEFAULT_NBR_DICE, DEFAULT_NBR_SIDES,
                 DEFAULT_START, DEFAULT_INCREMENT, DEFAULT_START - 1, true);
         diceConfigs.add(new DiceGuiConfig(config, button));
-        layoutDiceList.addView(layoutNew);
 
         // populate the detailed dice config page
         int i = diceConfigs.size() - 1;
-        Button buttonSides = getButtonForDieSides(diceConfigs.get(i).config.getNumberOfSides());
-        editConfig(diceConfigs.size() - 1, buttonSides == diceSidesButtons[OTHER_BUTTON_INDEX]);
+        DiceSidesInfo sidesInfo = getInfoForDieSides(diceConfigs.get(i).config.getNumberOfSides());
+        layoutNew.setBackground(getResources().getDrawable(sidesInfo.drawableClicked,null));
+        layoutDiceList.addView(layoutNew);
+        editConfig(diceConfigs.size() - 1, sidesInfo == diceSidesInfos[OTHER_BUTTON_INDEX]);
 
         // update the dice list item
         repopulateCurrentListItemFromConfig();
@@ -729,7 +743,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             }
 
             LinearLayout layoutDiceListItem = (LinearLayout) inflater.inflate(R.layout.dice_list_item, layout, false);
-            TextView diceNumbers = layoutDiceListItem.findViewById(R.id.numbers_on_die);
             Button diceButton = layoutDiceListItem.findViewById(R.id.die_config_button);
 
             // save all the config buttons so that we can easily find the one being clicked
@@ -751,7 +764,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             i++;
         }
 
-        editConfig(0, getButtonForDieSides(diceConfigs.get(0).config.getNumberOfSides()) == diceSidesButtons[OTHER_BUTTON_INDEX]);
+        editConfig(0, getInfoForDieSides(diceConfigs.get(0).config.getNumberOfSides()) == diceSidesInfos[OTHER_BUTTON_INDEX]);
     }
 
     private void editConfig(int i, boolean isOtherButton) {
@@ -760,27 +773,23 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         boolean newPanelIsConstant = config.getNumberOfSides() == 1;
         loadEditPanel(newPanelIsConstant);
 
-        for (Button button : diceSidesButtons) {
-            TypedValue value = new TypedValue();
-            getTheme().resolveAttribute(R.attr.round_button_unclicked, value, true);
-            button.setBackground(getResources().getDrawable(value.resourceId,null));
+        for (DiceSidesInfo info : diceSidesInfos) {
+            info.button.setBackground(getResources().getDrawable(info.drawableUnclicked,null));
         }
 
-        Button button = getButtonForDieSides(config.getNumberOfSides());
+        DiceSidesInfo info = getInfoForDieSides(config.getNumberOfSides());
         TextView other = findViewById(R.id.otherText);
         if (isOtherButton) {
             // the "other" button is pressed.  Populate the associated edit text with
             // the number of sides and enable it.
             other.setEnabled(true);
             other.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfSides()));
-            button = diceSidesButtons[OTHER_BUTTON_INDEX];
+            info = diceSidesInfos[OTHER_BUTTON_INDEX];
         } else {
             other.setEnabled(false);
         }
 
-        TypedValue value = new TypedValue();
-        getTheme().resolveAttribute(R.attr.round_button_clicked, value, true);
-        button.setBackground(getResources().getDrawable(value.resourceId,null));
+        info.button.setBackground(getResources().getDrawable(info.drawableClicked,null));
 
         if (newPanelIsConstant) {
             EditText edit = findViewById(R.id.constant);
@@ -800,6 +809,17 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 edit.setText("");
             }
         }
+    }
+
+    private DiceSidesInfo getInfoForButton(Button button) {
+        int length = diceConfigs.size();
+        for (int i = 0; i < length; i++) {
+            DiceGuiConfig cfg = diceConfigs.get(i);
+            if (cfg.button == button) {
+                return getInfoForDieSides(cfg.config.getNumberOfSides());
+            }
+        }
+        return null;  // should not happen
     }
 
     private int nbrSidesForDiceSidesButton(int index) {
@@ -834,30 +854,30 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 return Integer.decode(otherTextString);
         }
     }
-    private Button getButtonForDieSides(int nbrSides) {
+    private DiceSidesInfo getInfoForDieSides(int nbrSides) {
         switch (nbrSides) {
             case 1:
-                return diceSidesButtons[0];
+                return diceSidesInfos[0];
             case 3:
-                return diceSidesButtons[1];
+                return diceSidesInfos[1];
             case 4:
-                return diceSidesButtons[2];
+                return diceSidesInfos[2];
             case 6:
-                return diceSidesButtons[3];
+                return diceSidesInfos[3];
             case 8:
-                return diceSidesButtons[4];
+                return diceSidesInfos[4];
             case 10:
-                return diceSidesButtons[5];
+                return diceSidesInfos[5];
             case 12:
-                return diceSidesButtons[6];
+                return diceSidesInfos[6];
             case 20:
-                return diceSidesButtons[7];
+                return diceSidesInfos[7];
             case 30:
-                return diceSidesButtons[8];
+                return diceSidesInfos[8];
             case 100:
-                return diceSidesButtons[9];
+                return diceSidesInfos[9];
             default:
-                return diceSidesButtons[10];
+                return diceSidesInfos[10];
         }
     }
 }

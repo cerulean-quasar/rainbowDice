@@ -41,7 +41,8 @@
     <string name="constantConfigStringRepresentation">%d</string>
     <string name="rerollText">re-roll on: %d</string>
     <string name="themeTextDisplay">Text for this theme</string>
-    <string name="selectTheme">Select a Theme</string>
+    <string name="selectTheme">Choose a Theme:  </string>
+    <string name="selectThemeMenuItem">Choose a Theme</string>
     <string name="openLogFile">Open Log File</string>
     <string-array name="themeArray">
         <item>Space</item>

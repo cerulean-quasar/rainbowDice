@@ -1,9 +1,5 @@
 <resources>
 
-    <attr name="round_button_clicked" format="reference"/>
-    <attr name="round_button_unclicked" format="reference"/>
-    <attr name="rounded_rectangle_clicked" format="reference"/>
-    <attr name="rounded_rectangle_unclicked" format="reference"/>
     <attr name="divider" format="reference"/>
     <attr name="divider_vertical" format="reference"/>
     <attr name="background_landscape" format="reference"/>
@@ -17,13 +13,9 @@
     </style>
 
     <style name="Space" parent="Theme.AppCompat">
-        <item name="android:textColor">@android:color/white</item>
+        <item name="android:textColor">#3333ff</item>
         <item name="android:background">@null</item>
         <item name="android:windowBackground">@drawable/space</item>
-        <item name="round_button_clicked">@drawable/space_planet2</item>
-        <item name="round_button_unclicked">@drawable/space_planet1</item>
-        <item name="rounded_rectangle_clicked">@drawable/space_nebula2</item>
-        <item name="rounded_rectangle_unclicked">@drawable/space_nebula1</item>
         <item name="divider">@drawable/space_supernova</item>
         <item name="divider_vertical">@drawable/space_supernova_vertical</item>
         <item name="background_landscape">@drawable/space_landscape</item>
@@ -38,10 +30,6 @@
         <item name="android:textColor">#0000aa</item>
         <item name="android:background">@null</item>
         <item name="android:windowBackground">@drawable/sky</item>
-        <item name="round_button_clicked">@drawable/sky_flower_butterfly</item>
-        <item name="round_button_unclicked">@drawable/sky_flower</item>
-        <item name="rounded_rectangle_clicked">@drawable/sky_butterfly_colorful</item>
-        <item name="rounded_rectangle_unclicked">@drawable/sky_butterfly_yellow</item>
         <item name="divider">@drawable/sky_vine</item>
         <item name="divider_vertical">@drawable/sky_vine_vertical</item>
         <item name="background_landscape">@drawable/sky_landscape</item>
@@ -52,10 +40,6 @@
         <item name="android:textColor">#000000</item>
         <item name="android:background">@null</item>
         <item name="android:windowBackground">@drawable/trees</item>
-        <item name="round_button_clicked">@drawable/trees_bird_red</item>
-        <item name="round_button_unclicked">@drawable/trees_bird</item>
-        <item name="rounded_rectangle_clicked">@drawable/trees_flower_red</item>
-        <item name="rounded_rectangle_unclicked">@drawable/trees_flower</item>
         <item name="divider">@drawable/trees_branch</item>
         <item name="divider_vertical">@drawable/trees_branch_vertical</item>
         <item name="background_landscape">@drawable/trees_landscape</item>
@@ -66,10 +50,6 @@
         <item name="android:textColor">#000000</item>
         <item name="android:background">@null</item>
         <item name="android:windowBackground">@drawable/adventure</item>
-        <item name="round_button_clicked">@drawable/adventure_jewel_red</item>
-        <item name="round_button_unclicked">@drawable/adventure_jewel_green</item>
-        <item name="rounded_rectangle_clicked">@drawable/adventure_dragon_red</item>
-        <item name="rounded_rectangle_unclicked">@drawable/adventure_dragon_green</item>
         <item name="divider">@drawable/adventure_arrow</item>
         <item name="divider_vertical">@drawable/adventure_arrow_vertical</item>
         <item name="background_landscape">@drawable/adventure_landscape</item>

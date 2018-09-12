@@ -57,7 +57,6 @@ void main() {
         alpha = 1.0;
     } else {
         color = fragColor;
-        //color = vec3(0.0,0.0,0.0);
         alpha = 1.0;
     }
 
