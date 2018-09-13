@@ -83,13 +83,13 @@ public class MainActivity extends AppCompatActivity {
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
-    private boolean stoppedDiceDrawn = false;
     private Thread drawer = null;
     private DieConfiguration[] diceConfig = null;
     private DiceResult diceResult = null;
     private DiceConfigurationManager configurationFile = null;
     private LogFile logFile = null;
     private String diceFileLoaded = null;
+    private boolean drawingStarted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,10 +132,12 @@ public class MainActivity extends AppCompatActivity {
             Button button = new Button(this);
             button.setBackgroundColor(0xa0a0a0a0);
             button.setText(dice);
-            button.setPadding(50,0,50,0);
             button.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    drawingStarted = true;
+                    TextView result = findViewById(R.id.rollResult);
+                    result.setText(getString(R.string.diceMessageToStartRolling));
                     Button b = (Button) v;
                     joinDrawer();
                     destroySurface();
@@ -160,28 +162,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        stoppedDiceDrawn = false;
         joinDrawer();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        if (!stoppedDiceDrawn && surfaceReady) {
-            if (loadFromLog()) {
-                destroySurface();
-                SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-                SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-                startDrawing(drawSurfaceHolder);
-                drawStoppedDice();
-            }
-        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        diceResult = null;
     }
 
     @Override
@@ -251,9 +242,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void drawStoppedDice() {
-        if (stoppedDiceDrawn) {
-            return;
-        }
         ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
         int len = 0;
         for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
@@ -270,7 +258,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         drawOnce(symbols);
-        stoppedDiceDrawn = true;
     }
 
     public boolean loadFromLog() {
@@ -411,8 +398,6 @@ public class MainActivity extends AppCompatActivity {
         if (surfaceReady) {
             joinDrawer();
             diceResult = null;
-            TextView result = findViewById(R.id.rollResult);
-            result.setText(getString(R.string.diceMessageToStartRolling));
             roll();
             startDrawer();
         }
@@ -577,6 +562,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public boolean isDrawing() {
+        return drawingStarted;
+    }
+
     public void startDrawing(SurfaceHolder holder) {
         boolean usingVulkan = true;
         Surface drawSurface = holder.getSurface();
@@ -664,9 +653,10 @@ public class MainActivity extends AppCompatActivity {
             int[] indicesNeedReRoll = diceResult.reRollRequiredOnIndices();
             if (indicesNeedReRoll == null) {
                 // no dice need reroll, just update the results text view with the results.
+                logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
+                drawingStarted = false;
                 text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
                         getString(R.string.addition), getString(R.string.subtraction)));
-                logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
                 diceResult = null;
             } else {
                 text.setText(getString(R.string.diceMessageReRoll));

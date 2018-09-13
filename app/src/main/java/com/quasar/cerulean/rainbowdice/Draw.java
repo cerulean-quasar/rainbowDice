@@ -25,7 +25,6 @@ import android.os.Message;
 import android.util.Log;
 
 public class Draw implements Runnable {
-    private static String NATIVE = "Rainbow Dice Native";
     private Handler notify;
     public Draw(Handler inNotify) { notify = inNotify; }
     public void run() {
