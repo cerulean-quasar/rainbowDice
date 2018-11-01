@@ -116,6 +116,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
         diceGraphics->initWindow(window);
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
+        diceGraphics.reset();
         return env->NewStringUTF(e.what());
     }
     return env->NewStringUTF("");
@@ -310,6 +311,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyResources(
     // and joined the draw thread.
     if (diceGraphics.get() != nullptr) {
         diceGraphics->cleanup();
+        diceGraphics.reset();
     }
 }
 

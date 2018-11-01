@@ -252,7 +252,7 @@ void RainbowDiceVulkan::createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDe
 }
 
 void RainbowDiceVulkan::updatePerspectiveMatrix() {
-    for (auto die : dice) {
+    for (auto &die : dice) {
         die->die->updatePerspectiveMatrix(swapChainExtent.width, swapChainExtent.height);
     }
 }
@@ -261,7 +261,7 @@ void RainbowDiceVulkan::cleanupSwapChain() {
     if (logicalDevice == VK_NULL_HANDLE) {
         return;
     }
-    for (auto framebuffer : swapChainFramebuffers) {
+    for (auto &framebuffer : swapChainFramebuffers) {
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     }
     if (graphicsPipeline != VK_NULL_HANDLE) {
@@ -288,7 +288,7 @@ void RainbowDiceVulkan::cleanupSwapChain() {
         vkFreeMemory(logicalDevice, depthImageMemory, nullptr);
     }
 
-    for (auto imageView : swapChainImageViews) {
+    for (auto &imageView : swapChainImageViews) {
         vkDestroyImageView(logicalDevice, imageView, nullptr);
     }
 
