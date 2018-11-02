@@ -143,6 +143,95 @@ namespace vulkan {
                                       const VkAllocationCallbacks *pAllocator);
     };
 
+    class Device {
+    public:
+        struct QueueFamilyIndices {
+            int graphicsFamily = -1;
+            int presentFamily = -1;
+
+            bool isComplete() {
+                return graphicsFamily >= 0 && presentFamily >= 0;
+            }
+        };
+
+        struct SwapChainSupportDetails {
+            VkSurfaceCapabilitiesKHR capabilities;
+            std::vector<VkSurfaceFormatKHR> formats;
+            std::vector<VkPresentModeKHR> presentModes;
+        };
+
+        Device(std::shared_ptr<Instance> const &inInstance)
+                : m_instance (inInstance),
+                  m_physicalDevice{},
+                  m_logicalDevice{},
+                  m_graphicsQueue{},
+                  m_presentQueue{},
+                  m_depthFormat{} {
+            pickPhysicalDevice();
+            createLogicalDevice();
+            m_depthFormat = findSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+                                                 VK_FORMAT_D24_UNORM_S8_UINT},
+                                                VK_IMAGE_TILING_OPTIMAL,
+                                                VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+        }
+
+        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+        inline QueueFamilyIndices findQueueFamilies() {
+            return findQueueFamilies(m_physicalDevice);
+        }
+
+        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+        inline SwapChainSupportDetails querySwapChainSupport() {
+            return querySwapChainSupport(m_physicalDevice);
+        }
+
+        VkFormat depthFormat() { return m_depthFormat; }
+
+        inline std::shared_ptr<VkDevice_T> const &logicalDevice() { return m_logicalDevice; }
+
+        inline VkPhysicalDevice physicalDevice() { return m_physicalDevice; }
+
+        inline VkQueue graphicsQueue() { return m_graphicsQueue; }
+
+        inline VkQueue presentQueue() { return m_presentQueue; }
+
+        inline std::shared_ptr<Instance> const &instance() { return m_instance; }
+
+    private:
+        /* ensure that the instance is not destroyed before the device by holding a shared
+         * pointer to the instance here.
+         */
+        std::shared_ptr<Instance> m_instance;
+
+        // the physical device does not need to be freed.
+        VkPhysicalDevice m_physicalDevice;
+
+        std::shared_ptr<VkDevice_T> m_logicalDevice;
+
+        // the graphics and present queues are really part of the logical device and don't need to be freed.
+        VkQueue m_graphicsQueue;
+        VkQueue m_presentQueue;
+
+        VkFormat m_depthFormat;
+
+        const std::vector<const char *> deviceExtensions = {
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        };
+
+        VkFormat findSupportedFormat(const std::vector<VkFormat> &candidates,
+                                     VkImageTiling tiling, VkFormatFeatureFlags features);
+
+        void pickPhysicalDevice();
+
+        void createLogicalDevice();
+
+        bool isDeviceSuitable(VkPhysicalDevice device);
+
+        bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+    };
 } /* namespace vulkan */
 
 
@@ -150,7 +239,10 @@ class RainbowDiceVulkan : public RainbowDice {
 public:
     RainbowDiceVulkan(WindowType *window)
             : m_instance{new vulkan::Instance{window}},
-              swapChainImages(), swapChainImageViews(), swapChainFramebuffers() {}
+              m_device{new vulkan::Device{m_instance}},
+              swapChainImages(), swapChainImageViews(), swapChainFramebuffers(),
+              descriptorPools{m_device}
+              {}
     virtual void initWindow(WindowType *window);
 
     virtual void initPipeline();
@@ -192,6 +284,7 @@ public:
     virtual ~RainbowDiceVulkan() { }
 private:
     std::shared_ptr<vulkan::Instance> m_instance;
+    std::shared_ptr<vulkan::Device> m_device;
 
     struct QueueFamilyIndices {
         int graphicsFamily = -1;
@@ -212,12 +305,14 @@ private:
     class DescriptorPool {
         friend DescriptorPools;
     private:
+        std::shared_ptr<vulkan::Device> m_device;
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
         uint32_t totalDescriptorsAllocated;
         uint32_t totalDescriptorsInPool;
 
-        DescriptorPool(VkDescriptorPool pool, uint32_t totalDescriptors)
-                : descriptorPool(pool), totalDescriptorsInPool(totalDescriptors),
+        DescriptorPool(std::shared_ptr<vulkan::Device> const &inDevice,
+                       VkDescriptorPool pool, uint32_t totalDescriptors)
+                : m_device{inDevice}, descriptorPool(pool), totalDescriptorsInPool(totalDescriptors),
                   totalDescriptorsAllocated(0)
         { }
         VkDescriptorSet allocateDescriptor(VkDescriptorSetLayout layout) {
@@ -235,7 +330,7 @@ private:
                 /* the descriptor sets don't need to be freed because they are freed when the
                  * descriptor pool is freed
                  */
-                int rc = vkAllocateDescriptorSets(logicalDevice, &allocInfo, &descriptorSet);
+                int rc = vkAllocateDescriptorSets(m_device->logicalDevice().get(), &allocInfo, &descriptorSet);
                 if (rc != VK_SUCCESS) {
                     throw std::runtime_error("failed to allocate descriptor set!");
                 }
@@ -251,12 +346,14 @@ private:
     /* for passing data other than the vertex data to the vertex shader */
     class DescriptorPools {
     private:
+        std::shared_ptr<vulkan::Device> m_device;
         uint32_t const numberOfDescriptorSetsInPool = 128;
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         std::vector<DescriptorPool> descriptorPools;
         std::vector<VkDescriptorSet> unusedDescriptors;
     public:
-        DescriptorPools() : descriptorSetLayout(VK_NULL_HANDLE) { }
+        DescriptorPools(std::shared_ptr<vulkan::Device> const &inDevice)
+                : m_device{inDevice}, descriptorSetLayout(VK_NULL_HANDLE) { }
         ~DescriptorPools() { destroyResources(); }
 
         void setDescriptorSetLayout(VkDescriptorSetLayout layout) {
@@ -267,13 +364,13 @@ private:
             unusedDescriptors.clear();
 
             for (auto &&descriptorPool: descriptorPools) {
-                vkDestroyDescriptorPool(logicalDevice, descriptorPool.descriptorPool, nullptr);
+                vkDestroyDescriptorPool(m_device->logicalDevice().get(), descriptorPool.descriptorPool, nullptr);
             }
 
             descriptorPools.clear();
 
             if (descriptorSetLayout != VK_NULL_HANDLE) {
-                vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
+                vkDestroyDescriptorSetLayout(m_device->logicalDevice().get(), descriptorSetLayout, nullptr);
                 descriptorSetLayout = VK_NULL_HANDLE;
             }
 
@@ -315,11 +412,11 @@ private:
                 poolInfo.maxSets = numberOfDescriptorSetsInPool;
 
                 VkDescriptorPool descriptorPool;
-                if (vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+                if (vkCreateDescriptorPool(m_device->logicalDevice().get(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
                     throw std::runtime_error("failed to create descriptor pool!");
                 }
 
-                DescriptorPool newDescriptorPool(descriptorPool, numberOfDescriptorSetsInPool);
+                DescriptorPool newDescriptorPool(m_device, descriptorPool, numberOfDescriptorSetsInPool);
 
                 descriptorPools.push_back(newDescriptorPool);
                 return newDescriptorPool.allocateDescriptor(descriptorSetLayout);
@@ -329,10 +426,6 @@ private:
     /* for passing data other than the vertex data to the vertex shader */
     DescriptorPools descriptorPools;
 
-    static VkDevice logicalDevice;
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkQueue graphicsQueue = VK_NULL_HANDLE;
-    VkQueue presentQueue = VK_NULL_HANDLE;
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
 
     std::vector<VkImage> swapChainImages;
@@ -346,6 +439,7 @@ private:
     VkDeviceMemory viewPointBufferMemory;
 
     struct Dice {
+        std::shared_ptr<vulkan::Device> m_device;
         std::shared_ptr<DicePhysicsModel> die;
 
         /* vertex buffer and index buffer. the index buffer indicates which vertices to draw and in
@@ -363,7 +457,10 @@ private:
         VkDeviceMemory uniformBufferMemory;
 
         bool isBeingReRolled;
-        Dice(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
+        Dice(std::shared_ptr<vulkan::Device> const &inDevice,
+             std::vector<std::string> &symbols, glm::vec3 position)
+                : m_device{inDevice},
+                  die(nullptr)
         {
             isBeingReRolled = false;
             long nbrSides = symbols.size();
@@ -400,21 +497,21 @@ private:
             /* free the memory after the buffer has been destroyed because the buffer is bound to 
              * the memory, so the buffer is still using the memory until the buffer is destroyed.
              */
-            vkDestroyBuffer(logicalDevice, uniformBuffer, nullptr);
-            vkFreeMemory(logicalDevice, uniformBufferMemory, nullptr);
+            vkDestroyBuffer(m_device->logicalDevice().get(), uniformBuffer, nullptr);
+            vkFreeMemory(m_device->logicalDevice().get(), uniformBufferMemory, nullptr);
 
-            vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
-            vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
+            vkDestroyBuffer(m_device->logicalDevice().get(), vertexBuffer, nullptr);
+            vkFreeMemory(m_device->logicalDevice().get(), vertexBufferMemory, nullptr);
 
-            vkDestroyBuffer(logicalDevice, indexBuffer, nullptr);
-            vkFreeMemory(logicalDevice, indexBufferMemory, nullptr);
+            vkDestroyBuffer(m_device->logicalDevice().get(), indexBuffer, nullptr);
+            vkFreeMemory(m_device->logicalDevice().get(), indexBufferMemory, nullptr);
         }
 
         void updateUniformBuffer() {
             void* data;
-            vkMapMemory(logicalDevice, uniformBufferMemory, 0, sizeof(die->ubo), 0, &data);
+            vkMapMemory(m_device->logicalDevice().get(), uniformBufferMemory, 0, sizeof(die->ubo), 0, &data);
             memcpy(data, &die->ubo, sizeof(die->ubo));
-            vkUnmapMemory(logicalDevice, uniformBufferMemory);
+            vkUnmapMemory(m_device->logicalDevice().get(), uniformBufferMemory);
         }
 
     };
@@ -455,15 +552,9 @@ private:
     void updatePerspectiveMatrix();
 
     void cleanupSwapChain();
-    void pickPhysicalDevice();
-    bool isDeviceSuitable(VkPhysicalDevice device);
-    bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-    void createLogicalDevice();
     void createSwapChain();
     void createImageViews();
     VkShaderModule createShaderModule(const std::vector<char>& code);
@@ -474,16 +565,12 @@ private:
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void createCommandPool();
     void createCommandBuffers();
     void createSemaphores();
     void createDepthResources();
-    VkFormat findDepthFormat();
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
     bool hasStencilComponent(VkFormat format);
     void createDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer, VkDescriptorSet &descriptorSet);
-    //void createDescriptorPool();
     void createDescriptorSetLayout(VkDescriptorSetLayout &descriptorSetLayout);
     void createTextureImages();
     void createTextureImage(VkImage &textureImage, VkDeviceMemory &textureImageMemory);
