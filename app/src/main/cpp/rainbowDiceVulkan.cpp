@@ -458,6 +458,269 @@ namespace vulkan {
         return requiredExtensions.empty();
     }
 
+    /**
+     * create the swap chain.
+     */
+    void SwapChain::createSwapChain() {
+        /* chose details of the swap chain and get information about what is supported */
+        Device::SwapChainSupportDetails swapChainSupport = m_device->querySwapChainSupport();
+
+        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+        /* Decide on the number of images in the swap chain.  The implementation specifies the
+         * minimum amount, but we try to have more than that to implement triple buffering
+         * properly.
+         */
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        if (swapChainSupport.capabilities.maxImageCount > 0 &&
+            imageCount > swapChainSupport.capabilities.maxImageCount) {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+
+        /* set the create structure up. */
+        VkSwapchainCreateInfoKHR createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface = m_device->instance()->surface().get();
+        createInfo.minImageCount = imageCount;
+        createInfo.imageFormat = surfaceFormat.format;
+        createInfo.imageColorSpace = surfaceFormat.colorSpace;
+        createInfo.imageExtent = extent;
+        createInfo.imageArrayLayers = 1;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        /* Prefer exclusive ownership (images are owned by just one queue).  But if the present
+         * queue is different from the graphics queue (not usually the case), use the concurrent
+         * mode to avoid having to transfer ownership. (too hard for right now)
+         */
+        Device::QueueFamilyIndices indices = m_device->findQueueFamilies();
+        uint32_t queueFamilyIndices[] = {(uint32_t) indices.graphicsFamily,
+                                         (uint32_t) indices.presentFamily};
+        if (indices.graphicsFamily != indices.presentFamily) {
+            createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        } else {
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            createInfo.queueFamilyIndexCount = 0;
+            createInfo.pQueueFamilyIndices = nullptr;
+        }
+
+        /* Specify the transform to perform (like 90 degree clockwise rotation).  For no transform
+         * set this to current transform.
+         */
+        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+
+        /*
+         * specifies if the alpha channel should be used for blending with other windows in the
+         * window system.  Ignore the alpha channel.
+         */
+        //createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        // Todo: what should really go here.
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+
+        /* set the chosen present mode */
+        createInfo.presentMode = presentMode;
+
+        /* enable clipping - this says that we don't care about the color of the pixels that
+         * are obsured, (e.g. another window is in front of them).
+         */
+        createInfo.clipped = VK_TRUE;
+
+        /*
+         * oldSwapchain is for recreating the swap chain if it becomes invalid or unoptimized.
+         * if recreating the swap chain, you need to pass the old one in this field.  For now,
+         * we'll assume that we'll only ever create one swap chain.
+         */
+        createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        VkSwapchainKHR swapChainRaw;
+        if (vkCreateSwapchainKHR(m_device->logicalDevice().get(), &createInfo, nullptr, &swapChainRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to create swap chain!");
+        }
+
+        auto const &capDevice = m_device;
+        auto deleter = [capDevice](VkSwapchainKHR swapChainRaw) {
+            vkDestroySwapchainKHR(capDevice->logicalDevice().get(), swapChainRaw, nullptr);
+        };
+
+        m_swapChain.reset(swapChainRaw, deleter);
+
+        m_imageFormat = surfaceFormat.format;
+        m_extent = extent;
+    }
+
+    /**
+     * Choose the image format.  We want SRGB color space and RGB format.
+     */
+    VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(
+            const std::vector<VkSurfaceFormatKHR> &availableFormats) {
+        if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
+            return {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+        }
+
+        for (const auto &availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+                availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return availableFormat;
+            }
+        }
+
+        return availableFormats[0];
+
+    }
+
+    /**
+     * Choose the swap change present mode.
+     *
+     * We prefer VK_PRESENT_MODE_MAILBOX_KHR because it uses triple
+     * buffering and avoids tearing.  If we can't get that, we look for
+     * VK_PRESENT_MODE_IMMEDIATE_KHR next because although
+     * VK_PRESENT_MODE_FIFO_KHR is guaranteed to be available, not all video
+     * cards implement it correctly.
+     */
+    VkPresentModeKHR
+    SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
+        VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
+
+        for (const auto &availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return availablePresentMode;
+            } else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                bestMode = availablePresentMode;
+            }
+        }
+
+        return bestMode;
+    }
+
+    /**
+     * Choose the resolution of the swap images in the frame buffer.  Just return
+     * the current extent (same resolution as the window).
+     */
+    VkExtent2D SwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
+        return capabilities.currentExtent;
+    }
+
+    void RenderPass::createRenderPass(std::shared_ptr<SwapChain> const &swapchain) {
+        /* color buffer attachment descriptions: use a single attachment represented by
+         * one of the images from the swap chain.
+         */
+        VkAttachmentDescription colorAttachment = {};
+        colorAttachment.format = swapchain->imageFormat();
+        /* stick to one sample since we are not using multisampling */
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        /* clear the contents of the attachment to a constant at the start */
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        /* store the rendered contents in memory so they can be read later */
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        /* we don't care about the stencil buffer for this app */
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        /* we don't care which layout the image was in */
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        /* images to be presented in the swap chain */
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        /* subpasses and attachment references:
+         * a render pass may consist of many subpasses. For example, post processing tasks.
+         */
+        VkAttachmentReference colorAttachmentRef = {};
+        /* specify which attachment by its index in the attachment descriptions array */
+        colorAttachmentRef.attachment = 0;
+
+        /* specify the layout to use for the attachment during a subpass that uses this reference
+         * VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL gives the best performance for an attachment
+         * functioning as a color buffer
+         */
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        /* depth attachment */
+        VkAttachmentDescription depthAttachment = {};
+        depthAttachment.format = m_device->depthFormat();
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+
+        /* we won't be using the depth data after the drawing has finished, so use DONT_CARE for
+         * store operation
+         */
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        /* dont care about the previous contents */
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depthAttachmentRef = {};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        /* render subpass */
+        VkSubpassDescription subpass = {};
+        /* specify a graphics subpass (as opposed to a compute subpass) */
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+        /* create a render subbass dependency because we need the render pass to wait for the
+         * VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage of the graphics pipeline
+         */
+        VkSubpassDependency dependency = {};
+
+        /* The following two fields specify the indices of the dependency and the dependent
+         * subpass. The special value VK_SUBPASS_EXTERNAL refers to the implicit subpass before
+         * or after the render pass depending on whether it is specified in srcSubpass or
+         * dstSubpass. The index 0 refers to our subpass, which is the first and only one. The
+         * dstSubpass must always be higher than srcSubpass to prevent cycles in the
+         * dependency graph.
+         */
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+
+        /* wait for the VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage */
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = 0;
+
+        /* prevent the transition from happening until when we want to start writing colors to
+         * the color attachment.
+         */
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstAccessMask =
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        /* create the render pass */
+        std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+        VkRenderPassCreateInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+
+        VkRenderPass renderPassRaw;
+        if (vkCreateRenderPass(m_device->logicalDevice().get(), &renderPassInfo, nullptr, &renderPassRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to create render pass!");
+        }
+
+        auto const &capDevice = m_device;
+        auto deleter = [capDevice](VkRenderPass renderPassRaw) {
+            vkDestroyRenderPass(capDevice->logicalDevice().get(), renderPassRaw, nullptr);
+        };
+
+        m_renderPass.reset(renderPassRaw, deleter);
+    }
+
 } /* namespace vulkan */
 
 /* read the shader byte code files */
@@ -471,18 +734,17 @@ std::vector<char> RainbowDiceVulkan::readFile(const std::string &filename) {
     }
 }
 
-/**
- * Choose the resolution of the swap images in the frame buffer.  Just return
- * the current extent (same resolution as the window).
- */
-VkExtent2D RainbowDiceVulkan::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
-    return capabilities.currentExtent;
-}
-
 void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
-    createSwapChain();
+    /* retrieve the image handles from the swap chain. - handles cleaned up by Vulkan
+     * Note: Vulkan may have chosen to create more images than specified in minImageCount,
+     * so we have to requery the image count here.
+     */
+    uint32_t imageCount;
+    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, nullptr);
+    swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, swapChainImages.data());
+
     createImageViews();
-    createRenderPass();
 }
 
 void RainbowDiceVulkan::initPipeline() {
@@ -514,7 +776,7 @@ void RainbowDiceVulkan::initPipeline() {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        die->loadModel(swapChainExtent.width, swapChainExtent.height);
+        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
@@ -551,10 +813,19 @@ void RainbowDiceVulkan::recreateSwapChain() {
 
     cleanupSwapChain();
 
-    createSwapChain();
+    m_swapChain.reset(new vulkan::SwapChain{m_device});
+    /* retrieve the image handles from the swap chain. - handles cleaned up by Vulkan
+     * Note: Vulkan may have chosen to create more images than specified in minImageCount,
+     * so we have to requery the image count here.
+     */
+    uint32_t imageCount;
+    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, nullptr);
+    swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, swapChainImages.data());
+
     createImageViews();
     createDepthResources();
-    createRenderPass();
+    m_renderPass.reset(new vulkan::RenderPass{m_device, m_swapChain});
     createGraphicsPipeline();
     createFramebuffers();
     createCommandBuffers();
@@ -578,7 +849,7 @@ void RainbowDiceVulkan::recreateModels() {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        die->loadModel(swapChainExtent.width, swapChainExtent.height);
+        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
@@ -654,7 +925,7 @@ void RainbowDiceVulkan::createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDe
 
 void RainbowDiceVulkan::updatePerspectiveMatrix() {
     for (auto &die : dice) {
-        die->die->updatePerspectiveMatrix(swapChainExtent.width, swapChainExtent.height);
+        die->die->updatePerspectiveMatrix(m_swapChain->extent().width, m_swapChain->extent().height);
     }
 }
 
@@ -673,9 +944,7 @@ void RainbowDiceVulkan::cleanupSwapChain() {
         vkDestroyPipelineLayout(m_device->logicalDevice().get(), pipelineLayout, nullptr);
     }
 
-    if (renderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(m_device->logicalDevice().get(), renderPass, nullptr);
-    }
+    m_renderPass.reset();
 
     if (depthImageView != VK_NULL_HANDLE) {
         vkDestroyImageView(m_device->logicalDevice().get(), depthImageView, nullptr);
@@ -693,155 +962,16 @@ void RainbowDiceVulkan::cleanupSwapChain() {
         vkDestroyImageView(m_device->logicalDevice().get(), imageView, nullptr);
     }
 
-    if (swapChain != VK_NULL_HANDLE) {
-        vkDestroySwapchainKHR(m_device->logicalDevice().get(), swapChain, nullptr);
-    }
-}
+    swapChainImages.clear();
 
-/**
- * Choose the image format.  We want SRGB color space and RGB format.
- */
-VkSurfaceFormatKHR RainbowDiceVulkan::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-    if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
-        return {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
-    }
-
-    for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return availableFormat;
-        }
-    }
-
-    return availableFormats[0];
-
-}
-
-/**
- * Choose the swap change present mode.
- *
- * We prefer VK_PRESENT_MODE_MAILBOX_KHR because it uses triple
- * buffering and avoids tearing.  If we can't get that, we look for
- * VK_PRESENT_MODE_IMMEDIATE_KHR next because although
- * VK_PRESENT_MODE_FIFO_KHR is guaranteed to be available, not all video
- * cards implement it correctly.
- */
-VkPresentModeKHR RainbowDiceVulkan::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
-    VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
-
-    for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return availablePresentMode;
-        } else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-            bestMode = availablePresentMode;
-        }
-    }
-
-    return bestMode;
-}
-
-/**
- * create the swap chain.
- */
-void RainbowDiceVulkan::createSwapChain() {
-    /* chose details of the swap chain and get information about what is supported */
-    vulkan::Device::SwapChainSupportDetails swapChainSupport = m_device->querySwapChainSupport();
-
-    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
-
-    /* Decide on the number of images in the swap chain.  The implementation specifies the
-     * minimum amount, but we try to have more than that to implement triple buffering
-     * properly.
-     */
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-        imageCount = swapChainSupport.capabilities.maxImageCount;
-    }
-
-    /* set the create structure up. */
-    VkSwapchainCreateInfoKHR createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = m_instance->surface().get();
-    createInfo.minImageCount = imageCount;
-    createInfo.imageFormat = surfaceFormat.format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = extent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    /* Prefer exclusive ownership (images are owned by just one queue).  But if the present
-     * queue is different from the graphics queue (not usually the case), use the concurrent
-     * mode to avoid having to transfer ownership. (too hard for right now)
-     */
-    vulkan::Device::QueueFamilyIndices indices = m_device->findQueueFamilies();
-    uint32_t queueFamilyIndices[] = {(uint32_t) indices.graphicsFamily, (uint32_t)indices.presentFamily};
-    if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-    } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        createInfo.queueFamilyIndexCount = 0;
-        createInfo.pQueueFamilyIndices = nullptr;
-    }
-
-    /* Specify the transform to perform (like 90 degree clockwise rotation).  For no transform
-     * set this to current transform.
-     */
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-
-    /*
-     * specifies if the alpha channel should be used for blending with other windows in the
-     * window system.  Ignore the alpha channel.
-     */
-    /* Todo: vulkan validation layers says the following when trying to request: VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR:
-     * vkCreateSwapChainKHR() called with a non-supported pCreateInfo->compositeAlpha (i.e.
-     * VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR).  Supported values are: VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR.
-     * The spec valid usage text states 'compositeAlpha must be one of the bits present in the
-     * supportedCompositeAlpha member of the VkSurfaceCapabilitiesKHR structure returned by
-     * vkGetPhysicalDeviceSurfaceCapabilitiesKHR for the surface'
-     * (https://www.khronos.org/registry/vulkan/specs/1.0/html/vkspec.html#VUID-VkSwapchainCreateInfoKHR-compositeAlpha-01280)
-     */
-    //createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
-
-    /* set the chosen present mode */
-    createInfo.presentMode = presentMode;
-
-    /* enable clipping - this says that we don't care about the color of the pixels that
-     * are obsured, (e.g. another window is in front of them).
-     */
-    createInfo.clipped = VK_TRUE;
-
-    /*
-     * oldSwapchain is for recreating the swap chain if it becomes invalid or unoptimized.
-     * if recreating the swap chain, you need to pass the old one in this field.  For now,
-     * we'll assume that we'll only ever create one swap chain.
-     */
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-    if (vkCreateSwapchainKHR(m_device->logicalDevice().get(), &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create swap chain!");
-    }
-
-    /* retrieve the image handles from the swap chain. - handles cleaned up by Vulkan
-     * Note: Vulkan may have chosen to create more images than specified in minImageCount,
-     * so we have to requery the image count here.
-     */
-    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), swapChain, &imageCount, nullptr);
-    swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), swapChain, &imageCount, swapChainImages.data());
-
-    swapChainImageFormat = surfaceFormat.format;
-    swapChainExtent = extent;
+    m_swapChain.reset();
 }
 
 void RainbowDiceVulkan::createImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
 
     for (size_t i=0; i < swapChainImages.size(); i++) {
-        swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+        swapChainImageViews[i] = createImageView(swapChainImages[i], m_swapChain->imageFormat(), VK_IMAGE_ASPECT_COLOR_BIT);
     }
 }
 
@@ -859,113 +989,6 @@ VkShaderModule RainbowDiceVulkan::createShaderModule(const std::vector<char>& co
     }
 
     return shaderModule;
-}
-
-void RainbowDiceVulkan::createRenderPass() {
-    /* color buffer attachment descriptions: use a single attachment represented by
-     * one of the images from the swap chain.
-     */
-    VkAttachmentDescription colorAttachment = {};
-    colorAttachment.format = swapChainImageFormat;
-    /* stick to one sample since we are not using multisampling */
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    /* clear the contents of the attachment to a constant at the start */
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    /* store the rendered contents in memory so they can be read later */
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    /* we don't care about the stencil buffer for this app */
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    /* we don't care which layout the image was in */
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    /* images to be presented in the swap chain */
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    /* subpasses and attachment references:
-     * a render pass may consist of many subpasses. For example, post processing tasks.
-     */
-    VkAttachmentReference colorAttachmentRef = {};
-    /* specify which attachment by its index in the attachment descriptions array */
-    colorAttachmentRef.attachment = 0;
-
-    /* specify the layout to use for the attachment during a subpass that uses this reference
-     * VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL gives the best performance for an attachment
-     * functioning as a color buffer
-     */
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    /* depth attachment */
-    VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format = m_device->depthFormat();
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-
-    /* we won't be using the depth data after the drawing has finished, so use DONT_CARE for
-     * store operation
-     */
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    /* dont care about the previous contents */
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef = {};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    /* render subpass */
-    VkSubpassDescription subpass = {};
-    /* specify a graphics subpass (as opposed to a compute subpass) */
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    /* create a render subbass dependency because we need the render pass to wait for the
-     * VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage of the graphics pipeline
-     */
-    VkSubpassDependency dependency = {};
-
-    /* The following two fields specify the indices of the dependency and the dependent
-     * subpass. The special value VK_SUBPASS_EXTERNAL refers to the implicit subpass before
-     * or after the render pass depending on whether it is specified in srcSubpass or
-     * dstSubpass. The index 0 refers to our subpass, which is the first and only one. The
-     * dstSubpass must always be higher than srcSubpass to prevent cycles in the
-     * dependency graph.
-     */
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-
-    /* wait for the VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage */
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-
-    /* prevent the transition from happening until when we want to start writing colors to 
-     * the color attachment.
-     */
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    /* create the render pass */
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
-    VkRenderPassCreateInfo renderPassInfo = {};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(m_device->logicalDevice().get(), &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
-    }
 }
 
 void RainbowDiceVulkan::createGraphicsPipeline() {
@@ -1022,8 +1045,8 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float) swapChainExtent.width;
-    viewport.height = (float) swapChainExtent.height;
+    viewport.width = (float) m_swapChain->extent().width;
+    viewport.height = (float) m_swapChain->extent().height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -1032,7 +1055,7 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
      */
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
-    scissor.extent = swapChainExtent;
+    scissor.extent = m_swapChain->extent();
 
     /* can specify multiple viewports and scissors here */
     VkPipelineViewportStateCreateInfo viewportState = {};
@@ -1187,7 +1210,7 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.renderPass = m_renderPass->renderPass().get();
     pipelineInfo.subpass = 0; // index of the subpass
 
     /* if you want to create a pipeline from an already existing pipeline use these.
@@ -1215,11 +1238,11 @@ void RainbowDiceVulkan::createFramebuffers() {
 
         VkFramebufferCreateInfo framebufferInfo = {};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.renderPass = m_renderPass->renderPass().get();
         framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = swapChainExtent.width;
-        framebufferInfo.height = swapChainExtent.height;
+        framebufferInfo.width = m_swapChain->extent().width;
+        framebufferInfo.height = m_swapChain->extent().height;
         framebufferInfo.layers = 1;
 
         if (vkCreateFramebuffer(m_device->logicalDevice().get(), &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
@@ -1366,11 +1389,11 @@ void RainbowDiceVulkan::createCommandBuffers() {
         /* begin the render pass: drawing starts here*/
         VkRenderPassBeginInfo renderPassInfo = {};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
+        renderPassInfo.renderPass = m_renderPass->renderPass().get();
         renderPassInfo.framebuffer = swapChainFramebuffers[i];
         /* size of the render area */
         renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = swapChainExtent;
+        renderPassInfo.renderArea.extent = m_swapChain->extent();
 
         /* the color value to use when clearing the image with VK_ATTACHMENT_LOAD_OP_CLEAR,
          * using black with 0% opacity
@@ -1450,7 +1473,7 @@ void RainbowDiceVulkan::drawFrame() {
      * an error from this function does not necessarily mean that we need to terminate
      * the program
      */
-    VkResult result = vkAcquireNextImageKHR(m_device->logicalDevice().get(), swapChain,
+    VkResult result = vkAcquireNextImageKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(),
         std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE,
         &imageIndex);
 
@@ -1505,7 +1528,7 @@ void RainbowDiceVulkan::drawFrame() {
     /* which swap chains to present the image to and the index of the image for
      * each swap chain
      */
-    VkSwapchainKHR swapChains[] = {swapChain};
+    VkSwapchainKHR swapChains[] = {m_swapChain->swapChain().get()};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
@@ -1536,7 +1559,7 @@ void RainbowDiceVulkan::drawFrame() {
 void RainbowDiceVulkan::createDepthResources() {
     VkFormat depthFormat = m_device->depthFormat();
 
-    createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+    createImage(m_swapChain->extent().width, m_swapChain->extent().height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
     depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     transitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
@@ -2066,7 +2089,7 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         VkDeviceMemory uniformBufferMemory;
         VkDescriptorSet descriptorSet;
 
-        die->loadModel(swapChainExtent.width, swapChainExtent.height);
+        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);

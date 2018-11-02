@@ -232,6 +232,55 @@ namespace vulkan {
 
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     };
+
+    class SwapChain {
+    public:
+        SwapChain(std::shared_ptr<Device> inDevice)
+                : m_device(inDevice),
+                  m_swapChain{VK_NULL_HANDLE},
+                  m_imageFormat{},
+                  m_extent{} {
+            createSwapChain();
+        }
+
+        inline std::shared_ptr<Device> const &device() { return m_device; }
+        inline std::shared_ptr<VkSwapchainKHR_T> const &swapChain() {return m_swapChain; }
+        inline VkFormat imageFormat() { return m_imageFormat; }
+        inline VkExtent2D extent() { return m_extent; }
+    private:
+        std::shared_ptr<Device> m_device;
+        std::shared_ptr<VkSwapchainKHR_T> m_swapChain;
+        VkFormat m_imageFormat;
+        VkExtent2D m_extent;
+
+        void createSwapChain();
+
+        VkSurfaceFormatKHR
+        chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+
+        VkPresentModeKHR
+        chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
+
+        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+    };
+
+    class RenderPass {
+    public:
+        RenderPass(std::shared_ptr<Device> const &inDevice, std::shared_ptr<SwapChain> const &swapChain)
+                : m_device{inDevice},
+                  m_renderPass{} {
+            createRenderPass(swapChain);
+        }
+
+        inline std::shared_ptr<VkRenderPass_T> const &renderPass() { return m_renderPass; }
+
+    private:
+        std::shared_ptr<Device> m_device;
+        std::shared_ptr<VkRenderPass_T> m_renderPass;
+
+        void createRenderPass(std::shared_ptr<SwapChain> const &swapChain);
+    };
+
 } /* namespace vulkan */
 
 
@@ -240,6 +289,8 @@ public:
     RainbowDiceVulkan(WindowType *window)
             : m_instance{new vulkan::Instance{window}},
               m_device{new vulkan::Device{m_instance}},
+              m_swapChain{new vulkan::SwapChain{m_device}},
+              m_renderPass{new vulkan::RenderPass{m_device, m_swapChain}},
               swapChainImages(), swapChainImageViews(), swapChainFramebuffers(),
               descriptorPools{m_device}
               {}
@@ -285,21 +336,8 @@ public:
 private:
     std::shared_ptr<vulkan::Instance> m_instance;
     std::shared_ptr<vulkan::Device> m_device;
-
-    struct QueueFamilyIndices {
-        int graphicsFamily = -1;
-        int presentFamily = -1;
-
-        bool isComplete() {
-            return graphicsFamily >= 0 && presentFamily >= 0;
-        }
-    };
-
-    struct SwapChainSupportDetails {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
-    };
+    std::shared_ptr<vulkan::SwapChain> m_swapChain;
+    std::shared_ptr<vulkan::RenderPass> m_renderPass;
 
     class DescriptorPools;
     class DescriptorPool {
@@ -426,14 +464,8 @@ private:
     /* for passing data other than the vertex data to the vertex shader */
     DescriptorPools descriptorPools;
 
-    VkSwapchainKHR swapChain = VK_NULL_HANDLE;
-
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
-
-    VkFormat swapChainImageFormat;
-    VkExtent2D swapChainExtent;
-    VkRenderPass renderPass = VK_NULL_HANDLE;
 
     VkBuffer viewPointBuffer;
     VkDeviceMemory viewPointBufferMemory;
@@ -552,10 +584,6 @@ private:
     void updatePerspectiveMatrix();
 
     void cleanupSwapChain();
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    void createSwapChain();
     void createImageViews();
     VkShaderModule createShaderModule(const std::vector<char>& code);
     void createRenderPass();
