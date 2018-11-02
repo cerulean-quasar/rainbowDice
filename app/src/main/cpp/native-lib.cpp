@@ -29,9 +29,7 @@
 #include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
 
-#ifdef RAINBOWDICE_GLONLY
-#include "text.hpp"
-#else
+#ifdef CQ_ENABLE_VULKAN
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
 #endif
@@ -104,20 +102,29 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
     }
 
     try {
-#ifdef RAINBOWDICE_GLONLY
-        diceGraphics.reset(new RainbowDiceGL());
+#ifdef CQ_ENABLE_VULKAN
+        if (useVulkan) {
+            diceGraphics.reset(new RainbowDiceVulkan(window));
+        } else {
+            diceGraphics.reset(new RainbowDiceGL());
+        }
 #else
         if (useVulkan) {
-            diceGraphics.reset(new RainbowDiceVulkan());
+            return env->NewStringUTF("Vulkan disabled");
         } else {
             diceGraphics.reset(new RainbowDiceGL());
         }
 #endif
+    } catch (std::runtime_error &e) {
+        diceGraphics.reset();
+        return env->NewStringUTF(e.what());
+    }
+
+    try {
         diceGraphics->initWindow(window);
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
         diceGraphics.reset();
-        return env->NewStringUTF(e.what());
     }
     return env->NewStringUTF("");
 }
@@ -164,12 +171,13 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
     }
 
     try {
-#ifdef RAINBOWDICE_GLONLY
-        texAtlas.reset(new TextureAtlas(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight), bitmap));
-#else
+#ifdef CQ_ENABLE_VULKAN
         texAtlas.reset(new TextureAtlasVulkan(symbols, static_cast<uint32_t>(width),
                                               static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
                                               static_cast<uint32_t>(heightBlankSpace), bitmap));
+#else
+        texAtlas.reset(new TextureAtlas(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height),
+            static_cast<uint32_t>(imageHeight), static_cast<uint32_t>(heightBlankSpace), bitmap));
 #endif
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();

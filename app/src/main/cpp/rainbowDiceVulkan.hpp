@@ -46,28 +46,120 @@
 #include "text.hpp"
 #include "dice.hpp"
 
-const std::vector<const char*> validationLayers = {
-    /* required for checking for errors and getting error messages */
-    "VK_LAYER_LUNARG_standard_validation"
-};
-
+namespace vulkan {
+#define DEBUG
 #ifdef DEBUG
     const bool enableValidationLayers = true;
 #else
     const bool enableValidationLayers = false;
 #endif
 
+    const std::vector<const char *> validationLayers = {
+            /* required for checking for errors and getting error messages */
+            //"VK_LAYER_LUNARG_standard_validation"
+            "VK_LAYER_GOOGLE_threading",
+            "VK_LAYER_LUNARG_parameter_validation",
+            "VK_LAYER_LUNARG_object_tracker",
+            "VK_LAYER_LUNARG_core_validation",
+            "VK_LAYER_GOOGLE_unique_objects"
+    };
+
+    class VulkanLibrary {
+    public:
+        VulkanLibrary() {
+            if (!loadVulkan()) {
+                throw std::runtime_error("Could not find vulkan library.");
+            }
+        }
+    };
+
+    class Instance {
+    public:
+        Instance(WindowType *inWindow)
+                : m_loader{},
+                  m_window{},
+                  m_instance{},
+                  m_callback{},
+                  m_surface{} {
+            auto deleter = [](WindowType *windowRaw) {
+                /* release the java window object */
+                if (windowRaw != nullptr) {
+                    ANativeWindow_release(windowRaw);
+                }
+            };
+
+            m_window.reset(inWindow, deleter);
+
+            createInstance();
+            setupDebugCallback();
+            createSurface();
+        }
+
+        inline std::shared_ptr<VkInstance_T> const &instance() { return m_instance; }
+        inline std::shared_ptr<VkSurfaceKHR_T> const &surface() { return m_surface; }
+        inline std::shared_ptr<VkDebugReportCallbackEXT_T> const &callback() { return m_callback; }
+
+    private:
+        VulkanLibrary m_loader;
+        std::shared_ptr<WindowType> m_window;
+        std::shared_ptr<VkInstance_T> m_instance;
+        std::shared_ptr<VkDebugReportCallbackEXT_T> m_callback;
+        std::shared_ptr<VkSurfaceKHR_T> m_surface;
+
+        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+                VkDebugReportFlagsEXT flags,
+                VkDebugReportObjectTypeEXT objType,
+                uint64_t obj,
+                size_t location,
+                int32_t code,
+                const char *layerPrefix,
+                const char *msg,
+                void *userData) {
+
+            std::cerr << "validation layer: " << msg << std::endl;
+
+            return VK_FALSE;
+        }
+
+        void createSurface();
+
+        void setupDebugCallback();
+
+        void createInstance();
+
+        bool checkExtensionSupport();
+
+        bool checkValidationLayerSupport();
+
+        std::vector<const char *> getRequiredExtensions();
+
+        VkResult createDebugReportCallbackEXT(
+                const VkDebugReportCallbackCreateInfoEXT *pCreateInfo,
+                const VkAllocationCallbacks *pAllocator,
+                VkDebugReportCallbackEXT *pCallback);
+
+        static void
+        destroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback,
+                                      const VkAllocationCallbacks *pAllocator);
+    };
+
+} /* namespace vulkan */
+
 
 class RainbowDiceVulkan : public RainbowDice {
 public:
-    RainbowDiceVulkan() : swapChainImages(), swapChainImageViews(), swapChainFramebuffers() {}
+    RainbowDiceVulkan(WindowType *window)
+            : m_instance{new vulkan::Instance{window}},
+              swapChainImages(), swapChainImageViews(), swapChainFramebuffers() {}
     virtual void initWindow(WindowType *window);
 
     virtual void initPipeline();
 
-    virtual void initThread();
+    virtual void initThread() {}
 
-    virtual void cleanupThread();
+    virtual void cleanupThread() {}
+
+    virtual void destroyWindow() {}
 
     virtual void cleanup();
 
@@ -76,8 +168,6 @@ public:
     virtual bool updateUniformBuffer();
 
     virtual bool allStopped();
-
-    virtual void destroyWindow();
 
     virtual std::vector<std::string> getDiceResults();
 
@@ -101,6 +191,8 @@ public:
 
     virtual ~RainbowDiceVulkan() { }
 private:
+    std::shared_ptr<vulkan::Instance> m_instance;
+
     struct QueueFamilyIndices {
         int graphicsFamily = -1;
         int presentFamily = -1;
@@ -238,12 +330,9 @@ private:
     DescriptorPools descriptorPools;
 
     static VkDevice logicalDevice;
-    VkInstance instance = VK_NULL_HANDLE;
-    VkDebugReportCallbackEXT callback = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkQueue graphicsQueue = VK_NULL_HANDLE;
     VkQueue presentQueue = VK_NULL_HANDLE;
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
 
     std::vector<VkImage> swapChainImages;
@@ -357,22 +446,6 @@ private:
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-            VkDebugReportFlagsEXT flags,
-            VkDebugReportObjectTypeEXT objType,
-            uint64_t obj,
-            size_t location,
-            int32_t code,
-            const char* layerPrefix,
-            const char* msg,
-            void* userData) {
-
-        std::cerr << "validation layer: " << msg << std::endl;
-
-        return VK_FALSE;
-    }
-
-    void createSurface();
 
     std::vector<char> readFile(const std::string &filename);
 
@@ -382,11 +455,6 @@ private:
     void updatePerspectiveMatrix();
 
     void cleanupSwapChain();
-    std::vector<const char *> getRequiredExtensions();
-    void createInstance();
-    void setupDebugCallback();
-    bool checkExtensionSupport();
-    bool checkValidationLayerSupport();
     void pickPhysicalDevice();
     bool isDeviceSuitable(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);

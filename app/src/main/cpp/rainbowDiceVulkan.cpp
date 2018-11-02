@@ -23,51 +23,243 @@
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
 
-VkDevice RainbowDiceVulkan::logicalDevice = VK_NULL_HANDLE;
+namespace vulkan {
+/**
+ * Call used to allocate a debug report callback so that you can get error
+ * messages from Vulkan. This Vulkan function is from an extension, so you
+ * need to get the function pointer to make the call.
+ */
+    VkResult CreateDebugReportCallbackEXT(VkInstance instance,
+                                          const VkDebugReportCallbackCreateInfoEXT *pCreateInfo,
+                                          const VkAllocationCallbacks *pAllocator,
+                                          VkDebugReportCallbackEXT *pCallback) {
+        auto func = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(
+                instance, "vkCreateDebugReportCallbackEXT");
+        if (func != nullptr) {
+            return func(instance, pCreateInfo, pAllocator, pCallback);
+        } else {
+            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        }
+    }
+
+    void Instance::createSurface() {
+        VkAndroidSurfaceCreateInfoKHR createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+        createInfo.window = m_window.get();
+
+        VkSurfaceKHR surfaceRaw;
+        if (vkCreateAndroidSurfaceKHR(m_instance.get(), &createInfo, nullptr, &surfaceRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to create window surface!");
+        }
+
+        // the surface requires the window, so, pass it into the deleter.
+        std::shared_ptr<VkInstance_T> const &capInstance = m_instance;
+        std::shared_ptr<WindowType> const &capWindow = m_window;
+        auto deleter = [capInstance, capWindow](VkSurfaceKHR surfaceRaw) {
+            vkDestroySurfaceKHR(capInstance.get(), surfaceRaw, nullptr);
+        };
+
+        m_surface.reset(surfaceRaw, deleter);
+    }
+
+    void Instance::setupDebugCallback() {
+        if (!enableValidationLayers) return;
+
+        VkDebugReportCallbackCreateInfoEXT createInfo = {};
+        createInfo.sType =
+                VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+        createInfo.flags =
+                VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+        createInfo.pfnCallback = debugCallback;
+
+        VkDebugReportCallbackEXT callbackRaw;
+        if (createDebugReportCallbackEXT(&createInfo, nullptr, &callbackRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to set up debug callback!");
+        }
+
+        auto &capInstance = m_instance;
+        auto capDestroyDebugCallback = destroyDebugReportCallbackEXT;
+        auto deleter = [capInstance, capDestroyDebugCallback](
+                VkDebugReportCallbackEXT callbackRaw) {
+            capDestroyDebugCallback(capInstance.get(), callbackRaw, nullptr);
+        };
+
+        m_callback.reset(callbackRaw, deleter);
+    }
+
+    void Instance::createInstance() {
+        VkApplicationInfo appInfo = {};
+        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        appInfo.pApplicationName = "AmazingLabyrinth";
+        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.pEngineName = "No Engine";
+        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.apiVersion = VK_API_VERSION_1_0;
+
+        VkInstanceCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        createInfo.pApplicationInfo = &appInfo;
+
+        if (!checkExtensionSupport()) {
+            throw std::runtime_error(std::string("failed to find extension: "));
+        }
+
+        if (enableValidationLayers) {
+            if (!checkValidationLayerSupport()) {
+                throw std::runtime_error(std::string("failed to find validation layers: "));
+            }
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
+
+        auto extensions = getRequiredExtensions();
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+        createInfo.ppEnabledExtensionNames = extensions.data();
+
+        VkInstance instanceRaw;
+        if (vkCreateInstance(&createInfo, nullptr, &instanceRaw) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create instance!");
+        }
+
+        auto deleter = [](VkInstance instanceRaw) {
+            vkDestroyInstance(instanceRaw, nullptr);
+        };
+
+        m_instance.reset(instanceRaw, deleter);
+    }
+
+    bool Instance::checkExtensionSupport() {
+        uint32_t extensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+        std::cout << "list of extensions supported:\n";
+        for (const auto &item : extensions) {
+            std::cout << "\t" << item.extensionName << "\n";
+        }
+
+        std::cout << "\nneeded extensions:\n";
+        for (const auto &extension : getRequiredExtensions()) {
+            std::cout << "\t" << extension << "\n";
+            bool found = false;
+            for (const auto &item : extensions) {
+                if (strcmp(item.extensionName, extension) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Instance::checkValidationLayerSupport() {
+        uint32_t layerCount;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+        std::cout << "\nlist of validation layers supported:\n";
+        for (const auto &item : availableLayers) {
+            std::cout << "\t" << item.layerName << "\n";
+        }
+
+        std::cout << "\nneeded validation layers:\n";
+        for (const auto &layerName : validationLayers) {
+            std::cout << "\t" << layerName << "\n";
+            bool layerFound = false;
+
+            for (const auto &layerProperties : availableLayers) {
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+
+            if (!layerFound) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    std::vector<const char *> Instance::getRequiredExtensions() {
+        std::vector<const char *> extensions;
+
+        extensions.push_back("VK_KHR_surface");
+        extensions.push_back("VK_KHR_android_surface");
+
+        /* required to get debug messages from Vulkan */
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+        }
+
+        return extensions;
+    }
 
 /**
  * Call used to allocate a debug report callback so that you can get error
  * messages from Vulkan. This Vulkan function is from an extension, so you
  * need to get the function pointer to make the call.
  */
-VkResult CreateDebugReportCallbackEXT(VkInstance instance,
-    const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkDebugReportCallbackEXT* pCallback)
-{
-    auto func = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(
-        instance, "vkCreateDebugReportCallbackEXT");
-    if (func != nullptr) {
-        return func(instance, pCreateInfo, pAllocator, pCallback);
-    } else {
-        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    VkResult Instance::createDebugReportCallbackEXT(
+            const VkDebugReportCallbackCreateInfoEXT *pCreateInfo,
+            const VkAllocationCallbacks *pAllocator,
+            VkDebugReportCallbackEXT *pCallback) {
+        auto func = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(
+                m_instance.get(), "vkCreateDebugReportCallbackEXT");
+        if (func != nullptr) {
+            return func(m_instance.get(), pCreateInfo, pAllocator, pCallback);
+        } else {
+            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        }
     }
-}
 
 /**
  * Destroy the debug report callback created in CreateDebugReportCallbackEXT
  */
-void DestroyDebugReportCallbackEXT(VkInstance instance,
-    VkDebugReportCallbackEXT callback,
-    const VkAllocationCallbacks* pAllocator)
-{
-    auto func = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(
-        instance, "vkDestroyDebugReportCallbackEXT");
-    if (func != nullptr) {
-        func(instance, callback, pAllocator);
+    void
+    Instance::destroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback,
+                                            const VkAllocationCallbacks *pAllocator) {
+        auto func = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(
+                instance, "vkDestroyDebugReportCallbackEXT");
+        if (func != nullptr) {
+            func(instance, callback, pAllocator);
+        }
+    }
+
+} /* namespace vulkan */
+
+VkDevice RainbowDiceVulkan::logicalDevice = VK_NULL_HANDLE;
+
+/* read the shader byte code files */
+std::vector<char> RainbowDiceVulkan::readFile(const std::string &filename) {
+    if (filename == SHADER_VERT_FILE) {
+        return vertexShader;
+    } else if (filename == SHADER_FRAG_FILE) {
+        return fragmentShader;
+    } else {
+        throw std::runtime_error(std::string("undefined shader type: ") + filename);
     }
 }
 
+/**
+ * Choose the resolution of the swap images in the frame buffer.  Just return
+ * the current extent (same resolution as the window).
+ */
+VkExtent2D RainbowDiceVulkan::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+    return capabilities.currentExtent;
+}
+
 void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
-    window = inWindow;
-    if (!loadVulkan()) {
-        throw std::runtime_error(std::string("Could not find vulkan library."));
-    }
-    createInstance();
-
-    setupDebugCallback();
-
-    createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
     createSwapChain();
@@ -136,13 +328,7 @@ void RainbowDiceVulkan::cleanup() {
         vkDestroyDevice(logicalDevice, nullptr);
     }
 
-    if (instance != VK_NULL_HANDLE) {
-        DestroyDebugReportCallbackEXT(instance, callback, nullptr);
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
-    }
-
-    destroyWindow();
+    m_instance.reset();
 }
 
 void RainbowDiceVulkan::recreateSwapChain() {
@@ -297,139 +483,15 @@ void RainbowDiceVulkan::cleanupSwapChain() {
     }
 }
 
-std::vector<const char *> RainbowDiceVulkan::getRequiredExtensions() {
-    std::vector<const char *> extensions;
-
-    extensions.push_back("VK_KHR_surface");
-    extensions.push_back("VK_KHR_android_surface");
-
-    /* required to get debug messages from Vulkan */
-    if (enableValidationLayers) {
-        extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-    }
-
-    return extensions;
-}
-
-void RainbowDiceVulkan::createInstance() {
-    VkApplicationInfo appInfo = {};
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "RainbowDice";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "No Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
-
-    VkInstanceCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.pApplicationInfo = &appInfo;
-
-    if (!checkExtensionSupport()) {
-        throw std::runtime_error(std::string("failed to find extension: "));
-    }
-
-    if (enableValidationLayers) {
-        if (!checkValidationLayerSupport()) {
-            throw std::runtime_error(std::string("failed to find validation layers: "));
-        }
-        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        createInfo.ppEnabledLayerNames = validationLayers.data();
-    } else {
-        createInfo.enabledLayerCount = 0;
-    }
-
-    auto extensions = getRequiredExtensions();
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-    createInfo.ppEnabledExtensionNames = extensions.data();
-
-    if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create instance!");
-    }
-}
-
-void RainbowDiceVulkan::setupDebugCallback() {
-    if (!enableValidationLayers) return;
-
-    VkDebugReportCallbackCreateInfoEXT createInfo = {};
-    createInfo.sType =
-        VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    createInfo.flags =
-        VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-    createInfo.pfnCallback = debugCallback;
-
-    if (CreateDebugReportCallbackEXT(instance, &createInfo, nullptr, &callback) != VK_SUCCESS) {
-        throw std::runtime_error("failed to set up debug callback!");
-    }
-}
-
-bool RainbowDiceVulkan::checkExtensionSupport() {
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-    std::cout << "list of extensions supported:\n";
-    for (const auto &item : extensions) {
-        std::cout << "\t" << item.extensionName << "\n";
-    }
-
-    std::cout << "\nneeded extensions:\n";
-    for (const auto &extension : getRequiredExtensions()) {
-        std::cout << "\t" << extension << "\n";
-        bool found = false;
-        for (const auto &item : extensions) {
-            if (strcmp(item.extensionName, extension) == 0) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool RainbowDiceVulkan::checkValidationLayerSupport() {
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    std::vector<VkLayerProperties> availableLayers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-    std::cout << "\nlist of validation layers supported:\n";
-    for (const auto &item : availableLayers) {
-        std::cout << "\t" << item.layerName << "\n";
-    }
-
-    std::cout << "\nneeded validation layers:\n";
-    for (const auto &layerName : validationLayers) {
-        std::cout << "\t" << layerName << "\n";
-        bool layerFound = false;
-
-        for (const auto &layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
-            }
-        }
-
-        if (!layerFound) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void RainbowDiceVulkan::pickPhysicalDevice() {
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(m_instance->instance().get(), &deviceCount, nullptr);
     if (deviceCount == 0) {
         throw std::runtime_error("failed to find GPUs with Vulkan support!");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(m_instance->instance().get(), &deviceCount, devices.data());
     for (const auto& device : devices) {
         if (isDeviceSuitable(device)) {
             physicalDevice = device;
@@ -507,7 +569,7 @@ RainbowDiceVulkan::QueueFamilyIndices RainbowDiceVulkan::findQueueFamilies(VkPhy
     int i = 0;
     for (const auto& queueFamily : queueFamilies) {
         VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_instance->surface().get(), &presentSupport);
         if (queueFamily.queueCount > 0 && presentSupport) {
             indices.presentFamily = i;
         }
@@ -570,20 +632,20 @@ VkPresentModeKHR RainbowDiceVulkan::chooseSwapPresentMode(const std::vector<VkPr
 RainbowDiceVulkan::SwapChainSupportDetails RainbowDiceVulkan::querySwapChainSupport(VkPhysicalDevice device) {
     RainbowDiceVulkan::SwapChainSupportDetails details;
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_instance->surface().get(), &details.capabilities);
 
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_instance->surface().get(), &formatCount, nullptr);
     if (formatCount != 0) {
         details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_instance->surface().get(), &formatCount, details.formats.data());
     }
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_instance->surface().get(), &presentModeCount, nullptr);
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_instance->surface().get(), &presentModeCount, details.presentModes.data());
     }
 
     return details;
@@ -619,9 +681,9 @@ void RainbowDiceVulkan::createLogicalDevice() {
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-    if (enableValidationLayers) {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        createInfo.ppEnabledLayerNames = validationLayers.data();
+    if (vulkan::enableValidationLayers) {
+        createInfo.enabledLayerCount = static_cast<uint32_t>(vulkan::validationLayers.size());
+        createInfo.ppEnabledLayerNames = vulkan::validationLayers.data();
     } else {
         createInfo.enabledLayerCount = 0;
     }
@@ -657,7 +719,7 @@ void RainbowDiceVulkan::createSwapChain() {
     /* set the create structure up. */
     VkSwapchainCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface;
+    createInfo.surface = m_instance->surface().get();
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -690,7 +752,16 @@ void RainbowDiceVulkan::createSwapChain() {
      * specifies if the alpha channel should be used for blending with other windows in the
      * window system.  Ignore the alpha channel.
      */
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    /* Todo: vulkan validation layers says the following when trying to request: VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR:
+     * vkCreateSwapChainKHR() called with a non-supported pCreateInfo->compositeAlpha (i.e.
+     * VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR).  Supported values are: VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR.
+     * The spec valid usage text states 'compositeAlpha must be one of the bits present in the
+     * supportedCompositeAlpha member of the VkSurfaceCapabilitiesKHR structure returned by
+     * vkGetPhysicalDeviceSurfaceCapabilitiesKHR for the surface'
+     * (https://www.khronos.org/registry/vulkan/specs/1.0/html/vkspec.html#VUID-VkSwapchainCreateInfoKHR-compositeAlpha-01280)
+     */
+    //createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
 
     /* set the chosen present mode */
     createInfo.presentMode = presentMode;
