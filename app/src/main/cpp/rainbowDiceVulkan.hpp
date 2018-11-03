@@ -299,6 +299,14 @@ namespace vulkan {
         inline std::shared_ptr<VkDescriptorSet_T> const &descriptorSet() { return m_descriptorSet; }
     };
 
+    class DescriptorSetLayout {
+    public:
+        virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() = 0;
+        virtual void updateDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
+                                 std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) = 0;
+        virtual ~DescriptorSetLayout() {}
+    };
+
     class DescriptorPool {
         friend DescriptorPools;
     private:
@@ -341,12 +349,12 @@ namespace vulkan {
             m_descriptorPool.reset(descriptorPoolRaw, deleter);
         }
 
-        VkDescriptorSet allocateDescriptor(std::shared_ptr<VkDescriptorSetLayout_T> const &layout) {
+        VkDescriptorSet allocateDescriptor(std::shared_ptr<DescriptorSetLayout> const &layout) {
             if (m_totalDescriptorsAllocated == m_totalDescriptorsInPool) {
                 return VK_NULL_HANDLE;
             } else {
                 VkDescriptorSet descriptorSet;
-                VkDescriptorSetLayout layouts[] = {layout.get()};
+                VkDescriptorSetLayout layouts[] = {layout->descriptorSetLayout().get()};
                 VkDescriptorSetAllocateInfo allocInfo = {};
                 allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
                 allocInfo.descriptorPool = m_descriptorPool.get();
@@ -370,29 +378,27 @@ namespace vulkan {
             return m_totalDescriptorsAllocated < m_totalDescriptorsInPool;
         }
     };
-    
+
 /* for passing data other than the vertex data to the vertex shader */
     class DescriptorPools : public std::enable_shared_from_this<DescriptorPools> {
         friend DescriptorSet;
     private:
         std::shared_ptr<Device> m_device;
         static uint32_t constexpr m_numberOfDescriptorSetsInPool = 1024;
-        std::shared_ptr<VkDescriptorSetLayout_T> m_descriptorSetLayout;
+        std::shared_ptr<vulkan::DescriptorSetLayout> m_descriptorSetLayout;
         std::vector<DescriptorPool> m_descriptorPools;
         std::vector<VkDescriptorSet> m_unusedDescriptors;
 
-        void createDescriptorSetLayout();
-
     public:
-        DescriptorPools(std::shared_ptr<Device> const &inDevice)
+        DescriptorPools(std::shared_ptr<Device> const &inDevice,
+                        std::shared_ptr<DescriptorSetLayout> const &inDescriptorSetLayout)
                 : m_device{inDevice},
-                  m_descriptorSetLayout{},
+                  m_descriptorSetLayout{inDescriptorSetLayout},
                   m_descriptorPools{},
                   m_unusedDescriptors{} {
-            createDescriptorSetLayout();
         }
 
-        std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
+        std::shared_ptr<vulkan::DescriptorSetLayout> const &descriptorSetLayout() { return m_descriptorSetLayout; }
 
         std::shared_ptr<DescriptorSet> allocateDescriptor() {
             if (m_descriptorSetLayout == VK_NULL_HANDLE) {
@@ -433,6 +439,25 @@ namespace vulkan {
 
 } /* namespace vulkan */
 
+class DiceDescriptorSetLayout : public vulkan::DescriptorSetLayout {
+public:
+    DiceDescriptorSetLayout(std::shared_ptr<vulkan::Device> const &inDevice)
+            : m_device{inDevice},
+              m_descriptorSetLayout{}
+    {
+        createDescriptorSetLayout();
+    }
+
+    void updateDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
+                             std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet);
+
+    inline std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
+private:
+    std::shared_ptr<vulkan::Device> m_device;
+    std::shared_ptr<VkDescriptorSetLayout_T> m_descriptorSetLayout;
+
+    void createDescriptorSetLayout();
+};
 
 class RainbowDiceVulkan : public RainbowDice {
 public:
@@ -441,7 +466,8 @@ public:
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
               m_renderPass{new vulkan::RenderPass{m_device, m_swapChain}},
-              m_descriptorPools{new vulkan::DescriptorPools{m_device}},
+              m_descriptorSetLayout{new DiceDescriptorSetLayout{m_device}},
+              m_descriptorPools{new vulkan::DescriptorPools{m_device, m_descriptorSetLayout}},
               swapChainImages(), swapChainImageViews(), swapChainFramebuffers()
               {}
     virtual void initWindow(WindowType *window);
@@ -490,6 +516,7 @@ private:
     std::shared_ptr<vulkan::RenderPass> m_renderPass;
 
     /* for passing data other than the vertex data to the vertex shader */
+    std::shared_ptr<vulkan::DescriptorSetLayout> m_descriptorSetLayout;
     std::shared_ptr<vulkan::DescriptorPools> m_descriptorPools;
 
     std::vector<VkImage> swapChainImages;
