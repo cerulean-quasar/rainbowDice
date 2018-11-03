@@ -721,6 +721,54 @@ namespace vulkan {
         m_renderPass.reset(renderPassRaw, deleter);
     }
 
+    /* for accessing data other than the vertices from the shaders */
+    void DescriptorPools::createDescriptorSetLayout() {
+        /* MVP matrix */
+        VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.descriptorCount = 1;
+
+        /* only accessing the MVP matrix from the vertex shader */
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+
+        /* image sampler */
+        VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+        samplerLayoutBinding.binding = 1;
+        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerLayoutBinding.descriptorCount = 1;
+        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+        /* View Point vector */
+        VkDescriptorSetLayoutBinding viewPointLayoutBinding = {};
+        viewPointLayoutBinding.binding = 2;
+        viewPointLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        viewPointLayoutBinding.descriptorCount = 1;
+        viewPointLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        viewPointLayoutBinding.pImmutableSamplers = nullptr; // Optional
+        std::array<VkDescriptorSetLayoutBinding, 3> bindings =
+                {uboLayoutBinding, samplerLayoutBinding, viewPointLayoutBinding};
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        VkDescriptorSetLayout descriptorSetLayoutRaw;
+        if (vkCreateDescriptorSetLayout(m_device->logicalDevice().get(), &layoutInfo, nullptr, &descriptorSetLayoutRaw) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+
+        auto const &capDevice = m_device;
+        auto deleter = [capDevice](VkDescriptorSetLayout descriptorSetLayoutRaw) {
+            vkDestroyDescriptorSetLayout(capDevice->logicalDevice().get(), descriptorSetLayoutRaw, nullptr);
+        };
+
+        m_descriptorSetLayout.reset(descriptorSetLayoutRaw, deleter);
+    }
+
 } /* namespace vulkan */
 
 /* read the shader byte code files */
@@ -748,10 +796,6 @@ void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
 }
 
 void RainbowDiceVulkan::initPipeline() {
-    VkDescriptorSetLayout layout;
-    createDescriptorSetLayout(layout);
-    descriptorPools.setDescriptorSetLayout(layout);
-
     createGraphicsPipeline();
     createCommandPool();
     createTextureImages();
@@ -774,12 +818,12 @@ void RainbowDiceVulkan::initPipeline() {
         VkDeviceMemory vertexBufferMemory;
         VkBuffer uniformBuffer;
         VkDeviceMemory uniformBufferMemory;
-        VkDescriptorSet descriptorSet;
 
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
         createDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
         die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                       vertexBufferMemory, uniformBuffer, uniformBufferMemory);
@@ -800,8 +844,8 @@ void RainbowDiceVulkan::cleanup() {
         (static_cast<TextureAtlasVulkan*>(texAtlas.get()))->destroy(m_device->logicalDevice().get());
     }
 
-    if (m_device.get() != VK_NULL_HANDLE) {
-        descriptorPools.destroyResources();
+    if (m_device.get() != nullptr) {
+        m_descriptorPools.reset();
         vkDestroySemaphore(m_device->logicalDevice().get(), renderFinishedSemaphore, nullptr);
         vkDestroySemaphore(m_device->logicalDevice().get(), imageAvailableSemaphore, nullptr);
         vkDestroyCommandPool(m_device->logicalDevice().get(), commandPool, nullptr);
@@ -835,11 +879,8 @@ void RainbowDiceVulkan::recreateSwapChain() {
 // it is assumed that the caller will first destroy the old models with destroyModels, then
 // create the new ones, then call this function to recreate all the associated Vulkan resources.
 void RainbowDiceVulkan::recreateModels() {
-    VkDescriptorSetLayout layout;
-    createDescriptorSetLayout(layout);
     createCommandPool();
     createTextureImages();
-    descriptorPools.setDescriptorSetLayout(layout);
     for (auto && die : dice) {
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
@@ -847,12 +888,12 @@ void RainbowDiceVulkan::recreateModels() {
         VkDeviceMemory vertexBufferMemory;
         VkBuffer uniformBuffer;
         VkDeviceMemory uniformBufferMemory;
-        VkDescriptorSet descriptorSet;
 
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
         createDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
         die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                       vertexBufferMemory, uniformBuffer, uniformBufferMemory);
@@ -865,7 +906,6 @@ void RainbowDiceVulkan::destroyModels() {
     dice.clear();
 
     ((TextureAtlasVulkan*)texAtlas.get())->destroy(m_device->logicalDevice().get());
-    descriptorPools.destroyResources();
 
     vkDestroyCommandPool(m_device->logicalDevice().get(), commandPool, nullptr);
 }
@@ -1188,7 +1228,7 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
 
     /* the descriptor set layout for the MVP matrix */
     pipelineLayoutInfo.setLayoutCount = 1;
-    VkDescriptorSetLayout descriptorSetLayout = descriptorPools.getDescriptorSetLayout();
+    VkDescriptorSetLayout descriptorSetLayout = m_descriptorPools->descriptorSetLayout().get();
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
     pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
@@ -1421,7 +1461,8 @@ void RainbowDiceVulkan::createCommandBuffers() {
             vkCmdBindIndexBuffer(commandBuffers[i], die->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             /* The MVP matrix and texture samplers */
-            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &die->descriptorSet, 0, nullptr);
+            VkDescriptorSet descriptorSet = die->descriptorSet->descriptorSet().get();
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
             /* draw command:
              * parameter 1 - Command buffer for the draw command
@@ -1571,9 +1612,7 @@ bool RainbowDiceVulkan::hasStencilComponent(VkFormat format) {
 
 /* descriptor set for the MVP matrix and texture samplers */
 void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
-                                            VkDescriptorSet &descriptorSet) {
-    descriptorSet = descriptorPools.allocateDescriptor();
-
+                                            std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) {
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = uniformBuffer;
     bufferInfo.offset = 0;
@@ -1581,7 +1620,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer vie
 
     std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSet;
+    descriptorWrites[0].dstSet = descriptorSet->descriptorSet().get();
 
     /* must be the same as the binding in the vertex shader */
     descriptorWrites[0].dstBinding = 0;
@@ -1605,7 +1644,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer vie
     std::vector<VkDescriptorImageInfo> imageInfos = ((TextureAtlasVulkan*)texAtlas.get())->getImageInfosForDescriptorSet();
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptorSet;
+    descriptorWrites[1].dstSet = descriptorSet->descriptorSet().get();
     descriptorWrites[1].dstBinding = 1;
     descriptorWrites[1].dstArrayElement = 0;
     descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1618,7 +1657,7 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer vie
     bufferInfoViewPoint.range = sizeof(glm::vec3);
 
     descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[2].dstSet = descriptorSet;
+    descriptorWrites[2].dstSet = descriptorSet->descriptorSet().get();
     descriptorWrites[2].dstBinding = 2;
     descriptorWrites[2].dstArrayElement = 0;
     descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1627,46 +1666,6 @@ void RainbowDiceVulkan::createDescriptorSet(VkBuffer uniformBuffer, VkBuffer vie
     descriptorWrites[2].pImageInfo = nullptr; // Optional
     descriptorWrites[2].pTexelBufferView = nullptr; // Optional
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-}
-
-/* for accessing data other than the vertices from the shaders */
-void RainbowDiceVulkan::createDescriptorSetLayout(VkDescriptorSetLayout &descriptorSetLayout) {
-    /* MVP matrix */
-    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-
-    /* only accessing the MVP matrix from the vertex shader */
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
-
-    /* image sampler */
-    VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-
-    /* View Point vector */
-    VkDescriptorSetLayoutBinding viewPointLayoutBinding = {};
-    viewPointLayoutBinding.binding = 2;
-    viewPointLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    viewPointLayoutBinding.descriptorCount = 1;
-    viewPointLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    viewPointLayoutBinding.pImmutableSamplers = nullptr; // Optional
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings =
-            {uboLayoutBinding, samplerLayoutBinding, viewPointLayoutBinding};
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(m_device->logicalDevice().get(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
 }
 
 void RainbowDiceVulkan::createTextureImages() {
@@ -2087,12 +2086,12 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         VkDeviceMemory vertexBufferMemory;
         VkBuffer uniformBuffer;
         VkDeviceMemory uniformBufferMemory;
-        VkDescriptorSet descriptorSet;
 
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
         createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
         createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
         createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
         createDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
         die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
                   vertexBufferMemory, uniformBuffer, uniformBufferMemory);
