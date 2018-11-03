@@ -652,8 +652,6 @@ public class MainActivity extends AppCompatActivity {
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    private native String sendVertexShader(byte[] shader, int length);
-    private native String sendFragmentShader(byte[] shader, int length);
     private native String initWindow(boolean useVulkan, Surface surface, AssetManager manager);
     private native String initPipeline();
     private native void destroyResources();

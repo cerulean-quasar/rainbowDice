@@ -369,7 +369,7 @@ void RainbowDiceGL::drawFrame() {
     eglSwapBuffers(display, surface);
 }
 
-GLuint RainbowDiceGL::loadShaders(std::string vertexShaderFile, std::string fragmentShaderFile) {
+GLuint RainbowDiceGL::loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile) {
     GLint Result = GL_TRUE;
     GLint InfoLogLength = 0;
 

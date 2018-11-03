@@ -5,15 +5,7 @@
 #include "rainbowDiceGlobal.hpp"
 
 class RainbowDice {
-protected:
-    std::vector<char> vertexShader;
-    std::vector<char> fragmentShader;
-
 public:
-    void addVertexShader(std::vector<char> &shader) { vertexShader = shader; }
-
-    void addFragmentShader(std::vector<char> &shader) { fragmentShader = shader; }
-
     virtual void initWindow(WindowType *window) = 0;
 
     virtual void initPipeline()=0;

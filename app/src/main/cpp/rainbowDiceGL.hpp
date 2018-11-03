@@ -117,5 +117,5 @@ private:
     typedef std::list<std::shared_ptr<Dice> > DiceList;
     DiceList dice;
 
-    GLuint loadShaders(std::string vertexShaderFile, std::string fragmentShaderFile);
+    GLuint loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile);
 };

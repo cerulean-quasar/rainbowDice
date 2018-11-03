@@ -454,7 +454,51 @@ namespace vulkan {
         inline std::shared_ptr<VkShaderModule_T> const &shader() { return m_shaderModule; }
     };
 
+    class Pipeline {
+    public:
+        Pipeline(std::shared_ptr<SwapChain> const &inSwapChain,
+                 std::shared_ptr<RenderPass> const &inRenderPass,
+                 std::shared_ptr<DescriptorSetLayout> const &inDescriptorSetLayout,
+                 VkVertexInputBindingDescription const &bindingDescription,
+                 std::vector<VkVertexInputAttributeDescription> const &attributeDescription,
+                 std::string const &vertexShader,
+                 std::string const &fragmentShader)
+                : m_device{inSwapChain->device()},
+                  m_swapChain{inSwapChain},
+                  m_renderPass{inRenderPass},
+                  m_descriptorSetLayout{inDescriptorSetLayout},
+                  m_pipelineLayout{},
+                  m_pipeline{} {
+            createGraphicsPipeline(bindingDescription, attributeDescription, vertexShader,
+                                   fragmentShader);
+        }
+
+        inline std::shared_ptr<VkPipeline_T> const &pipeline() { return m_pipeline; }
+        inline std::shared_ptr<VkPipelineLayout_T> const &layout() { return m_pipelineLayout; }
+
+        ~Pipeline() {
+            m_pipeline.reset();
+            m_pipelineLayout.reset();
+        }
+
+    private:
+        std::shared_ptr<Device> m_device;
+        std::shared_ptr<SwapChain> m_swapChain;
+        std::shared_ptr<RenderPass> m_renderPass;
+        std::shared_ptr<DescriptorSetLayout> m_descriptorSetLayout;
+
+        std::shared_ptr<VkPipelineLayout_T> m_pipelineLayout;
+        std::shared_ptr<VkPipeline_T> m_pipeline;
+
+        void createGraphicsPipeline(VkVertexInputBindingDescription const &bindingDescription,
+                                    std::vector<VkVertexInputAttributeDescription> const &attributeDescriptions,
+                                    std::string const &vertexShader, std::string const &fragmentShader);
+    };
+
 } /* namespace vulkan */
+
+VkVertexInputBindingDescription getBindingDescription();
+std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
 
 class DiceDescriptorSetLayout : public vulkan::DescriptorSetLayout {
 public:
@@ -485,6 +529,8 @@ public:
               m_renderPass{new vulkan::RenderPass{m_device, m_swapChain}},
               m_descriptorSetLayout{new DiceDescriptorSetLayout{m_device}},
               m_descriptorPools{new vulkan::DescriptorPools{m_device, m_descriptorSetLayout}},
+              m_graphicsPipeline{new vulkan::Pipeline{m_swapChain, m_renderPass, m_descriptorSetLayout,
+                  getBindingDescription(), getAttributeDescriptions(), SHADER_VERT_FILE, SHADER_FRAG_FILE}},
               swapChainImages(), swapChainImageViews(), swapChainFramebuffers()
               {}
     virtual void initWindow(WindowType *window);
@@ -527,6 +573,9 @@ public:
 
     virtual ~RainbowDiceVulkan() { }
 private:
+    static std::string const SHADER_VERT_FILE;
+    static std::string const SHADER_FRAG_FILE;
+
     std::shared_ptr<vulkan::Instance> m_instance;
     std::shared_ptr<vulkan::Device> m_device;
     std::shared_ptr<vulkan::SwapChain> m_swapChain;
@@ -535,6 +584,8 @@ private:
     /* for passing data other than the vertex data to the vertex shader */
     std::shared_ptr<vulkan::DescriptorSetLayout> m_descriptorSetLayout;
     std::shared_ptr<vulkan::DescriptorPools> m_descriptorPools;
+
+    std::shared_ptr<vulkan::Pipeline> m_graphicsPipeline;
 
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
@@ -623,8 +674,6 @@ private:
     typedef std::list<std::shared_ptr<Dice> > DiceList;
     DiceList dice;
 
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapChainFramebuffers;
 
     VkCommandPool commandPool;

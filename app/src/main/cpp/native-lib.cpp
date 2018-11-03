@@ -191,47 +191,6 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_sendVertexShader(
-        JNIEnv *env,
-        jobject jthis,
-        jbyteArray jShader,
-        jint length) {
-    jbyte *bytes = env->GetByteArrayElements(jShader, nullptr);
-    std::vector<char> shader;
-    shader.resize(static_cast<size_t>(length));
-    memcpy(shader.data(), bytes, shader.size());
-    env->ReleaseByteArrayElements(jShader, bytes, JNI_ABORT);
-
-    try {
-        diceGraphics->addVertexShader(shader);
-    } catch (std::runtime_error &e) {
-        return env->NewStringUTF(e.what());
-    }
-    return env->NewStringUTF("");
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_sendFragmentShader(
-        JNIEnv *env,
-        jobject jthis,
-        jbyteArray jShader,
-        jint length) {
-    jbyte *bytes = env->GetByteArrayElements(jShader, nullptr);
-    std::vector<char> shader;
-    shader.resize(static_cast<size_t>(length));
-    memcpy(shader.data(), bytes, shader.size());
-    env->ReleaseByteArrayElements(jShader, bytes, JNI_ABORT);
-
-    try {
-        diceGraphics->addFragmentShader(shader);
-    } catch (std::runtime_error &e) {
-        return env->NewStringUTF(e.what());
-    }
-    return env->NewStringUTF("");
-}
-
-
-extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_draw(
         JNIEnv *env,
         jobject jthis)

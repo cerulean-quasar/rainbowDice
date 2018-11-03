@@ -47,8 +47,6 @@ struct Vertex {
     glm::vec3 corner4;
     glm::vec3 corner5;
 
-    static VkVertexInputBindingDescription getBindingDescription();
-    static std::array<VkVertexInputAttributeDescription, 10> getAttributeDescriptions();
     bool operator==(const Vertex& other) const;
 };
 
