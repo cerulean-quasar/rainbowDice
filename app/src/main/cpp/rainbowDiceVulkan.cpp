@@ -998,6 +998,41 @@ namespace vulkan {
         m_pipeline.reset(pipelineRaw, pipelineDeleter);
     }
 
+    /* command pools are used to retrieve command buffers.  Command buffers is where the drawing
+     * commands are written.
+     */
+    void CommandPool::createCommandPool() {
+        Device::QueueFamilyIndices queueFamilyIndices = m_device->findQueueFamilies();
+        VkCommandPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+
+        /* each command pool can only allocate command buffers that are submitted on a single type
+         * of queue.  Select the graphics queue family for drawing.
+         */
+        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+
+        /* possible flags:
+         *      VK_COMMAND_POOL_CREATE_TRANSIENT_BIT: Hint that command buffers are rerecorded
+         * with new commands very often (may change memory allocation behavior)
+         *      VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT: Allow command buffers to be
+         * rerecorded individually, without this flag they all have to be reset together
+         */
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        VkCommandPool commandsRaw;
+        if (vkCreateCommandPool(m_device->logicalDevice().get(), &poolInfo, nullptr, &commandsRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to create command pool!");
+        }
+
+        auto const &capDevice = m_device;
+        auto deleter = [capDevice](VkCommandPool commandsRaw) {
+            vkDestroyCommandPool(capDevice->logicalDevice().get(), commandsRaw, nullptr);
+        };
+
+        m_commandPool.reset(commandsRaw, deleter);
+    }
+
 } /* namespace vulkan */
 
 std::string const RainbowDiceVulkan::SHADER_VERT_FILE("shaders/shader.vert.spv");
@@ -1205,7 +1240,6 @@ void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
 }
 
 void RainbowDiceVulkan::initPipeline() {
-    createCommandPool();
     createTextureImages();
 
     // copy the view point of the scene into device memory to send to the fragment shader for the
@@ -1256,7 +1290,7 @@ void RainbowDiceVulkan::cleanup() {
         m_descriptorPools.reset();
         vkDestroySemaphore(m_device->logicalDevice().get(), renderFinishedSemaphore, nullptr);
         vkDestroySemaphore(m_device->logicalDevice().get(), imageAvailableSemaphore, nullptr);
-        vkDestroyCommandPool(m_device->logicalDevice().get(), commandPool, nullptr);
+        m_commandPool.reset();
     }
 }
 
@@ -1289,7 +1323,7 @@ void RainbowDiceVulkan::recreateSwapChain() {
 // it is assumed that the caller will first destroy the old models with destroyModels, then
 // create the new ones, then call this function to recreate all the associated Vulkan resources.
 void RainbowDiceVulkan::recreateModels() {
-    createCommandPool();
+    m_commandPool.reset(new vulkan::CommandPool{m_device});
     createTextureImages();
     for (auto && die : dice) {
         VkBuffer indexBuffer;
@@ -1317,7 +1351,6 @@ void RainbowDiceVulkan::destroyModels() {
 
     ((TextureAtlasVulkan*)texAtlas.get())->destroy(m_device->logicalDevice().get());
 
-    vkDestroyCommandPool(m_device->logicalDevice().get(), commandPool, nullptr);
 }
 
 /* buffer for the MVP matrix - updated every frame so don't copy in the data here */
@@ -1487,7 +1520,7 @@ VkCommandBuffer RainbowDiceVulkan::beginSingleTimeCommands() {
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = m_commandPool->commandPool().get();
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
@@ -1514,33 +1547,7 @@ void RainbowDiceVulkan::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     /* wait for the command to be done. */
     vkQueueWaitIdle(m_device->graphicsQueue());
 
-    vkFreeCommandBuffers(m_device->logicalDevice().get(), commandPool, 1, &commandBuffer);
-}
-
-/* command pools are used to retrieve command buffers.  Command buffers is where the drawing
- * commands are written.
- */
-void RainbowDiceVulkan::createCommandPool() {
-    vulkan::Device::QueueFamilyIndices queueFamilyIndices = m_device->findQueueFamilies();
-    VkCommandPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-
-    /* each command pool can only allocate command buffers that are submitted on a single type
-     * of queue.  Select the graphics queue family for drawing.
-     */
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
-
-    /* possible flags:
-     *      VK_COMMAND_POOL_CREATE_TRANSIENT_BIT: Hint that command buffers are rerecorded
-     * with new commands very often (may change memory allocation behavior)
-     *      VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT: Allow command buffers to be
-     * rerecorded individually, without this flag they all have to be reset together
-     */
-    poolInfo.flags = 0;
-
-    if (vkCreateCommandPool(m_device->logicalDevice().get(), &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create command pool!");
-    }
+    vkFreeCommandBuffers(m_device->logicalDevice().get(), m_commandPool->commandPool().get(), 1, &commandBuffer);
 }
 
 /* Allocate and record commands for each swap chain immage */
@@ -1552,7 +1559,7 @@ void RainbowDiceVulkan::createCommandBuffers() {
      */
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = m_commandPool->commandPool().get();
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
 
