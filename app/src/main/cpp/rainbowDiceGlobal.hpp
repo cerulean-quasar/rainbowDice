@@ -25,9 +25,6 @@
 
 typedef ANativeWindow WindowType;
 
-extern std::string const SHADER_VERT_FILE;
-extern std::string const SHADER_FRAG_FILE;
-
 #include "rainbowDice.hpp"
 #include "text.hpp"
 #include <memory>

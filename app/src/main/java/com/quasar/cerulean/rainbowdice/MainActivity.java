@@ -21,6 +21,7 @@ package com.quasar.cerulean.rainbowdice;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -90,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
     private LogFile logFile = null;
     private String diceFileLoaded = null;
     private boolean drawingStarted = false;
+    private AssetManager manager = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,10 +105,10 @@ public class MainActivity extends AppCompatActivity {
         setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
+
+        manager = getAssets();
         createDefaults();
-
         logFile = new LogFile(this);
-
         initGui();
     }
 
@@ -569,11 +571,11 @@ public class MainActivity extends AppCompatActivity {
     public void startDrawing(SurfaceHolder holder) {
         boolean usingVulkan = true;
         Surface drawSurface = holder.getSurface();
-        String err = initWindow(usingVulkan, drawSurface);
+        String err = initWindow(usingVulkan, drawSurface, manager);
         if (err != null && err.length() != 0) {
             usingVulkan = false;
             // Vulkan failed, try with OpenGL instead
-            err = initWindow(false, drawSurface);
+            err = initWindow(usingVulkan, drawSurface, manager);
             if (err != null && err.length() != 0) {
                 publishError(err);
                 return;
@@ -581,27 +583,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (!loadModelsAndTextures()) {
-            return;
-        }
-
-        byte[] vertShader;
-        byte[] fragShader;
-        if (usingVulkan) {
-            vertShader = readAssetFile(false, "shaders/shader.vert.spv");
-            fragShader = readAssetFile(false, "shaders/shader.frag.spv");
-        } else {
-            vertShader = readAssetFile(true, "shaderGL.vert");
-            fragShader = readAssetFile(true, "shaderGL.frag");
-        }
-        err = sendVertexShader(vertShader, vertShader.length);
-        if (err != null && err.length() != 0) {
-            publishError(err);
-            return;
-        }
-
-        err = sendFragmentShader(fragShader, fragShader.length);
-        if (err != null && err.length() != 0) {
-            publishError(err);
             return;
         }
 
@@ -673,7 +654,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private native String sendVertexShader(byte[] shader, int length);
     private native String sendFragmentShader(byte[] shader, int length);
-    private native String initWindow(boolean useVulkan, Surface surface);
+    private native String initWindow(boolean useVulkan, Surface surface, AssetManager manager);
     private native String initPipeline();
     private native void destroyResources();
     private native void tellDrawerStop();

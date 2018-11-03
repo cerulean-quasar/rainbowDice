@@ -437,6 +437,23 @@ namespace vulkan {
         }
     };
 
+    class Shader {
+        std::shared_ptr<Device> m_device;
+
+        std::shared_ptr<VkShaderModule_T> m_shaderModule;
+
+        void createShaderModule(std::string const &codeFile);
+
+    public:
+        Shader(std::shared_ptr<Device> const &inDevice, std::string const &codeFile)
+                : m_device(inDevice),
+                  m_shaderModule{} {
+            createShaderModule(codeFile);
+        }
+
+        inline std::shared_ptr<VkShaderModule_T> const &shader() { return m_shaderModule; }
+    };
+
 } /* namespace vulkan */
 
 class DiceDescriptorSetLayout : public vulkan::DescriptorSetLayout {
@@ -631,7 +648,6 @@ private:
     };
 
 
-    std::vector<char> readFile(const std::string &filename);
 
     void createUniformBuffer(VkBuffer &uniformBuffer, VkDeviceMemory &uniformBufferMemory);
     void createVertexBuffer(Dice *die, VkBuffer &vertexBuffer, VkDeviceMemory &vertexBufferMemory);
@@ -640,7 +656,6 @@ private:
 
     void cleanupSwapChain();
     void createImageViews();
-    VkShaderModule createShaderModule(const std::vector<char>& code);
     void createGraphicsPipeline();
     void createFramebuffers();
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
@@ -652,7 +667,6 @@ private:
     void createSemaphores();
     void createDepthResources();
     bool hasStencilComponent(VkFormat format);
-    void createDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer, std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet);
     void createTextureImages();
     void createTextureImage(VkImage &textureImage, VkDeviceMemory &textureImageMemory);
     void createTextureSampler(VkSampler &textureSampler);

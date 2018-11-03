@@ -25,6 +25,7 @@ add_library( # Sets the name of the library.
              # Provides a relative path to your source file(s).
              src/main/cpp/native-lib.cpp
              ${platform64_files}
+             src/main/cpp/android.cpp
              src/main/cpp/rainbowDiceGL.cpp
              src/main/cpp/rainbowDiceGlobal.cpp
              src/main/cpp/random.cpp

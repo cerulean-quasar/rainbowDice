@@ -27,6 +27,10 @@
 #include <jni.h>
 #include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
+#include "android.hpp"
+
+std::string const SHADER_VERT_FILE("shaderGL.vert");
+std::string const SHADER_FRAG_FILE("shaderGL.frag");
 
 GLuint texturetest;
 
@@ -121,7 +125,7 @@ void RainbowDiceGL::initWindow(WindowType *inWindow){
 }
 
 void RainbowDiceGL::initPipeline() {
-    programID = loadShaders();
+    programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
 
     int32_t w = ANativeWindow_getWidth(window);
     int32_t h = ANativeWindow_getHeight(window);
@@ -365,9 +369,12 @@ void RainbowDiceGL::drawFrame() {
     eglSwapBuffers(display, surface);
 }
 
-GLuint RainbowDiceGL::loadShaders() {
+GLuint RainbowDiceGL::loadShaders(std::string vertexShaderFile, std::string fragmentShaderFile) {
     GLint Result = GL_TRUE;
     GLint InfoLogLength = 0;
+
+    std::vector<char> vertexShader = readFile(vertexShaderFile);
+    std::vector<char> fragmentShader = readFile(fragmentShaderFile);
 
     // Create the shaders
     GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);

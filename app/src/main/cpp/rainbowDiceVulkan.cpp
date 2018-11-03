@@ -22,6 +22,7 @@
 #include "rainbowDiceGlobal.hpp"
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
+#include "android.hpp"
 
 namespace vulkan {
 /**
@@ -721,8 +722,35 @@ namespace vulkan {
         m_renderPass.reset(renderPassRaw, deleter);
     }
 
+    void Shader::createShaderModule(std::string const &codeFile) {
+        auto code = readFile(codeFile.c_str());
+
+        VkShaderModuleCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+
+        /* vector.data is 32 bit aligned as is required. */
+        createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+
+        VkShaderModule shaderModuleRaw;
+        if (vkCreateShaderModule(m_device->logicalDevice().get(), &createInfo, nullptr, &shaderModuleRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        auto const &capDevice = m_device;
+        auto deleter = [capDevice](VkShaderModule shaderModule) {
+            vkDestroyShaderModule(capDevice->logicalDevice().get(), shaderModule, nullptr);
+        };
+
+        m_shaderModule.reset(shaderModuleRaw, deleter);
+    }
+
 
 } /* namespace vulkan */
+
+std::string const SHADER_VERT_FILE("shaders/shader.vert.spv");
+std::string const SHADER_FRAG_FILE("shaders/shader.frag.spv");
 
 /* for accessing data other than the vertices from the shaders */
 void DiceDescriptorSetLayout::createDescriptorSetLayout() {
@@ -828,17 +856,6 @@ void DiceDescriptorSetLayout::updateDescriptorSet(VkBuffer uniformBuffer, VkBuff
     descriptorWrites[2].pImageInfo = nullptr; // Optional
     descriptorWrites[2].pTexelBufferView = nullptr; // Optional
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-}
-
-/* read the shader byte code files */
-std::vector<char> RainbowDiceVulkan::readFile(const std::string &filename) {
-    if (filename == SHADER_VERT_FILE) {
-        return vertexShader;
-    } else if (filename == SHADER_FRAG_FILE) {
-        return fragmentShader;
-    } else {
-        throw std::runtime_error(std::string("undefined shader type: ") + filename);
-    }
 }
 
 void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
@@ -1074,34 +1091,21 @@ void RainbowDiceVulkan::createImageViews() {
     }
 }
 
-VkShaderModule RainbowDiceVulkan::createShaderModule(const std::vector<char>& code) {
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-
-    /* vector.data is 32 bit aligned as is required. */
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(m_device->logicalDevice().get(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create shader module!");
-    }
-
-    return shaderModule;
-}
-
 void RainbowDiceVulkan::createGraphicsPipeline() {
-    auto vertShaderCode = readFile(std::string(SHADER_VERT_FILE));
-    auto fragShaderCode = readFile(std::string(SHADER_FRAG_FILE));
+    //auto vertShaderCode = readFile(std::string(SHADER_VERT_FILE));
+    //auto fragShaderCode = readFile(std::string(SHADER_FRAG_FILE));
 
-    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+    //VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+    //VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+    vulkan::Shader vertShaderModule{m_device, SHADER_VERT_FILE};
+    vulkan::Shader fragShaderModule{m_device, SHADER_FRAG_FILE};
 
     /* assign shaders to stages in the graphics pipeline */
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.module = vertShaderModule.shader().get();
     vertShaderStageInfo.pName = "main";
     /* can also use pSpecializationInfo to set constants used by the shader.  This allows
      * the usage of one shader module to be configured in different ways at pipeline creation,
@@ -1113,7 +1117,7 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.module = fragShaderModule.shader().get();
     fragShaderStageInfo.pName = "main";
     fragShaderStageInfo.pSpecializationInfo = nullptr;
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
@@ -1321,10 +1325,6 @@ void RainbowDiceVulkan::createGraphicsPipeline() {
     if (vkCreateGraphicsPipelines(m_device->logicalDevice().get(), VK_NULL_HANDLE/*pipeline cache*/, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline!");
     }
-
-    /* clean up */
-    vkDestroyShaderModule(m_device->logicalDevice().get(), vertShaderModule, nullptr);
-    vkDestroyShaderModule(m_device->logicalDevice().get(), fragShaderModule, nullptr);
 }
 
 void RainbowDiceVulkan::createFramebuffers() {

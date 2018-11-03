@@ -21,9 +21,6 @@
 #include "rainbowDiceGlobal.hpp"
 #include "text.hpp"
 
-const std::string SHADER_VERT_FILE = "vertexShader";
-const std::string SHADER_FRAG_FILE = "fragmentShader";
-
 std::unique_ptr<TextureAtlas> texAtlas;
 
 float const screenWidth = 1.2f;

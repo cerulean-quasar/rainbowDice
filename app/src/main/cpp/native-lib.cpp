@@ -28,6 +28,7 @@
 #include "rainbowDice.hpp"
 #include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
+#include "android.hpp"
 
 #ifdef CQ_ENABLE_VULKAN
 #include "rainbowDiceVulkan.hpp"
@@ -95,11 +96,14 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
         JNIEnv *env,
         jobject jthis,
         jboolean useVulkan,
-        jobject surface) {
+        jobject surface,
+        jobject manager) {
     ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
     if (window == nullptr) {
         return env->NewStringUTF("Unable to acquire window from surface.");
     }
+
+    setAssetManager(AAssetManager_fromJava(env, manager));
 
     try {
 #ifdef CQ_ENABLE_VULKAN
