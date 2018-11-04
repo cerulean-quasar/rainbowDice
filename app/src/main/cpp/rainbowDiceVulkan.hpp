@@ -299,10 +299,11 @@ namespace vulkan {
         inline std::shared_ptr<VkDescriptorSet_T> const &descriptorSet() { return m_descriptorSet; }
     };
 
+    class Buffer;
     class DescriptorSetLayout {
     public:
         virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() = 0;
-        virtual void updateDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
+        virtual void updateDescriptorSet(std::shared_ptr<Buffer> const &uniformBuffer, std::shared_ptr<Buffer> const &viewPointBuffer,
                                  std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) = 0;
         virtual ~DescriptorSetLayout() {}
     };
@@ -513,6 +514,73 @@ namespace vulkan {
         void createCommandPool();
     };
 
+    class SingleTimeCommands {
+    public:
+        SingleTimeCommands(std::shared_ptr<Device> inDevice,
+                           std::shared_ptr<CommandPool> commandPool)
+                : m_device{inDevice},
+                  m_pool{commandPool},
+                  m_commandBuffer{} {
+            create();
+        }
+
+        void create();
+        void begin();
+        void end();
+
+        inline std::shared_ptr<VkCommandBuffer_T> commandBuffer() { return m_commandBuffer; }
+    private:
+        std::shared_ptr<Device> m_device;
+        std::shared_ptr<CommandPool> m_pool;
+        std::shared_ptr<VkCommandBuffer_T> m_commandBuffer;
+    };
+
+    class Buffer {
+    public:
+        Buffer(std::shared_ptr<Device> inDevice, VkDeviceSize size, VkBufferUsageFlags usage,
+               VkMemoryPropertyFlags properties)
+                : m_device{inDevice},
+                  m_buffer{},
+                  m_bufferMemory{} {
+            createBuffer(size, usage, properties);
+        }
+
+        void copyTo(std::shared_ptr<CommandPool> cmds, std::shared_ptr<Buffer> const &srcBuffer,
+                    VkDeviceSize size) {
+            copyTo(cmds, *srcBuffer, size);
+        }
+
+        void copyTo(std::shared_ptr<CommandPool> cmds, Buffer const &srcBuffer, VkDeviceSize size);
+
+        void copyRawTo(void const *dataRaw, size_t size);
+
+        inline std::shared_ptr<VkBuffer_T> const &buffer() const { return m_buffer; }
+        inline std::shared_ptr<VkDeviceMemory_T> const &memory() const { return m_bufferMemory; }
+
+        ~Buffer() {
+            /* ensure order of destruction.
+             * free the memory after the buffer has been destroyed because the buffer is bound to
+             * the memory, so the buffer is still using the memory until the buffer is destroyed.
+             */
+            m_buffer.reset();
+            m_bufferMemory.reset();
+        }
+
+        static std::shared_ptr<Buffer> createUniformBuffer(std::shared_ptr<Device> const &inDevice,
+                                                           size_t size)
+        {
+            return std::shared_ptr<Buffer>{new vulkan::Buffer{inDevice, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT}};
+        }
+    private:
+        std::shared_ptr<Device> m_device;
+
+        std::shared_ptr<VkBuffer_T> m_buffer;
+        std::shared_ptr<VkDeviceMemory_T> m_bufferMemory;
+
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+    };
+
 } /* namespace vulkan */
 
 VkVertexInputBindingDescription getBindingDescription();
@@ -527,7 +595,8 @@ public:
         createDescriptorSetLayout();
     }
 
-    void updateDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
+    void updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
+                             std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
                              std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet);
 
     inline std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
@@ -550,8 +619,14 @@ public:
               m_graphicsPipeline{new vulkan::Pipeline{m_swapChain, m_renderPass, m_descriptorSetLayout,
                   getBindingDescription(), getAttributeDescriptions(), SHADER_VERT_FILE, SHADER_FRAG_FILE}},
               m_commandPool{new vulkan::CommandPool{m_device}},
+              m_viewPointBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (glm::vec3))},
               swapChainImages(), swapChainImageViews(), swapChainFramebuffers()
-              {}
+    {
+        // copy the view point of the scene into device memory to send to the fragment shader for the
+        // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
+        m_viewPointBuffer->copyRawTo(&viewPoint, sizeof(viewPoint));
+    }
+
     virtual void initWindow(WindowType *window);
 
     virtual void initPipeline();
@@ -606,12 +681,11 @@ private:
 
     std::shared_ptr<vulkan::Pipeline> m_graphicsPipeline;
     std::shared_ptr<vulkan::CommandPool> m_commandPool;
+    std::shared_ptr<vulkan::Buffer> m_viewPointBuffer;
 
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
 
-    VkBuffer viewPointBuffer;
-    VkDeviceMemory viewPointBufferMemory;
 
     struct Dice {
         std::shared_ptr<vulkan::Device> m_device;
@@ -621,15 +695,12 @@ private:
          * the specified order.  Note, vertices can be listed twice if they should be part of more
          * than one triangle.
          */
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
+        std::shared_ptr<vulkan::Buffer> vertexBuffer;
+        std::shared_ptr<vulkan::Buffer> indexBuffer;
 
         /* for passing data other than the vertex data to the vertex shader */
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
-        VkBuffer uniformBuffer;
-        VkDeviceMemory uniformBufferMemory;
+        std::shared_ptr<vulkan::Buffer> uniformBuffer;
 
         bool isBeingReRolled;
         Dice(std::shared_ptr<vulkan::Device> const &inDevice,
@@ -658,35 +729,18 @@ private:
             die->updatePerspectiveMatrix(width, height);
         }
 
-        void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet, VkBuffer inIndexBuffer, VkDeviceMemory inIndexBufferMemory, VkBuffer inVertexBuffer, VkDeviceMemory inVertexBufferMemory, VkBuffer inUniformBuffer, VkDeviceMemory inUniformBufferMemory) {
+        void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet,
+                  std::shared_ptr<vulkan::Buffer> inIndexBuffer,
+                  std::shared_ptr<vulkan::Buffer> inVertexBuffer,
+                  std::shared_ptr<vulkan::Buffer> inUniformBuffer) {
             uniformBuffer = inUniformBuffer;
-            uniformBufferMemory = inUniformBufferMemory;
             indexBuffer = inIndexBuffer;
-            indexBufferMemory = inIndexBufferMemory;
             vertexBuffer = inVertexBuffer;
-            vertexBufferMemory = inVertexBufferMemory;
             descriptorSet = inDescriptorSet;
         }
 
-        ~Dice() {
-            /* free the memory after the buffer has been destroyed because the buffer is bound to 
-             * the memory, so the buffer is still using the memory until the buffer is destroyed.
-             */
-            vkDestroyBuffer(m_device->logicalDevice().get(), uniformBuffer, nullptr);
-            vkFreeMemory(m_device->logicalDevice().get(), uniformBufferMemory, nullptr);
-
-            vkDestroyBuffer(m_device->logicalDevice().get(), vertexBuffer, nullptr);
-            vkFreeMemory(m_device->logicalDevice().get(), vertexBufferMemory, nullptr);
-
-            vkDestroyBuffer(m_device->logicalDevice().get(), indexBuffer, nullptr);
-            vkFreeMemory(m_device->logicalDevice().get(), indexBufferMemory, nullptr);
-        }
-
         void updateUniformBuffer() {
-            void* data;
-            vkMapMemory(m_device->logicalDevice().get(), uniformBufferMemory, 0, sizeof(die->ubo), 0, &data);
-            memcpy(data, &die->ubo, sizeof(die->ubo));
-            vkUnmapMemory(m_device->logicalDevice().get(), uniformBufferMemory);
+            uniformBuffer->copyRawTo(&die->ubo, sizeof(die->ubo));
         }
 
     };
@@ -715,22 +769,13 @@ private:
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
-
-
-    void createUniformBuffer(VkBuffer &uniformBuffer, VkDeviceMemory &uniformBufferMemory);
-    void createVertexBuffer(Dice *die, VkBuffer &vertexBuffer, VkDeviceMemory &vertexBufferMemory);
-    void createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDeviceMemory &indexBufferMemory);
+    std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
+    std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
     void updatePerspectiveMatrix();
 
     void cleanupSwapChain();
     void createImageViews();
-    void createGraphicsPipeline();
     void createFramebuffers();
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    VkCommandBuffer beginSingleTimeCommands();
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    void createCommandPool();
     void createCommandBuffers();
     void createSemaphores();
     void createDepthResources();

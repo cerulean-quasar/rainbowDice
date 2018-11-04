@@ -1033,6 +1033,137 @@ namespace vulkan {
         m_commandPool.reset(commandsRaw, deleter);
     }
 
+    void SingleTimeCommands::create() {
+        VkCommandBufferAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = m_pool->commandPool().get();
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBufferRaw;
+        VkResult result = vkAllocateCommandBuffers(m_device->logicalDevice().get(), &allocInfo,
+                                                   &commandBufferRaw);
+        if (result != VK_SUCCESS) {
+            throw (std::runtime_error("Failed to allocate command buffer"));
+        }
+
+        auto const &capDevice = m_device;
+        auto const &capCommandPool = m_pool;
+        auto deleter = [capDevice, capCommandPool](VkCommandBuffer commandBufferRaw) {
+            vkFreeCommandBuffers(capDevice->logicalDevice().get(),
+                                 capCommandPool->commandPool().get(), 1, &commandBufferRaw);
+        };
+
+        m_commandBuffer.reset(commandBufferRaw, deleter);
+    }
+
+    void SingleTimeCommands::begin() {
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(m_commandBuffer.get(), &beginInfo);
+    }
+
+    void SingleTimeCommands::end() {
+        vkEndCommandBuffer(m_commandBuffer.get());
+
+        VkSubmitInfo submitInfo = {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+
+        // command is expecting an array of command buffers.  commandBufferRaw is passed in
+        // as const and will not be modified.
+        VkCommandBuffer commandBufferRaw = m_commandBuffer.get();
+        submitInfo.pCommandBuffers = &commandBufferRaw;
+
+        VkResult result = vkQueueSubmit(m_device->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("failed to submit command buffer!");
+        }
+
+        /* wait for the command to be done. */
+        result = vkQueueWaitIdle(m_device->graphicsQueue());
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("failed to wait on graphics queue!");
+        }
+    }
+
+    void Buffer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                              VkMemoryPropertyFlags properties) {
+        VkBufferCreateInfo bufferInfo = {};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+
+        /* this buffer will be used as a vertex buffer */
+        bufferInfo.usage = usage;
+
+        /* the buffer will only be used by the graphics queue, so use exclusive sharing mode */
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VkBuffer buf;
+        if (vkCreateBuffer(m_device->logicalDevice().get(), &bufferInfo, nullptr, &buf) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create buffer!");
+        }
+
+        auto const &capDevice = m_device;
+        auto bufdeleter = [capDevice](VkBuffer buf) {
+            vkDestroyBuffer(capDevice->logicalDevice().get(), buf, nullptr);
+        };
+
+        m_buffer.reset(buf, bufdeleter);
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(m_device->logicalDevice().get(), m_buffer.get(), &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = m_device->findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        VkDeviceMemory bufmem;
+        if (vkAllocateMemory(m_device->logicalDevice().get(), &allocInfo, nullptr, &bufmem) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate buffer memory!");
+        }
+
+        auto bufmemdeleter = [capDevice](VkDeviceMemory bufmem) {
+            vkFreeMemory(capDevice->logicalDevice().get(), bufmem, nullptr);
+        };
+
+        m_bufferMemory.reset(bufmem, bufmemdeleter);
+
+        VkResult result = vkBindBufferMemory(m_device->logicalDevice().get(), m_buffer.get(), m_bufferMemory.get(),
+                                             0 /* offset into the memory */);
+        if (result != VK_SUCCESS) {
+            throw (std::runtime_error("Failed to bind buffer to memory!"));
+        }
+    }
+
+    /* copy the data from CPU readable memory in the graphics card to non-CPU readable memory */
+    void Buffer::copyTo(std::shared_ptr<CommandPool> pool, Buffer const &srcBuffer,
+                        VkDeviceSize size) {
+        SingleTimeCommands cmds(m_device, pool);
+        cmds.begin();
+
+        VkBufferCopy copyRegion = {};
+        copyRegion.size = size;
+        vkCmdCopyBuffer(cmds.commandBuffer().get(), srcBuffer.m_buffer.get(),
+                        m_buffer.get(), 1, &copyRegion);
+
+        cmds.end();
+    }
+
+    void Buffer::copyRawTo(void const *dataRaw, size_t size) {
+        void *data;
+        VkResult result = vkMapMemory(m_device->logicalDevice().get(), m_bufferMemory.get(), 0,
+                                      size, 0, &data);
+        if (result != VK_SUCCESS) {
+            throw (std::runtime_error("Can't map memory."));
+        }
+        memcpy(data, dataRaw, size);
+        vkUnmapMemory(m_device->logicalDevice().get(), m_bufferMemory.get());
+    }
+
 } /* namespace vulkan */
 
 std::string const RainbowDiceVulkan::SHADER_VERT_FILE("shaders/shader.vert.spv");
@@ -1169,10 +1300,11 @@ void DiceDescriptorSetLayout::createDescriptorSetLayout() {
 }
 
 /* descriptor set for the MVP matrix and texture samplers */
-void DiceDescriptorSetLayout::updateDescriptorSet(VkBuffer uniformBuffer, VkBuffer viewPointBuffer,
+void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
+                                                  std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
                                             std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) {
     VkDescriptorBufferInfo bufferInfo = {};
-    bufferInfo.buffer = uniformBuffer;
+    bufferInfo.buffer = uniformBuffer->buffer().get();
     bufferInfo.offset = 0;
     bufferInfo.range = sizeof(UniformBufferObject);
 
@@ -1210,7 +1342,7 @@ void DiceDescriptorSetLayout::updateDescriptorSet(VkBuffer uniformBuffer, VkBuff
     descriptorWrites[1].pImageInfo = imageInfos.data();
 
     VkDescriptorBufferInfo bufferInfoViewPoint = {};
-    bufferInfoViewPoint.buffer = viewPointBuffer;
+    bufferInfoViewPoint.buffer = viewPointBuffer->buffer().get();
     bufferInfoViewPoint.offset = 0;
     bufferInfoViewPoint.range = sizeof(glm::vec3);
 
@@ -1242,33 +1374,15 @@ void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
 void RainbowDiceVulkan::initPipeline() {
     createTextureImages();
 
-    // copy the view point of the scene into device memory to send to the fragment shader for the
-    // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
-    VkDeviceSize bufferSize = sizeof(glm::vec3);
-    createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 viewPointBuffer, viewPointBufferMemory);
-    void *data;
-    vkMapMemory(m_device->logicalDevice().get(), viewPointBufferMemory, 0, sizeof(viewPoint), 0, &data);
-    memcpy(data, &viewPoint, sizeof(viewPoint));
-    vkUnmapMemory(m_device->logicalDevice().get(), viewPointBufferMemory);
-
     for (auto && die : dice) {
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkBuffer uniformBuffer;
-        VkDeviceMemory uniformBufferMemory;
-
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
-        createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
-        createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
-        createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
+        std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
+        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device,
+            sizeof (UniformBufferObject))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
-        die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
-                      vertexBufferMemory, uniformBuffer, uniformBufferMemory);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet);
+        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
     }
     createDepthResources();
     createFramebuffers();
@@ -1326,21 +1440,13 @@ void RainbowDiceVulkan::recreateModels() {
     m_commandPool.reset(new vulkan::CommandPool{m_device});
     createTextureImages();
     for (auto && die : dice) {
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkBuffer uniformBuffer;
-        VkDeviceMemory uniformBufferMemory;
-
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
-        createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
-        createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
-        createUniformBuffer(uniformBuffer, uniformBufferMemory);
-        std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
-        die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
-                      vertexBufferMemory, uniformBuffer, uniformBufferMemory);
+        std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
+        std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
+        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (UniformBufferObject))};
+        std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet);
+        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
     }
 
     createCommandBuffers();
@@ -1353,57 +1459,44 @@ void RainbowDiceVulkan::destroyModels() {
 
 }
 
-/* buffer for the MVP matrix - updated every frame so don't copy in the data here */
-void RainbowDiceVulkan::createUniformBuffer(VkBuffer &uniformBuffer, VkDeviceMemory &uniformBufferMemory) {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-    createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
-}
-
-void RainbowDiceVulkan::createVertexBuffer(Dice *die, VkBuffer &vertexBuffer, VkDeviceMemory &vertexBufferMemory) {
+std::shared_ptr<vulkan::Buffer> RainbowDiceVulkan::createVertexBuffer(Dice *die) {
     VkDeviceSize bufferSize = sizeof(die->die->vertices[0]) * die->die->vertices.size();
 
     /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
      * memory.  Then use a copy command to copy the data into fast graphics card only memory.
      */
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    void *data;
-    vkMapMemory(m_device->logicalDevice().get(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, die->die->vertices.data(), static_cast<size_t>(bufferSize));
-    vkUnmapMemory(m_device->logicalDevice().get(), stagingBufferMemory);
+    stagingBuffer.copyRawTo(die->die->vertices.data(), static_cast<size_t>(bufferSize));
 
-    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+    std::shared_ptr<vulkan::Buffer> vertexBuffer{new vulkan::Buffer{m_device, bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
 
-    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+    vertexBuffer->copyTo(m_commandPool, stagingBuffer, bufferSize);
 
-    vkDestroyBuffer(m_device->logicalDevice().get(), stagingBuffer, nullptr);
-    vkFreeMemory(m_device->logicalDevice().get(), stagingBufferMemory, nullptr);
+    return vertexBuffer;
 }
 
 /* buffer for the indices - used to reference which vertex in the vertex array (by index) to
  * draw.  This way normally duplicated vertices would not need to be specified twice.
  * Only one index buffer per pipeline is allowed.  Put all dice in the same index buffer.
  */
-void RainbowDiceVulkan::createIndexBuffer(Dice *die, VkBuffer &indexBuffer, VkDeviceMemory &indexBufferMemory) {
+std::shared_ptr<vulkan::Buffer>  RainbowDiceVulkan::createIndexBuffer(Dice *die) {
     VkDeviceSize bufferSize = sizeof(die->die->indices[0]) * die->die->indices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    char* data;
-    vkMapMemory(m_device->logicalDevice().get(), stagingBufferMemory, 0, bufferSize, 0, (void**)&data);
-    memcpy(data, die->die->indices.data(), (size_t) sizeof(die->die->indices[0]) * die->die->indices.size());
-    vkUnmapMemory(m_device->logicalDevice().get(), stagingBufferMemory);
+    stagingBuffer.copyRawTo(die->die->indices.data(), sizeof(die->die->indices[0]) * die->die->indices.size());
 
-    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+    std::shared_ptr<vulkan::Buffer> indexBuffer{new vulkan::Buffer{m_device, bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
 
-    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    indexBuffer->copyTo(m_commandPool, stagingBuffer, bufferSize);
 
-    vkDestroyBuffer(m_device->logicalDevice().get(), stagingBuffer, nullptr);
-    vkFreeMemory(m_device->logicalDevice().get(), stagingBufferMemory, nullptr);
+    return indexBuffer;
 }
 
 void RainbowDiceVulkan::updatePerspectiveMatrix() {
@@ -1475,81 +1568,6 @@ void RainbowDiceVulkan::createFramebuffers() {
     }
 }
 
-void RainbowDiceVulkan::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-
-    /* this buffer will be used as a vertex buffer */
-    bufferInfo.usage = usage;
-
-    /* the buffer will only be used by the graphics queue, so use exclusive sharing mode */
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateBuffer(m_device->logicalDevice().get(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create vertex buffer!");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(m_device->logicalDevice().get(), buffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = m_device->findMemoryType(memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(m_device->logicalDevice().get(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate vertex buffer memory!");
-    }
-
-    vkBindBufferMemory(m_device->logicalDevice().get(), buffer, bufferMemory, 0 /* offset into the memory */);
-}
-
-/* copy the data from CPU readable memory in the graphics card to non-CPU readable memory */
-void RainbowDiceVulkan::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-    VkBufferCopy copyRegion = {};
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-    endSingleTimeCommands(commandBuffer);
-}
-
-VkCommandBuffer RainbowDiceVulkan::beginSingleTimeCommands() {
-    VkCommandBufferAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = m_commandPool->commandPool().get();
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(m_device->logicalDevice().get(), &allocInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    return commandBuffer;
-}
-
-void RainbowDiceVulkan::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(m_device->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    /* wait for the command to be done. */
-    vkQueueWaitIdle(m_device->graphicsQueue());
-
-    vkFreeCommandBuffers(m_device->logicalDevice().get(), m_commandPool->commandPool().get(), 1, &commandBuffer);
-}
-
 /* Allocate and record commands for each swap chain immage */
 void RainbowDiceVulkan::createCommandBuffers() {
     commandBuffers.resize(swapChainFramebuffers.size());
@@ -1615,8 +1633,9 @@ void RainbowDiceVulkan::createCommandBuffers() {
 
         VkDeviceSize offsets[1] = {0};
         for (auto die : dice) {
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &die->vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(commandBuffers[i], die->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            VkBuffer vertexBuffer = die->vertexBuffer->buffer().get();
+            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertexBuffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffers[i], die->indexBuffer->buffer().get(), 0, VK_INDEX_TYPE_UINT32);
 
             /* The MVP matrix and texture samplers */
             VkDescriptorSet descriptorSet = die->descriptorSet->descriptorSet().get();
@@ -1787,18 +1806,14 @@ void RainbowDiceVulkan::createTextureImage(VkImage &textureImage, VkDeviceMemory
     char *buffer = (texAtlas->getImage().data());
     VkDeviceSize imageSize = texAtlas->getImage().size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-
     /* copy the image to CPU accessable memory in the graphics card.  Make sure that it has the
      * VK_BUFFER_USAGE_TRANSFER_SRC_BIT set so that we can copy from it to an image later
      */
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    vulkan::Buffer stagingBuffer{m_device, imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    void* data;
-    vkMapMemory(m_device->logicalDevice().get(), stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, buffer, static_cast<size_t>(imageSize));
-    vkUnmapMemory(m_device->logicalDevice().get(), stagingBufferMemory);
+    stagingBuffer.copyRawTo(buffer, static_cast<size_t>(imageSize));
 
     VkFormat format = VK_FORMAT_R8_UNORM;
     createImage(texWidth, texHeight, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
@@ -1808,16 +1823,12 @@ void RainbowDiceVulkan::createTextureImage(VkImage &textureImage, VkDeviceMemory
      */
     transitionImageLayout(textureImage,  format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    copyBufferToImage(stagingBuffer.buffer().get(), textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 
     /* transition the image to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL so that the
      * shader can read from it.
      */
     transitionImageLayout(textureImage,  format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    /* free staging buffer */
-    vkDestroyBuffer(m_device->logicalDevice().get(), stagingBuffer, nullptr);
-    vkFreeMemory(m_device->logicalDevice().get(), stagingBufferMemory, nullptr);
 }
 
 void RainbowDiceVulkan::createTextureSampler(VkSampler &textureSampler) {
@@ -1986,7 +1997,8 @@ void RainbowDiceVulkan::createImage(uint32_t width, uint32_t height, VkFormat fo
 
 /* get the image in the right layout before we execute a copy command */
 void RainbowDiceVulkan::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    vulkan::SingleTimeCommands cmds{m_device, m_commandPool};
+    cmds.begin();
 
     /* use an image barrier to transition the layout */
     VkImageMemoryBarrier barrier = {};
@@ -2053,7 +2065,7 @@ void RainbowDiceVulkan::transitionImageLayout(VkImage image, VkFormat format, Vk
     }
 
     vkCmdPipelineBarrier(
-        commandBuffer,
+        cmds.commandBuffer().get(),
         sourceStage, destinationStage,
         0,
         0, nullptr,
@@ -2061,11 +2073,12 @@ void RainbowDiceVulkan::transitionImageLayout(VkImage image, VkFormat format, Vk
         1, &barrier
     );
 
-    endSingleTimeCommands(commandBuffer);
+    cmds.end();
 }
 
 void RainbowDiceVulkan::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    vulkan::SingleTimeCommands cmds{m_device, m_commandPool};
+    cmds.begin();
 
     VkBufferImageCopy region = {};
 
@@ -2093,7 +2106,7 @@ void RainbowDiceVulkan::copyBufferToImage(VkBuffer buffer, VkImage image, uint32
     };
 
     vkCmdCopyBufferToImage(
-        commandBuffer,
+        cmds.commandBuffer().get(),
         buffer,
         image,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -2101,7 +2114,7 @@ void RainbowDiceVulkan::copyBufferToImage(VkBuffer buffer, VkImage image, uint32
         &region
     );
 
-    endSingleTimeCommands(commandBuffer);
+    cmds.end();
 }
 
 void RainbowDiceVulkan::loadObject(std::vector<std::string> &symbols) {
@@ -2181,21 +2194,14 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         std::shared_ptr<Dice> die(new Dice(m_device, diceIt->get()->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
         diceIt->get()->isBeingReRolled = true;
 
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
-        VkBuffer uniformBuffer;
-        VkDeviceMemory uniformBufferMemory;
 
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
-        createVertexBuffer(die.get(), vertexBuffer, vertexBufferMemory);
-        createIndexBuffer(die.get(), indexBuffer, indexBufferMemory);
-        createUniformBuffer(uniformBuffer, uniformBufferMemory);
+        std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
+        std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
+        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (UniformBufferObject))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, viewPointBuffer, descriptorSet);
-        die->init(descriptorSet, indexBuffer, indexBufferMemory, vertexBuffer,
-                  vertexBufferMemory, uniformBuffer, uniformBufferMemory);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet);
+        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
         die->die->resetPosition();
 
         diceIt++;
