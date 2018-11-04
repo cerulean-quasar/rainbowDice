@@ -303,8 +303,6 @@ namespace vulkan {
     class DescriptorSetLayout {
     public:
         virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() = 0;
-        virtual void updateDescriptorSet(std::shared_ptr<Buffer> const &uniformBuffer, std::shared_ptr<Buffer> const &viewPointBuffer,
-                                 std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) = 0;
         virtual ~DescriptorSetLayout() {}
     };
 
@@ -581,6 +579,23 @@ namespace vulkan {
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
     };
 
+    class Semaphore {
+        std::shared_ptr<Device> m_device;
+
+        std::shared_ptr<VkSemaphore_T> m_semaphore;
+
+        void createSemaphore();
+
+    public:
+        Semaphore(std::shared_ptr<Device> const &inDevice)
+                : m_device{inDevice},
+                  m_semaphore{} {
+            createSemaphore();
+        }
+
+        inline std::shared_ptr<VkSemaphore_T> const &semaphore() { return m_semaphore; }
+    };
+
 } /* namespace vulkan */
 
 VkVertexInputBindingDescription getBindingDescription();
@@ -599,12 +614,71 @@ public:
                              std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
                              std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet);
 
-    inline std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
+    inline virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
 private:
     std::shared_ptr<vulkan::Device> m_device;
     std::shared_ptr<VkDescriptorSetLayout_T> m_descriptorSetLayout;
 
     void createDescriptorSetLayout();
+};
+
+struct Dice {
+    std::shared_ptr<vulkan::Device> m_device;
+    std::shared_ptr<DicePhysicsModel> die;
+
+    /* vertex buffer and index buffer. the index buffer indicates which vertices to draw and in
+     * the specified order.  Note, vertices can be listed twice if they should be part of more
+     * than one triangle.
+     */
+    std::shared_ptr<vulkan::Buffer> vertexBuffer;
+    std::shared_ptr<vulkan::Buffer> indexBuffer;
+
+    /* for passing data other than the vertex data to the vertex shader */
+    std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
+    std::shared_ptr<vulkan::Buffer> uniformBuffer;
+
+    bool isBeingReRolled;
+
+    Dice(std::shared_ptr<vulkan::Device> const &inDevice,
+         std::vector<std::string> &symbols, glm::vec3 position)
+            : m_device{inDevice},
+              die(nullptr)
+    {
+        isBeingReRolled = false;
+        long nbrSides = symbols.size();
+        if (nbrSides == 4) {
+            die.reset(new DiceModelTetrahedron(symbols, position));
+        } else if (nbrSides == 12) {
+            die.reset(new DiceModelDodecahedron(symbols, position));
+        } else if (nbrSides == 20) {
+            die.reset(new DiceModelIcosahedron(symbols, position));
+        } else if (6 % nbrSides == 0) {
+            die.reset(new DiceModelCube(symbols, position));
+        } else {
+            die.reset(new DiceModelHedron(symbols, position));
+        }
+    }
+
+    void loadModel(int width, int height) {
+        die->loadModel();
+        die->setView();
+        die->updatePerspectiveMatrix(width, height);
+    }
+
+    void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet,
+              std::shared_ptr<vulkan::Buffer> inIndexBuffer,
+              std::shared_ptr<vulkan::Buffer> inVertexBuffer,
+              std::shared_ptr<vulkan::Buffer> inUniformBuffer) {
+        uniformBuffer = inUniformBuffer;
+        indexBuffer = inIndexBuffer;
+        vertexBuffer = inVertexBuffer;
+        descriptorSet = inDescriptorSet;
+    }
+
+    void updateUniformBuffer() {
+        uniformBuffer->copyRawTo(&die->ubo, sizeof(die->ubo));
+    }
+
 };
 
 class RainbowDiceVulkan : public RainbowDice {
@@ -620,6 +694,8 @@ public:
                   getBindingDescription(), getAttributeDescriptions(), SHADER_VERT_FILE, SHADER_FRAG_FILE}},
               m_commandPool{new vulkan::CommandPool{m_device}},
               m_viewPointBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (glm::vec3))},
+              m_imageAvailableSemaphore{m_device},
+              m_renderFinishedSemaphore{m_device},
               swapChainImages(), swapChainImageViews(), swapChainFramebuffers()
     {
         // copy the view point of the scene into device memory to send to the fragment shader for the
@@ -676,7 +752,7 @@ private:
     std::shared_ptr<vulkan::RenderPass> m_renderPass;
 
     /* for passing data other than the vertex data to the vertex shader */
-    std::shared_ptr<vulkan::DescriptorSetLayout> m_descriptorSetLayout;
+    std::shared_ptr<DiceDescriptorSetLayout> m_descriptorSetLayout;
     std::shared_ptr<vulkan::DescriptorPools> m_descriptorPools;
 
     std::shared_ptr<vulkan::Pipeline> m_graphicsPipeline;
@@ -685,65 +761,6 @@ private:
 
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
-
-
-    struct Dice {
-        std::shared_ptr<vulkan::Device> m_device;
-        std::shared_ptr<DicePhysicsModel> die;
-
-        /* vertex buffer and index buffer. the index buffer indicates which vertices to draw and in
-         * the specified order.  Note, vertices can be listed twice if they should be part of more
-         * than one triangle.
-         */
-        std::shared_ptr<vulkan::Buffer> vertexBuffer;
-        std::shared_ptr<vulkan::Buffer> indexBuffer;
-
-        /* for passing data other than the vertex data to the vertex shader */
-        std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
-        std::shared_ptr<vulkan::Buffer> uniformBuffer;
-
-        bool isBeingReRolled;
-        Dice(std::shared_ptr<vulkan::Device> const &inDevice,
-             std::vector<std::string> &symbols, glm::vec3 position)
-                : m_device{inDevice},
-                  die(nullptr)
-        {
-            isBeingReRolled = false;
-            long nbrSides = symbols.size();
-            if (nbrSides == 4) {
-                die.reset(new DiceModelTetrahedron(symbols, position));
-            } else if (nbrSides == 12) {
-                die.reset(new DiceModelDodecahedron(symbols, position));
-            } else if (nbrSides == 20) {
-                die.reset(new DiceModelIcosahedron(symbols, position));
-            } else if (6 % nbrSides == 0) {
-                die.reset(new DiceModelCube(symbols, position));
-            } else {
-                die.reset(new DiceModelHedron(symbols, position));
-            }
-        }
-
-        void loadModel(int width, int height) {
-            die->loadModel();
-            die->setView();
-            die->updatePerspectiveMatrix(width, height);
-        }
-
-        void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet,
-                  std::shared_ptr<vulkan::Buffer> inIndexBuffer,
-                  std::shared_ptr<vulkan::Buffer> inVertexBuffer,
-                  std::shared_ptr<vulkan::Buffer> inUniformBuffer) {
-            uniformBuffer = inUniformBuffer;
-            indexBuffer = inIndexBuffer;
-            vertexBuffer = inVertexBuffer;
-            descriptorSet = inDescriptorSet;
-        }
-
-        void updateUniformBuffer() {
-            uniformBuffer->copyRawTo(&die->ubo, sizeof(die->ubo));
-        }
-
-    };
 
     typedef std::list<std::shared_ptr<Dice> > DiceList;
     DiceList dice;
@@ -756,18 +773,13 @@ private:
      * but fences are more for coordinating in our program itself and not for internal
      * Vulkan coordination of resource usage.
      */
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
+    vulkan::Semaphore m_imageAvailableSemaphore;
+    vulkan::Semaphore m_renderFinishedSemaphore;
 
     /* depth buffer image */
     VkImage depthImage = VK_NULL_HANDLE;
     VkDeviceMemory depthImageMemory = VK_NULL_HANDLE;
     VkImageView depthImageView = VK_NULL_HANDLE;
-    WindowType *window = nullptr;
-
-    const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
 
     std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
     std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
@@ -777,7 +789,6 @@ private:
     void createImageViews();
     void createFramebuffers();
     void createCommandBuffers();
-    void createSemaphores();
     void createDepthResources();
     bool hasStencilComponent(VkFormat format);
     void createTextureImages();

@@ -1164,6 +1164,23 @@ namespace vulkan {
         vkUnmapMemory(m_device->logicalDevice().get(), m_bufferMemory.get());
     }
 
+    void Semaphore::createSemaphore() {
+        VkSemaphoreCreateInfo semaphoreInfo = {};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkSemaphore semaphoreRaw;
+        if (vkCreateSemaphore(m_device->logicalDevice().get(), &semaphoreInfo, nullptr, &semaphoreRaw) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("failed to create semaphores!");
+        }
+
+        auto const &capDevice = m_device;
+        auto deleter = [capDevice](VkSemaphore semaphoreRaw) {
+            vkDestroySemaphore(capDevice->logicalDevice().get(), semaphoreRaw, nullptr);
+        };
+
+        m_semaphore.reset(semaphoreRaw, deleter);
+    }
+
 } /* namespace vulkan */
 
 std::string const RainbowDiceVulkan::SHADER_VERT_FILE("shaders/shader.vert.spv");
@@ -1388,7 +1405,6 @@ void RainbowDiceVulkan::initPipeline() {
     createFramebuffers();
 
     createCommandBuffers();
-    createSemaphores();
 }
 
 void RainbowDiceVulkan::cleanup() {
@@ -1398,13 +1414,6 @@ void RainbowDiceVulkan::cleanup() {
 
     if (texAtlas.get() != nullptr && m_device.get() != VK_NULL_HANDLE) {
         (static_cast<TextureAtlasVulkan*>(texAtlas.get()))->destroy(m_device->logicalDevice().get());
-    }
-
-    if (m_device.get() != nullptr) {
-        m_descriptorPools.reset();
-        vkDestroySemaphore(m_device->logicalDevice().get(), renderFinishedSemaphore, nullptr);
-        vkDestroySemaphore(m_device->logicalDevice().get(), imageAvailableSemaphore, nullptr);
-        m_commandPool.reset();
     }
 }
 
@@ -1670,16 +1679,6 @@ void RainbowDiceVulkan::createCommandBuffers() {
     }
 }
 
-void RainbowDiceVulkan::createSemaphores() {
-    VkSemaphoreCreateInfo semaphoreInfo = {};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    if (vkCreateSemaphore(m_device->logicalDevice().get(), &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(m_device->logicalDevice().get(), &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to create semaphores!");
-    }
-}
-
 void RainbowDiceVulkan::drawFrame() {
     /* update the app state here */
 
@@ -1693,8 +1692,8 @@ void RainbowDiceVulkan::drawFrame() {
      * the program
      */
     VkResult result = vkAcquireNextImageKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(),
-        std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE,
-        &imageIndex);
+        std::numeric_limits<uint64_t>::max(), m_imageAvailableSemaphore.semaphore().get(),
+        VK_NULL_HANDLE, &imageIndex);
 
     /* If the window surface is no longer compatible with the swap chain, then we need to
      * recreate the swap chain and let the next call draw the image.
@@ -1714,7 +1713,7 @@ void RainbowDiceVulkan::drawFrame() {
     /* wait for the semaphore before writing to the color attachment.  This means that we
      * could start executing the vertex shader before the image is available.
      */
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+    VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphore.semaphore().get()};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
@@ -1725,7 +1724,7 @@ void RainbowDiceVulkan::drawFrame() {
     submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
 
     /* indicate which semaphore to signal when execution is done */
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+    VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphore.semaphore().get()};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
