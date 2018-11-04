@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.4.1)
 
 set (platform64_files)
 if ((NOT ${CMAKE_ANDROID_ARCH_ABI} STREQUAL x86) AND (NOT ${CMAKE_ANDROID_ARCH_ABI} STREQUAL armeabi-v7a))
-    list(APPEND platform64_files src/main/cpp/rainbowDiceVulkan.cpp src/main/cpp/vulkanWrapper.cpp)
+    list(APPEND platform64_files src/main/cpp/graphicsVulkan.cpp src/main/cpp/rainbowDiceVulkan.cpp src/main/cpp/vulkanWrapper.cpp)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCQ_ENABLE_VULKAN")
 endif ((NOT ${CMAKE_ANDROID_ARCH_ABI} STREQUAL x86) AND (NOT ${CMAKE_ANDROID_ARCH_ABI} STREQUAL armeabi-v7a))
 
