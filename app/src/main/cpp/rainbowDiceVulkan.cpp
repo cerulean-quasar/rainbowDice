@@ -216,19 +216,6 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-void RainbowDiceVulkan::initWindow(WindowType *inWindow) {
-    /* retrieve the image handles from the swap chain. - handles cleaned up by Vulkan
-     * Note: Vulkan may have chosen to create more images than specified in minImageCount,
-     * so we have to requery the image count here.
-     */
-    uint32_t imageCount;
-    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, nullptr);
-    swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, swapChainImages.data());
-
-    createImageViews();
-}
-
 void RainbowDiceVulkan::initPipeline() {
     createTextureImages();
 
@@ -243,9 +230,8 @@ void RainbowDiceVulkan::initPipeline() {
         die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
     }
     updateDepthResources();
-    createFramebuffers();
 
-    createCommandBuffers();
+    initializeCommandBuffers();
 }
 
 void RainbowDiceVulkan::cleanup() {
@@ -264,23 +250,19 @@ void RainbowDiceVulkan::recreateSwapChain() {
     cleanupSwapChain();
 
     m_swapChain.reset(new vulkan::SwapChain{m_device});
-    /* retrieve the image handles from the swap chain. - handles cleaned up by Vulkan
-     * Note: Vulkan may have chosen to create more images than specified in minImageCount,
-     * so we have to requery the image count here.
-     */
-    uint32_t imageCount;
-    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, nullptr);
-    swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(m_device->logicalDevice().get(), m_swapChain->swapChain().get(), &imageCount, swapChainImages.data());
 
-    createImageViews();
+    m_depthImageView.reset(new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
+                                                 m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT});
     updateDepthResources();
+
     m_renderPass.reset(new vulkan::RenderPass{m_device, m_swapChain});
     m_graphicsPipeline.reset(new vulkan::Pipeline{m_swapChain, m_renderPass, m_descriptorSetLayout,
                                             getBindingDescription(), getAttributeDescriptions(),
                                             SHADER_VERT_FILE, SHADER_FRAG_FILE});
-    createFramebuffers();
-    createCommandBuffers();
+    m_swapChainCommands.reset(new vulkan::SwapChainCommands{m_swapChain, m_commandPool, m_renderPass,
+                                                            m_depthImageView});
+
+    initializeCommandBuffers();
 }
 
 // call to finish loading the new models and their associated resources.
@@ -288,6 +270,8 @@ void RainbowDiceVulkan::recreateSwapChain() {
 // create the new ones, then call this function to recreate all the associated Vulkan resources.
 void RainbowDiceVulkan::recreateModels() {
     m_commandPool.reset(new vulkan::CommandPool{m_device});
+    m_swapChainCommands.reset(new vulkan::SwapChainCommands{m_swapChain, m_commandPool, m_renderPass,
+        m_depthImageView});
     createTextureImages();
     for (auto && die : dice) {
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
@@ -299,7 +283,7 @@ void RainbowDiceVulkan::recreateModels() {
         die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
     }
 
-    createCommandBuffers();
+    initializeCommandBuffers();
 }
 
 void RainbowDiceVulkan::destroyModels() {
@@ -356,115 +340,20 @@ void RainbowDiceVulkan::updatePerspectiveMatrix() {
 }
 
 void RainbowDiceVulkan::cleanupSwapChain() {
-    if (m_device.get() == nullptr) {
-        return;
-    }
-    for (auto &framebuffer : swapChainFramebuffers) {
-        vkDestroyFramebuffer(m_device->logicalDevice().get(), framebuffer, nullptr);
-    }
-
+    m_swapChainCommands.reset();
     m_graphicsPipeline.reset();
     m_renderPass.reset();
 
     m_depthImageView.reset();
 
-    for (auto &imageView : swapChainImageViews) {
-        vkDestroyImageView(m_device->logicalDevice().get(), imageView, nullptr);
-    }
-
-    swapChainImages.clear();
-
     m_swapChain.reset();
 }
 
-void RainbowDiceVulkan::createImageViews() {
-    swapChainImageViews.resize(swapChainImages.size());
-
-    for (size_t i=0; i < swapChainImages.size(); i++) {
-        swapChainImageViews[i] = createImageView(swapChainImages[i], m_swapChain->imageFormat(), VK_IMAGE_ASPECT_COLOR_BIT);
-    }
-}
-
-VkImageView RainbowDiceVulkan::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
-    VkImageViewCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    createInfo.image = image;
-
-    /* specify how the image data should be interpreted. viewType allows you
-     * to treat images as 1D textures, 2D textures 3D textures and cube maps.
-     */
-    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    createInfo.format = format;
-
-    /* components enables swizzling the color channels around.  Can map to other channels
-     * or use the constant values of 0 and 1.  Use the default mapping...
-     */
-    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    /* subresourcesRange describes the image's purpose and which part of the image
-     * should be accessed.  Use the images as color targets without any mimapping levels
-     * or multiple layers.
-     */
-    createInfo.subresourceRange.aspectMask = aspectFlags;
-    createInfo.subresourceRange.baseMipLevel = 0;
-    createInfo.subresourceRange.levelCount = 1;
-    createInfo.subresourceRange.baseArrayLayer = 0;
-    createInfo.subresourceRange.layerCount = 1;
-
-    /* create the image view: destroy when done. */
-    VkImageView imageView;
-    if (vkCreateImageView(m_device->logicalDevice().get(), &createInfo, nullptr, &imageView) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create image views");
-    }
-
-    return imageView;
-}
-
-void RainbowDiceVulkan::createFramebuffers() {
-    swapChainFramebuffers.resize(swapChainImageViews.size());
-    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
-            swapChainImageViews[i],
-            m_depthImageView->imageView().get()
-        };
-
-        VkFramebufferCreateInfo framebufferInfo = {};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = m_renderPass->renderPass().get();
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = m_swapChain->extent().width;
-        framebufferInfo.height = m_swapChain->extent().height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(m_device->logicalDevice().get(), &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create framebuffer!");
-        }
-    }
-}
-
 /* Allocate and record commands for each swap chain immage */
-void RainbowDiceVulkan::createCommandBuffers() {
-    commandBuffers.resize(swapChainFramebuffers.size());
-
-    /* allocate the command buffer from the command pool, freed by Vulkan when the command
-     * pool is freed
-     */
-    VkCommandBufferAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = m_commandPool->commandPool().get();
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
-
-    if (vkAllocateCommandBuffers(m_device->logicalDevice().get(), &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate command buffers!");
-    }
-
+void RainbowDiceVulkan::initializeCommandBuffers() {
     /* begin recording commands into each comand buffer */
-    for (size_t i = 0; i < commandBuffers.size(); i++) {
+    for (size_t i = 0; i < m_swapChainCommands->size(); i++) {
+        VkCommandBuffer commandBuffer = m_swapChainCommands->commandBuffer(i);
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -478,13 +367,13 @@ void RainbowDiceVulkan::createCommandBuffers() {
         /* this call will reset the command buffer.  its not possible to append commands at
          * a later time.
          */
-        vkBeginCommandBuffer(commandBuffers[i], &beginInfo);
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
         /* begin the render pass: drawing starts here*/
         VkRenderPassBeginInfo renderPassInfo = {};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = m_renderPass->renderPass().get();
-        renderPassInfo.framebuffer = swapChainFramebuffers[i];
+        renderPassInfo.framebuffer = m_swapChainCommands->frameBuffer(i);
         /* size of the render area */
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = m_swapChain->extent();
@@ -502,22 +391,22 @@ void RainbowDiceVulkan::createCommandBuffers() {
          * none of these functions returns an error (they return void).  There will be no error
          * handling until recording is done.
          */
-        vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         /* bind the graphics pipeline to the command buffer, the second parameter tells Vulkan
          * that we are binding to a graphics pipeline.
          */
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->pipeline().get());
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->pipeline().get());
 
         VkDeviceSize offsets[1] = {0};
         for (auto die : dice) {
             VkBuffer vertexBuffer = die->vertexBuffer->buffer().get();
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(commandBuffers[i], die->indexBuffer->buffer().get(), 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, die->indexBuffer->buffer().get(), 0, VK_INDEX_TYPE_UINT32);
 
             /* The MVP matrix and texture samplers */
             VkDescriptorSet descriptorSet = die->descriptorSet->descriptorSet().get();
-            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     m_graphicsPipeline->layout().get(), 0, 1, &descriptorSet, 0, nullptr);
 
             /* draw command:
@@ -527,7 +416,7 @@ void RainbowDiceVulkan::createCommandBuffers() {
              * parameter 4 - offset into the vertex buffer
              * parameter 5 - offset for instance rendering
              */
-            //vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+            //vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
             /* indexed draw command:
              * parameter 1 - Command buffer for the draw command
@@ -537,12 +426,12 @@ void RainbowDiceVulkan::createCommandBuffers() {
              * parameter 5 - offset to add to the indices in the index buffer
              * parameter 6 - offset for instance rendering
              */
-            vkCmdDrawIndexed(commandBuffers[i], die->die->indices.size(), 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, die->die->indices.size(), 1, 0, 0, 0);
         }
 
-        vkCmdEndRenderPass(commandBuffers[i]);
+        vkCmdEndRenderPass(commandBuffer);
 
-        if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }
     }
@@ -590,7 +479,8 @@ void RainbowDiceVulkan::drawFrame() {
 
     /* use the command buffer that corresponds to the image we just acquired */
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+    VkCommandBuffer commandBuffer = m_swapChainCommands->commandBuffer(imageIndex);
+    submitInfo.pCommandBuffers = &commandBuffer;
 
     /* indicate which semaphore to signal when execution is done */
     VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphore.semaphore().get()};
@@ -786,7 +676,7 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         diceIt--;
     }
 
-    createCommandBuffers();
+    initializeCommandBuffers();
 
     i=0;
     for (auto &&die : dice) {

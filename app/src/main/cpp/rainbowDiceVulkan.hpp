@@ -147,14 +147,15 @@ public:
               m_renderFinishedSemaphore{m_device},
               m_depthImageView{new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
                                                      m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT}},
-              swapChainImages(), swapChainImageViews(), swapChainFramebuffers()
+              m_swapChainCommands{new vulkan::SwapChainCommands{m_swapChain, m_commandPool,
+                                                                m_renderPass, m_depthImageView}}
     {
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
         m_viewPointBuffer->copyRawTo(&viewPoint, sizeof(viewPoint));
     }
 
-    virtual void initWindow(WindowType *window);
+    virtual void initWindow(WindowType *window) {}
 
     virtual void initPipeline();
 
@@ -210,15 +211,8 @@ private:
     std::shared_ptr<vulkan::CommandPool> m_commandPool;
     std::shared_ptr<vulkan::Buffer> m_viewPointBuffer;
 
-    std::vector<VkImage> swapChainImages;
-    std::vector<VkImageView> swapChainImageViews;
-
     typedef std::list<std::shared_ptr<Dice> > DiceList;
     DiceList dice;
-
-    std::vector<VkFramebuffer> swapChainFramebuffers;
-
-    std::vector<VkCommandBuffer> commandBuffers;
 
     /* use semaphores to coordinate the rendering and presentation. Could also use fences
      * but fences are more for coordinating in our program itself and not for internal
@@ -230,17 +224,16 @@ private:
     /* depth buffer image */
     std::shared_ptr<vulkan::ImageView> m_depthImageView;
 
+    std::shared_ptr<vulkan::SwapChainCommands> m_swapChainCommands;
+
     std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
     std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
     void updatePerspectiveMatrix();
 
     void cleanupSwapChain();
-    void createImageViews();
-    void createFramebuffers();
-    void createCommandBuffers();
+    void initializeCommandBuffers();
     void updateDepthResources();
     void createTextureImages();
     std::shared_ptr<vulkan::Image> createTextureImage();
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 };
 #endif

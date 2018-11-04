@@ -692,6 +692,78 @@ namespace vulkan {
         void createTextureSampler();
     };
 
+    class SwapChainCommands {
+    public:
+        SwapChainCommands(std::shared_ptr<SwapChain> const &inSwapChain,
+                          std::shared_ptr<CommandPool> const &inPool,
+                          std::shared_ptr<RenderPass> const &inRenderPass,
+                          std::shared_ptr<ImageView> const &inDepthImage)
+                : m_swapChain{inSwapChain},
+                  m_pool{inPool},
+                  m_renderPass{inRenderPass},
+                  m_depthImage{inDepthImage},
+                  m_images{},
+                  m_imageViews{},
+                  m_framebuffers{},
+                  m_commandBuffers{} {
+            /* retrieve the image handles from the swap chain. - handles cleaned up by Vulkan
+             * Note: Vulkan may have chosen to create more images than specified in minImageCount,
+             * so we have to requery the image count here.
+             */
+            uint32_t imageCount;
+            vkGetSwapchainImagesKHR(m_swapChain->device()->logicalDevice().get(), m_swapChain->swapChain().get(),
+                                    &imageCount, nullptr);
+            m_images.resize(imageCount);
+            vkGetSwapchainImagesKHR(m_swapChain->device()->logicalDevice().get(), m_swapChain->swapChain().get(),
+                                    &imageCount, m_images.data());
+
+            // The swap chain images are owned by the swap chain.  They go away when the swap chain
+            // is destroyed.  So make sure the swap chain hangs around until all the images are
+            // deleted.  So add it as a capture in the deleter.
+            auto deleter = [inSwapChain](VkImage imageRaw) {
+                // do nothing
+            };
+
+            for (auto &img : m_images) {
+                std::shared_ptr<VkImage_T> imgptr(img, deleter);
+                VkExtent2D ext = m_swapChain->extent();
+                ImageView imageView{
+                        std::shared_ptr<Image>(new Image(m_swapChain->device(), imgptr, ext.width, ext.height)),
+                        m_swapChain->imageFormat(), VK_IMAGE_ASPECT_COLOR_BIT};
+                m_imageViews.push_back(imageView);
+            }
+            createFramebuffers(m_renderPass, m_depthImage);
+            createCommandBuffers();
+        }
+
+        inline size_t size() { return m_images.size(); }
+        inline VkFramebuffer frameBuffer(size_t index) { return m_framebuffers[index].get(); }
+        inline VkCommandBuffer commandBuffer(size_t index) { return m_commandBuffers[index]; }
+
+        ~SwapChainCommands() {
+            vkFreeCommandBuffers(m_swapChain->device()->logicalDevice().get(), m_pool->commandPool().get(),
+                                 m_commandBuffers.size(), m_commandBuffers.data());
+            m_commandBuffers.clear();
+            m_framebuffers.clear();
+            m_imageViews.clear();
+        }
+
+    private:
+        std::shared_ptr<SwapChain> m_swapChain;
+        std::shared_ptr<CommandPool> m_pool;
+        std::shared_ptr<RenderPass> m_renderPass;
+        std::shared_ptr<ImageView> m_depthImage;
+
+        std::vector<VkImage> m_images;
+        std::vector<ImageView> m_imageViews;
+        std::vector<std::shared_ptr<VkFramebuffer_T>> m_framebuffers;
+        std::vector<VkCommandBuffer> m_commandBuffers;
+
+        void createFramebuffers(std::shared_ptr<RenderPass> &renderPass,
+                                std::shared_ptr<ImageView> &depthImage);
+
+        void createCommandBuffers();
+    };
 } /* namespace vulkan */
 
 #endif /* RAINBOWDICE_VULKAN_GRAPHICS_HPP */
