@@ -235,12 +235,8 @@ void RainbowDiceVulkan::initPipeline() {
 }
 
 void RainbowDiceVulkan::cleanup() {
-    cleanupSwapChain();
-
-    dice.clear();
-
     if (texAtlas.get() != nullptr && m_device.get() != VK_NULL_HANDLE) {
-        (static_cast<TextureAtlasVulkan*>(texAtlas.get()))->destroy(m_device->logicalDevice().get());
+        (static_cast<TextureAtlasVulkan*>(texAtlas.get()))->destroy();
     }
 }
 
@@ -289,7 +285,7 @@ void RainbowDiceVulkan::recreateModels() {
 void RainbowDiceVulkan::destroyModels() {
     dice.clear();
 
-    ((TextureAtlasVulkan*)texAtlas.get())->destroy(m_device->logicalDevice().get());
+    ((TextureAtlasVulkan*)texAtlas.get())->destroy();
 
 }
 

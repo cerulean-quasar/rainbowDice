@@ -36,7 +36,7 @@ public:
           m_textureSampler{}
     {}
 
-    void destroy(VkDevice logicalDevice) {
+    void destroy() {
         m_textureSampler.reset();
     }
 
