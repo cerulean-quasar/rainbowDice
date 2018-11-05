@@ -25,15 +25,59 @@
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
 
+namespace graphicsGL {
+    class Surface {
+    public:
+        Surface(WindowType *window)
+                : m_window{window},
+                  m_context{EGL_NO_CONTEXT},
+                  m_config{},
+                  m_surface{EGL_NO_SURFACE},
+                  m_display{EGL_NO_DISPLAY},
+                  m_width{0},
+                  m_height{0}
+        {
+            createSurface();
+        }
+
+        void initThread();
+        void cleanupThread();
+
+        inline int width() { return m_width; }
+        inline int height() { return m_height; }
+        inline EGLSurface surface() { return m_surface; }
+        inline EGLDisplay display() { return m_display; }
+
+        ~Surface() {
+            destroySurface();
+        }
+
+    private:
+        WindowType *m_window;
+        EGLContext m_context;
+        EGLConfig m_config;
+        EGLSurface m_surface;
+        EGLDisplay m_display;
+
+        int m_width;
+        int m_height;
+
+        void createSurface();
+        void destroySurface();
+    };
+} /* namespace graphicsGL */
+
 class RainbowDiceGL : public RainbowDice {
 public:
-    virtual void initWindow(WindowType *window);
+    RainbowDiceGL(WindowType *window)
+            : m_surface{window}
+    {}
 
     virtual void initPipeline();
 
-    virtual void initThread();
+    virtual void initThread() { m_surface.initThread(); }
 
-    virtual void cleanupThread();
+    virtual void cleanupThread() { m_surface.cleanupThread(); }
 
     virtual void cleanup();
 
@@ -42,8 +86,6 @@ public:
     virtual bool updateUniformBuffer();
 
     virtual bool allStopped();
-
-    virtual void destroyWindow();
 
     virtual std::vector<std::string> getDiceResults();
 
@@ -67,11 +109,7 @@ public:
 
     virtual ~RainbowDiceGL() {}
 private:
-    WindowType *window;
-    EGLContext context;
-    EGLConfig config;
-    EGLSurface surface;
-    EGLDisplay display;
+    graphicsGL::Surface m_surface;
     GLuint programID;
     std::vector<GLuint> texture;
 

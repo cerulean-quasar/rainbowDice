@@ -569,7 +569,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void startDrawing(SurfaceHolder holder) {
-        boolean usingVulkan = true;
+        boolean usingVulkan = false;
         Surface drawSurface = holder.getSurface();
         String err = initWindow(usingVulkan, drawSurface, manager);
         if (err != null && err.length() != 0) {

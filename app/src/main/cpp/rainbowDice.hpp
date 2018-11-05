@@ -6,8 +6,6 @@
 
 class RainbowDice {
 public:
-    virtual void initWindow(WindowType *window) = 0;
-
     virtual void initPipeline()=0;
 
     virtual void initThread()=0;
@@ -19,8 +17,6 @@ public:
     virtual bool updateUniformBuffer()=0;
 
     virtual bool allStopped()=0;
-
-    virtual void destroyWindow()=0;
 
     virtual std::vector<std::string> getDiceResults()=0;
 

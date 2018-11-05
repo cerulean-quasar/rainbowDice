@@ -110,13 +110,13 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
         if (useVulkan) {
             diceGraphics.reset(new RainbowDiceVulkan(window));
         } else {
-            diceGraphics.reset(new RainbowDiceGL());
+            diceGraphics.reset(new RainbowDiceGL(window));
         }
 #else
         if (useVulkan) {
             return env->NewStringUTF("Vulkan disabled");
         } else {
-            diceGraphics.reset(new RainbowDiceGL());
+            diceGraphics.reset(new RainbowDiceGL(window));
         }
 #endif
     } catch (std::runtime_error &e) {
@@ -124,12 +124,6 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
         return env->NewStringUTF(e.what());
     }
 
-    try {
-        diceGraphics->initWindow(window);
-    } catch (std::runtime_error &e) {
-        diceGraphics->cleanup();
-        diceGraphics.reset();
-    }
     return env->NewStringUTF("");
 }
 

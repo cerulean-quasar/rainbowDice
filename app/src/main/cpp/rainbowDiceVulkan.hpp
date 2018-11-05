@@ -155,15 +155,11 @@ public:
         m_viewPointBuffer->copyRawTo(&viewPoint, sizeof(viewPoint));
     }
 
-    virtual void initWindow(WindowType *window) {}
-
     virtual void initPipeline();
 
     virtual void initThread() {}
 
     virtual void cleanupThread() {}
-
-    virtual void destroyWindow() {}
 
     virtual void cleanup();
 

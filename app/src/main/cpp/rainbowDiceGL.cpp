@@ -29,108 +29,136 @@
 #include "rainbowDiceGlobal.hpp"
 #include "android.hpp"
 
+namespace graphicsGL {
+    void Surface::createSurface() {
+        /*
+        static EGLint const attribute_list[] = {
+                EGL_RED_SIZE, 1,
+                EGL_GREEN_SIZE, 1,
+                EGL_BLUE_SIZE, 1,
+                EGL_NONE
+        };
+         */
+        const EGLint attribute_list[] = {
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL_CONFORMANT, EGL_OPENGL_ES2_BIT,
+                EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+                EGL_COLOR_BUFFER_TYPE, EGL_RGB_BUFFER,
+                EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8,
+                EGL_ALPHA_SIZE, 8,
+                EGL_DEPTH_SIZE, 24,
+                EGL_NONE};
+
+        // Initialize EGL
+        if ((m_display = eglGetDisplay(EGL_DEFAULT_DISPLAY)) == EGL_NO_DISPLAY) {
+            destroySurface();
+            throw std::runtime_error("Could not open display");
+        }
+
+        EGLint majorVersion;
+        EGLint minorVersion;
+        if (!eglInitialize(m_display, &majorVersion, &minorVersion)) {
+            destroySurface();
+            throw std::runtime_error("Could not initialize display");
+        }
+
+        EGLint nbr_config;
+        if (!eglChooseConfig(m_display, attribute_list, &m_config, 1, &nbr_config)) {
+            destroySurface();
+            throw std::runtime_error("Could not get config");
+        }
+
+        if (nbr_config == 0) {
+            destroySurface();
+            throw std::runtime_error("Got 0 configs.");
+        }
+
+        int32_t format;
+        if (!eglGetConfigAttrib(m_display, m_config, EGL_NATIVE_VISUAL_ID, &format)) {
+            destroySurface();
+            throw std::runtime_error("Could not get display format");
+        }
+        ANativeWindow_setBuffersGeometry(m_window, 0, 0, format);
+
+        if ((m_surface = eglCreateWindowSurface(m_display, m_config, m_window, nullptr)) ==
+            EGL_NO_SURFACE) {
+            destroySurface();
+            throw std::runtime_error("Could not create surface");
+        }
+
+        EGLint contextAttributes[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+        if ((m_context = eglCreateContext(m_display, m_config, EGL_NO_CONTEXT, contextAttributes)) ==
+            EGL_NO_CONTEXT) {
+            destroySurface();
+            throw std::runtime_error("Could not create context");
+        }
+
+        if (!eglMakeCurrent(m_display, m_surface, m_surface, m_context)) {
+            destroySurface();
+            throw std::runtime_error("Could not set the surface to current");
+        }
+
+        if (!eglQuerySurface(m_display, m_surface, EGL_WIDTH, &m_width) ||
+            !eglQuerySurface(m_display, m_surface, EGL_HEIGHT, &m_height)) {
+            destroySurface();
+            throw std::runtime_error("Could not get width and height of surface");
+        }
+
+        // Enable depth test
+        glEnable(GL_DEPTH_TEST);
+        // Accept fragment if it is closer to the camera than the former one.
+        glDepthFunc(GL_LESS);
+
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        glDepthMask(GL_TRUE);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    void Surface::destroySurface() {
+        if (m_display != EGL_NO_DISPLAY) {
+            eglMakeCurrent(m_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            if (m_context != EGL_NO_CONTEXT) {
+                eglDestroyContext(m_display, m_context);
+            }
+            if (m_surface != EGL_NO_SURFACE) {
+                eglDestroySurface(m_display, m_surface);
+            }
+            eglTerminate(m_display);
+        }
+        m_display = EGL_NO_DISPLAY;
+        m_context = EGL_NO_CONTEXT;
+        m_surface = EGL_NO_SURFACE;
+
+        /* release the java window object */
+        ANativeWindow_release(m_window);
+    }
+
+    void Surface::initThread() {
+        if (!eglMakeCurrent(m_display, m_surface, m_surface, m_context)) {
+            throw std::runtime_error("Could not set the surface to current");
+        }
+    }
+
+    void Surface::cleanupThread() {
+        if (!eglMakeCurrent(m_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
+            throw std::runtime_error("Could not unset the surface to current");
+        }
+    }
+
+} /* namespace graphicsGL */
+
 std::string const SHADER_VERT_FILE("shaderGL.vert");
 std::string const SHADER_FRAG_FILE("shaderGL.frag");
 
 GLuint texturetest;
 
-void RainbowDiceGL::initWindow(WindowType *inWindow){
-    /*
-    static EGLint const attribute_list[] = {
-            EGL_RED_SIZE, 1,
-            EGL_GREEN_SIZE, 1,
-            EGL_BLUE_SIZE, 1,
-            EGL_NONE
-    };
-     */
-    const EGLint attribute_list[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_CONFORMANT, EGL_OPENGL_ES2_BIT,
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_COLOR_BUFFER_TYPE, EGL_RGB_BUFFER,
-        EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_RED_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_DEPTH_SIZE, 24,
-        EGL_NONE };
-
-    window = inWindow;
-
-    // Initialize EGL
-    if ((display = eglGetDisplay(EGL_DEFAULT_DISPLAY)) == EGL_NO_DISPLAY) {
-        destroyWindow();
-        throw std::runtime_error("Could not open display");
-    }
-
-    EGLint majorVersion;
-    EGLint minorVersion;
-    if (!eglInitialize(display, &majorVersion, &minorVersion)) {
-        destroyWindow();
-        throw std::runtime_error("Could not initialize display");
-    }
-
-    EGLint nbr_config;
-    if (!eglChooseConfig(display, attribute_list, &config, 1, &nbr_config)) {
-        destroyWindow();
-        throw std::runtime_error("Could not get config");
-    }
-
-    if (nbr_config == 0) {
-        destroyWindow();
-        throw std::runtime_error("Got 0 configs.");
-    }
-
-    int32_t format;
-    if (!eglGetConfigAttrib(display, config, EGL_NATIVE_VISUAL_ID, &format)) {
-        destroyWindow();
-        throw std::runtime_error("Could not get display format");
-    }
-    ANativeWindow_setBuffersGeometry(window, 0, 0, format);
-
-    if ((surface = eglCreateWindowSurface(display, config, window, nullptr)) == EGL_NO_SURFACE) {
-        destroyWindow();
-        throw std::runtime_error("Could not create surface");
-    }
-
-    EGLint contextAttributes[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-    if ((context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttributes)) == EGL_NO_CONTEXT) {
-        destroyWindow();
-        throw std::runtime_error("Could not create context");
-    }
-
-    if (!eglMakeCurrent(display, surface, surface, context)) {
-        destroyWindow();
-        throw std::runtime_error("Could not set the surface to current");
-    }
-
-    int width;
-    int height;
-    if (!eglQuerySurface(display, surface, EGL_WIDTH, &width) ||
-        !eglQuerySurface(display, surface, EGL_HEIGHT, &height)) {
-        destroyWindow();
-        throw std::runtime_error("Could not get width and height of surface");
-    }
-
-    // The clear background color is transparent black.
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-    // Enable depth test
-    glEnable(GL_DEPTH_TEST);
-    // Accept fragment if it is closer to the camera than the former one.
-    glDepthFunc(GL_LESS);
-
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glDepthMask(GL_TRUE);
-
-    glViewport(0, 0, width, height);
-}
-
 void RainbowDiceGL::initPipeline() {
     programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
 
-    int32_t w = ANativeWindow_getWidth(window);
-    int32_t h = ANativeWindow_getHeight(window);
     for (auto &&die : dice) {
-        die->loadModel(w, h);
+        die->loadModel(m_surface.width(), m_surface.height());
     }
 
     for (auto &&die : dice) {
@@ -169,28 +197,12 @@ void RainbowDiceGL::initPipeline() {
     glGenerateMipmap(GL_TEXTURE_2D);
 
     // needed because we are going to switch to another thread now
-    if (!eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-        destroyWindow();
-        throw std::runtime_error("Could not unset the surface to current");
-    }
-}
-
-void RainbowDiceGL::initThread() {
-    if (!eglMakeCurrent(display, surface, surface, context)) {
-        throw std::runtime_error("Could not set the surface to current");
-    }
-}
-
-void RainbowDiceGL::cleanupThread() {
-    if (!eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-        throw std::runtime_error("Could not unset the surface to current");
-    }
+    m_surface.cleanupThread();
 }
 
 void RainbowDiceGL::cleanup() {
     dice.clear();
     glDeleteTextures(1, &texturetest);
-    destroyWindow();
 }
 
 void RainbowDiceGL::drawFrame() {
@@ -366,7 +378,7 @@ void RainbowDiceGL::drawFrame() {
         glDisableVertexAttribArray(corner4ID);
         glDisableVertexAttribArray(corner5ID);
     }
-    eglSwapBuffers(display, surface);
+    eglSwapBuffers(m_surface.display(), m_surface.surface());
 }
 
 GLuint RainbowDiceGL::loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile) {
@@ -495,24 +507,6 @@ bool RainbowDiceGL::allStopped() {
     }
     return true;
 }
-void RainbowDiceGL::destroyWindow() {
-    if (display != EGL_NO_DISPLAY) {
-        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        if (context != EGL_NO_CONTEXT) {
-            eglDestroyContext(display, context);
-        }
-        if (surface != EGL_NO_SURFACE) {
-            eglDestroySurface(display, surface);
-        }
-        eglTerminate(display);
-    }
-    display = EGL_NO_DISPLAY;
-    context = EGL_NO_CONTEXT;
-    surface = EGL_NO_SURFACE;
-
-    /* release the java window object */
-    ANativeWindow_release(window);
-}
 
 std::vector<std::string> RainbowDiceGL::getDiceResults() {
     std::vector<std::string> results;
@@ -593,8 +587,8 @@ void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         Dice *currentDie = diceIt->get();
         std::shared_ptr<Dice> die(new Dice(currentDie->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
         diceIt->get()->isBeingReRolled = true;
-        int32_t w = ANativeWindow_getWidth(window);
-        int32_t h = ANativeWindow_getHeight(window);
+        int32_t w = m_surface.width();
+        int32_t h = m_surface.height();
         die->loadModel(w, h);
 
         // the vertex buffer
