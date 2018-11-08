@@ -152,8 +152,6 @@ namespace graphicsGL {
 std::string const SHADER_VERT_FILE("shaderGL.vert");
 std::string const SHADER_FRAG_FILE("shaderGL.frag");
 
-GLuint texturetest;
-
 void RainbowDiceGL::initPipeline() {
     programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
 
@@ -179,9 +177,9 @@ void RainbowDiceGL::initPipeline() {
     glUseProgram(programID);
 
     // load the textures
-    glGenTextures(1, &texturetest);
+    glGenTextures(1, &texture);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texturetest);
+    glBindTexture(GL_TEXTURE_2D, texture);
 
     // when sampling outside of the texture
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -202,7 +200,7 @@ void RainbowDiceGL::initPipeline() {
 
 void RainbowDiceGL::cleanup() {
     dice.clear();
-    glDeleteTextures(1, &texturetest);
+    glDeleteTextures(1, &texture);
 }
 
 void RainbowDiceGL::drawFrame() {
@@ -210,7 +208,7 @@ void RainbowDiceGL::drawFrame() {
 
     GLint textureID = glGetUniformLocation(programID, "texSampler");
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texturetest);
+    glBindTexture(GL_TEXTURE_2D, texture);
     glUniform1i(textureID, 0);
 
     GLint viewPos = glGetUniformLocation(programID, "viewPosition");
@@ -524,7 +522,7 @@ std::vector<std::string> RainbowDiceGL::getDiceResults() {
 }
 
 void RainbowDiceGL::loadObject(std::vector<std::string> &symbols) {
-    std::shared_ptr<Dice> o(new Dice(symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+    std::shared_ptr<DiceGL> o(new DiceGL(symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
     dice.push_back(o);
 }
 
@@ -584,8 +582,8 @@ void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
             diceIt++;
         }
 
-        Dice *currentDie = diceIt->get();
-        std::shared_ptr<Dice> die(new Dice(currentDie->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+        DiceGL *currentDie = diceIt->get();
+        std::shared_ptr<DiceGL> die(new DiceGL(currentDie->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
         diceIt->get()->isBeingReRolled = true;
         int32_t w = m_surface.width();
         int32_t h = m_surface.height();

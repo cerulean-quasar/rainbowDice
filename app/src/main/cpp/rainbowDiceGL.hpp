@@ -67,6 +67,45 @@ namespace graphicsGL {
     };
 } /* namespace graphicsGL */
 
+struct DiceGL {
+    GLuint vertexBuffer;
+    GLuint indexBuffer;
+    std::shared_ptr<DicePhysicsModel> die;
+
+    // If the die is being rerolled, then don't count it in the results list returned because
+    // the GUI is expecting a new list of results that only contains one set of rolls for a die
+    // and then uses the index to determine what the reroll value was.
+    bool isBeingReRolled;
+
+    DiceGL(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
+    {
+        isBeingReRolled = false;
+        long nbrSides = symbols.size();
+        if (nbrSides == 4) {
+            die.reset((DicePhysicsModel*)new DiceModelTetrahedron(symbols, position, true));
+        } else if (nbrSides == 12) {
+            die.reset((DicePhysicsModel*)new DiceModelDodecahedron(symbols, position, true));
+        } else if (nbrSides == 20) {
+            die.reset((DicePhysicsModel*)new DiceModelIcosahedron(symbols, position, true));
+        } else if (6 % nbrSides == 0) {
+            die.reset((DicePhysicsModel*)new DiceModelCube(symbols, position, true));
+        } else {
+            die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, nbrSides, true));
+        }
+    }
+
+    void loadModel(int width, int height) {
+        die->loadModel();
+        die->setView();
+        die->updatePerspectiveMatrix(width, height);
+    }
+
+    ~DiceGL() {
+        glDeleteBuffers(1, &vertexBuffer);
+        glDeleteBuffers(1, &indexBuffer);
+    }
+};
+
 class RainbowDiceGL : public RainbowDice {
 public:
     RainbowDiceGL(WindowType *window)
@@ -111,48 +150,9 @@ public:
 private:
     graphicsGL::Surface m_surface;
     GLuint programID;
-    std::vector<GLuint> texture;
+    GLuint texture;
 
-    struct Dice {
-        GLuint vertexBuffer;
-        GLuint indexBuffer;
-        std::shared_ptr<DicePhysicsModel> die;
-
-        // If the die is being rerolled, then don't count it in the results list returned because
-        // the GUI is expecting a new list of results that only contains one set of rolls for a die
-        // and then uses the index to determine what the reroll value was.
-        bool isBeingReRolled;
-
-        Dice(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
-        {
-            isBeingReRolled = false;
-            long nbrSides = symbols.size();
-            if (nbrSides == 4) {
-                die.reset((DicePhysicsModel*)new DiceModelTetrahedron(symbols, position, true));
-            } else if (nbrSides == 12) {
-                die.reset((DicePhysicsModel*)new DiceModelDodecahedron(symbols, position, true));
-            } else if (nbrSides == 20) {
-                die.reset((DicePhysicsModel*)new DiceModelIcosahedron(symbols, position, true));
-            } else if (6 % nbrSides == 0) {
-                die.reset((DicePhysicsModel*)new DiceModelCube(symbols, position, true));
-            } else {
-                die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, nbrSides, true));
-            }
-        }
-
-        void loadModel(int width, int height) {
-            die->loadModel();
-            die->setView();
-            die->updatePerspectiveMatrix(width, height);
-        }
-
-        ~Dice() {
-            glDeleteBuffers(1, &vertexBuffer);
-            glDeleteBuffers(1, &indexBuffer);
-        }
-    };
-
-    typedef std::list<std::shared_ptr<Dice> > DiceList;
+    typedef std::list<std::shared_ptr<DiceGL> > DiceList;
     DiceList dice;
 
     GLuint loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile);
