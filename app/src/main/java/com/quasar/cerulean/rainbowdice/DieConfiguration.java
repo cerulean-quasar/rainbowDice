@@ -271,4 +271,41 @@ public class DieConfiguration implements Parcelable {
 
         return stringRepresentation.toString();
     }
+
+    public int getNumberDiceInRepresentation() {
+        if (isRepresentableByTwoTenSided()) {
+            return 2;
+        } else {
+            return 1;
+        }
+    }
+
+    public String[] getSymbols(int i) {
+        if (isRepresentableByTwoTenSided()) {
+            // special case a d100 die to be represented by two 10 sided dice, one for the ten's
+            // place and one for the one's place.
+            if (i == 0) {
+                String[] symbols = new String[10];
+                for (int j = 0; j < 10; j++) {
+                    symbols[j] = String.format(Locale.getDefault(), "%d", 10 * j);
+                }
+                return symbols;
+            } else if (i == 1) {
+                String[] symbols = new String[10];
+                for (int j = 0; j < 10; j++) {
+                    symbols[j] = String.format(Locale.getDefault(), "%d", startAt + increment * j);
+                }
+                return symbols;
+            }
+        } else if (i == 0) {
+            String[] symbols = new String[numberOfSides];
+            for (int j = 0; j < numberOfSides; j++) {
+                symbols[j] = String.format(Locale.getDefault(), "%d", startAt + increment * j);
+            }
+            return symbols;
+        }
+
+        // should not happen
+        return null;
+    }
 }

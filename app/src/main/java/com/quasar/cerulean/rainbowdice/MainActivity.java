@@ -450,25 +450,9 @@ public class MainActivity extends AppCompatActivity {
         // First we need to load all the textures in the texture Atlas (in cpp), then
         // we can load the models.  Since the model depends on the size of the textures.
         for (DieConfiguration dieConfig : diceConfig) {
-            int nbrSides = dieConfig.getNumberOfSides();
-            int startOn = dieConfig.getStartAt();
-            int increment = dieConfig.getIncrement();
-            if (dieConfig.isRepresentableByTwoTenSided()) {
-                // special case a d100 die to be represented by two 10 sided dice, one for the ten's
-                // place and one for the one's place.
-                for (int j = 0; j < 10; j++) {
-                    String symbol = String.format(Locale.getDefault(), "%d", startOn + increment * j);
-                    symbolSet.add(symbol);
-                }
-
-                for (int j = 0; j < 10; j++) {
-                    String symbol = String.format(Locale.getDefault(), "%d", 10 * j);
-                    symbolSet.add(symbol);
-                }
-
-            } else if (nbrSides > 1) {
-                for (int j = 0; j < nbrSides; j++) {
-                    String symbol = String.format(Locale.getDefault(), "%d", startOn + increment * j);
+            for (int i=0; i < dieConfig.getNumberDiceInRepresentation(); i++) {
+                String[] symbols = dieConfig.getSymbols(i);
+                for (String symbol : symbols) {
                     symbolSet.add(symbol);
                 }
             }
@@ -522,33 +506,9 @@ public class MainActivity extends AppCompatActivity {
 
         // now load the models. Some of the vertices depend on the size of the texture image.
         for (DieConfiguration dieConfig : diceConfig) {
-            int nbrDice = dieConfig.getNumberOfDice();
-            int nbrSides = dieConfig.getNumberOfSides();
-            int startOn = dieConfig.getStartAt();
-            int increment = dieConfig.getIncrement();
-            if (dieConfig.isRepresentableByTwoTenSided()) {
-                // special case a d100 die to be represented by two 10 sided dice, one for the ten's
-                // place and one for the one's place.
-                String[] symbolsOnes = new String[10];
-                String[] symbolsTens = new String[10];
-                for (int j = 0; j < 10; j++) {
-                    symbolsOnes[j] = String.format(Locale.getDefault(), "%d", startOn + increment * j);
-                }
-
-                for (int j = 0; j < 10; j++) {
-                    symbolsTens[j] = String.format(Locale.getDefault(), "%d", 10 * j);
-                }
-
-                for (int j = 0; j < nbrDice; j++) {
-                    loadModel(symbolsTens);
-                    loadModel(symbolsOnes);
-                }
-            } else if (nbrSides > 1){
-                String[] symbols = new String[nbrSides];
-                for (int j = 0; j < nbrSides; j++) {
-                    symbols[j] = String.format(Locale.getDefault(), "%d", startOn + increment * j);
-                }
-                for (int j = 0; j < nbrDice; j++){
+            for (int k = 0; k < dieConfig.getNumberOfDice(); k ++) {
+                for (int j = 0; j < dieConfig.getNumberDiceInRepresentation(); j++) {
+                    String[] symbols = dieConfig.getSymbols(j);
                     loadModel(symbols);
                 }
             }
