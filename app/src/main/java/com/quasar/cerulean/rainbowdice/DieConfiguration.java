@@ -308,4 +308,20 @@ public class DieConfiguration implements Parcelable {
         // should not happen
         return null;
     }
+
+    public String getSymbolsString(int i) {
+        String[] arr = getSymbols(i);
+
+        StringBuilder builder = new StringBuilder();
+        for (String symbol : arr) {
+            builder.append(symbol);
+            builder.append('\n');
+        }
+
+        return builder.toString();
+    }
+
+    public int getNumberOfDiceInt() {
+        return numberOfDice;
+    }
 }

@@ -580,7 +580,7 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage() {
     return textureImage;
 }
 
-void RainbowDiceVulkan::loadObject(std::vector<std::string> &symbols) {
+void RainbowDiceVulkan::loadObject(std::vector<std::string> const &symbols) {
     std::shared_ptr<Dice> o(new Dice(m_device, symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
     dice.push_back(o);
 }

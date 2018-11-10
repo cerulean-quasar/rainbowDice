@@ -521,7 +521,7 @@ std::vector<std::string> RainbowDiceGL::getDiceResults() {
     return results;
 }
 
-void RainbowDiceGL::loadObject(std::vector<std::string> &symbols) {
+void RainbowDiceGL::loadObject(std::vector<std::string> const &symbols) {
     std::shared_ptr<DiceGL> o(new DiceGL(symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
     dice.push_back(o);
 }

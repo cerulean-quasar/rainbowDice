@@ -89,7 +89,7 @@ struct Dice {
     bool isBeingReRolled;
 
     Dice(std::shared_ptr<vulkan::Device> const &inDevice,
-         std::vector<std::string> &symbols, glm::vec3 position)
+         std::vector<std::string> const &symbols, glm::vec3 position)
             : m_device{inDevice},
               die(nullptr)
     {
@@ -171,7 +171,7 @@ public:
 
     virtual std::vector<std::string> getDiceResults();
 
-    virtual void loadObject(std::vector<std::string> &symbols);
+    virtual void loadObject(std::vector<std::string> const &symbols);
 
     virtual void destroyModels();
 

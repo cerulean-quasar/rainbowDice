@@ -59,6 +59,7 @@ import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Locale;
 import java.util.TreeSet;
@@ -80,6 +81,11 @@ public class MainActivity extends AppCompatActivity {
             System.out.println("Could not load library: native-lib: " + (e.getMessage() != null ? e.getMessage() : "<no error message>"));
         }
     }
+
+    // for the texture dimensions.
+    private static final int TEXWIDTH = 64;
+    private static final int TEXHEIGHT = 64;
+    private static final int TEX_BLANK_HEIGHT = 56;
 
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
@@ -434,30 +440,7 @@ public class MainActivity extends AppCompatActivity {
         drawer = null;
     }
 
-    private boolean loadModelsAndTextures() {
-        if (diceConfig == null || diceConfig.length == 0) {
-            // somehow someone managed to crash the code by having dice config null.  I don't know
-            // how they did this, but returning here avoids the crash.
-            publishError("No dice configurations exist, please choose dice.");
-            return false;
-        }
-        int TEXWIDTH = 64;
-        int TEXHEIGHT = 64;
-        int TEX_BLANK_HEIGHT = 56;
-
-        TreeSet<String> symbolSet = new TreeSet<>();
-
-        // First we need to load all the textures in the texture Atlas (in cpp), then
-        // we can load the models.  Since the model depends on the size of the textures.
-        for (DieConfiguration dieConfig : diceConfig) {
-            for (int i=0; i < dieConfig.getNumberDiceInRepresentation(); i++) {
-                String[] symbols = dieConfig.getSymbols(i);
-                for (String symbol : symbols) {
-                    symbolSet.add(symbol);
-                }
-            }
-        }
-
+    private byte[] createTexture(Collection<String> symbolSet) {
         Bitmap bitmap;
         try {
             bitmap = Bitmap.createBitmap(TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT) * symbolSet.size(), ALPHA_8);
@@ -467,7 +450,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 publishError("Could not generate dice textures.");
             }
-            return false;
+            return null;
         }
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
@@ -494,27 +477,10 @@ public class MainActivity extends AppCompatActivity {
             imageBuffer.get(bytes);
         } catch (Exception e) {
             publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
-            return false;
-        }
-        String err = addSymbols(symbolSet.toArray(new String[symbolSet.size()]), symbolSet.size(),
-                TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
-                TEX_BLANK_HEIGHT, bitmapSize, bytes);
-        if (err != null && err.length() != 0) {
-            publishError(err);
-            return false;
+            return null;
         }
 
-        // now load the models. Some of the vertices depend on the size of the texture image.
-        for (DieConfiguration dieConfig : diceConfig) {
-            for (int k = 0; k < dieConfig.getNumberOfDice(); k ++) {
-                for (int j = 0; j < dieConfig.getNumberDiceInRepresentation(); j++) {
-                    String[] symbols = dieConfig.getSymbols(j);
-                    loadModel(symbols);
-                }
-            }
-        }
-
-        return true;
+        return bytes;
     }
 
     public void publishError(String err) {
@@ -524,13 +490,43 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public boolean isDrawing() {
-        return drawingStarted;
-    }
-
     public void startDrawing(SurfaceHolder holder) {
-        boolean usingVulkan = false;
+        if (diceConfig == null || diceConfig.length == 0) {
+            // somehow someone managed to crash the code by having dice config null.  I don't know
+            // how they did this, but returning here avoids the crash.
+            publishError("No dice configurations exist, please choose dice.");
+            return;
+        }
+
+        TreeSet<String> symbolSet = new TreeSet<>();
+
+        // First we need to load all the textures in the texture Atlas (in cpp), then
+        // we can load the models.  Since the model depends on the size of the textures.
+        for (DieConfiguration dieConfig : diceConfig) {
+            for (int i=0; i < dieConfig.getNumberDiceInRepresentation(); i++) {
+                String[] symbols = dieConfig.getSymbols(i);
+                for (String symbol : symbols) {
+                    symbolSet.add(symbol);
+                }
+            }
+        }
+
+        byte[] texture = createTexture(symbolSet);
+        if (texture == null) {
+            return;
+        }
+
         Surface drawSurface = holder.getSurface();
+        String err = initDice(drawSurface, manager, diceConfig,
+                symbolSet.toArray(new String[symbolSet.size()]), symbolSet.size(),
+                TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
+                TEX_BLANK_HEIGHT, texture.length, texture);
+        if (err != null && err.length() != 0) {
+            publishError(err);
+            return;
+        }
+/*
+        boolean usingVulkan = false;
         String err = initWindow(usingVulkan, drawSurface, manager);
         if (err != null && err.length() != 0) {
             usingVulkan = false;
@@ -557,20 +553,12 @@ public class MainActivity extends AppCompatActivity {
             publishError(err);
             return;
         }
-
+*/
         surfaceReady = true;
     }
 
-    private byte[] readAssetFile(boolean nullAppend, String filename) {
-        try {
-            InputStream inputStream = getAssets().open(filename);
-            ByteBufferBuilder bytes = new ByteBufferBuilder(1024);
-            bytes.readToBuffer(inputStream, nullAppend);
-            return bytes.getBytes();
-        } catch (IOException e) {
-            publishError("Error in opening asset file: " + filename + " message: " + e.getMessage());
-            return null;
-        }
+    public boolean isDrawing() {
+        return drawingStarted;
     }
 
     private class ResultHandler implements Handler.Callback {
@@ -621,6 +609,9 @@ public class MainActivity extends AppCompatActivity {
     private native void recreateSwapChain();
     private native void loadModel(String[] symbols);
     private native String addSymbols(String[] symbols, int nbrSymbols, int width, int height, int heightImage, int heightBlankSpace, int bitmapSize, byte[] bitmap);
+    private native String initDice(Surface surface, AssetManager manager, DieConfiguration[] diceConfig,
+                                   String[] symbols, int nbrSymbols, int width, int height, int heightImage,
+                                   int heightBlankSpace, int bitmapSize, byte[] bitmap);
     private native void roll();
     private native void reRoll(int[] indices);
     private native String drawOnce(String[] symbols);

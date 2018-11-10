@@ -20,7 +20,7 @@ public:
 
     virtual std::vector<std::string> getDiceResults()=0;
 
-    virtual void loadObject(std::vector<std::string> &symbols)=0;
+    virtual void loadObject(std::vector<std::string> const &symbols)=0;
 
     virtual void destroyModels()=0;
 

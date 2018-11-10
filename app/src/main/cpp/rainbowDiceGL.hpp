@@ -77,7 +77,7 @@ struct DiceGL {
     // and then uses the index to determine what the reroll value was.
     bool isBeingReRolled;
 
-    DiceGL(std::vector<std::string> &symbols, glm::vec3 position) : die(nullptr)
+    DiceGL(std::vector<std::string> const &symbols, glm::vec3 position) : die(nullptr)
     {
         isBeingReRolled = false;
         long nbrSides = symbols.size();
@@ -128,7 +128,7 @@ public:
 
     virtual std::vector<std::string> getDiceResults();
 
-    virtual void loadObject(std::vector<std::string> &symbols);
+    virtual void loadObject(std::vector<std::string> const &symbols);
 
     virtual void destroyModels();
 

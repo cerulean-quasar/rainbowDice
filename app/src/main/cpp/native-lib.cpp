@@ -61,17 +61,13 @@ ASensorEventQueue *eventQueue = nullptr;
 ALooper *looper = nullptr;
 std::unique_ptr<RainbowDice> diceGraphics;
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_initSensors(
-        JNIEnv *env,
-        jobject jthis)
-{
+bool initSensors() {
     sensorManager = ASensorManager_getInstance();
     //sensorManager = ASensorManager_getInstanceForPackage("com.indigo.rainbodice");
     sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
     if (sensor == nullptr) {
         // TODO: use a flick gesture instead?
-        return env->NewStringUTF("Accelerometer is not present");
+        return false;
     }
 
     looper = ALooper_forThread();
@@ -80,15 +76,11 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initSensors(
     }
 
     if (looper == nullptr) {
-        return env->NewStringUTF("Could not get looper.");
+        return false;
     }
 
     eventQueue = ASensorManager_createEventQueue(sensorManager, looper, EVENT_TYPE_ACCELEROMETER, nullptr, nullptr);
-    if (eventQueue == nullptr) {
-        return env->NewStringUTF("Could not create event queue for sensor");
-    }
-
-    return env->NewStringUTF("");
+    return eventQueue != nullptr;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -145,9 +137,12 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initPipeline(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
+Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         JNIEnv *env,
         jobject jthis,
+        jobject surface,
+        jobject manager,
+        jobjectArray jDiceConfigs,
         jobjectArray jSymbols,
         jint nbrSymbols,
         jint width,
@@ -156,6 +151,37 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
         jint heightBlankSpace,
         jint bitmapSize,
         jbyteArray jbitmap) {
+    if (!initSensors()) {
+        return env->NewStringUTF("Failed to initialize accelerometer");
+    }
+
+    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
+    if (window == nullptr) {
+        return env->NewStringUTF("Unable to acquire window from surface.");
+    }
+
+    setAssetManager(AAssetManager_fromJava(env, manager));
+
+    bool useGl = false;
+#ifdef CQ_ENABLE_VULKAN
+    try {
+        diceGraphics.reset(new RainbowDiceVulkan(window));
+    } catch (std::runtime_error &e) {
+        useGl = true;
+    }
+#else
+    useGl = true;
+#endif
+
+    if (useGl) {
+        try {
+            diceGraphics.reset(new RainbowDiceGL(window));
+        } catch (std::runtime_error &e) {
+            ANativeWindow_release(window);
+            return env->NewStringUTF(e.what());
+        }
+    }
+
     jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
     std::vector<char> bitmap(static_cast<size_t>(bitmapSize));
     memcpy(bitmap.data(), bytes, bitmap.size());
@@ -179,8 +205,70 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_addSymbols(
 #endif
     } catch (std::runtime_error &e) {
         diceGraphics->cleanup();
+        diceGraphics.reset();
+        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
         return env->NewStringUTF(e.what());
     }
+
+    // todo: call diceConfig
+    jint nbrDiceConfigs = env->GetArrayLength(jDiceConfigs);
+    for (int i = 0; i < nbrDiceConfigs; i++) {
+        jobject obj = env->GetObjectArrayElement(jDiceConfigs, i);
+        jclass diceConfigClass = env->GetObjectClass(obj);
+
+        jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberDiceInRepresentation", "()I");
+        if (mid == 0) {
+            return env->NewStringUTF("Could not load dice models");
+        }
+        jint nbrDiceInRepresentation = env->CallIntMethod(obj, mid);
+
+        std::vector<std::vector<std::string>> symbolsDiceVector;
+        mid = env->GetMethodID(diceConfigClass, "getSymbolsString", "(I)Ljava/lang/String;");
+        if (mid == 0) {
+            return env->NewStringUTF("Could not load dice models");
+        }
+        for (int j = 0; j < nbrDiceInRepresentation; j++) {
+            jstring jSymbolsDice = (jstring) env->CallObjectMethod(obj, mid, j);
+            std::string symbolsDice(env->GetStringUTFChars(jSymbolsDice, 0));
+
+            std::size_t epos = symbolsDice.find("\n");
+            std::size_t bpos = 0;
+            std::vector<std::string> symbolsDieVector;
+            while (epos != std::string::npos) {
+                std::string symbolDice = symbolsDice.substr(bpos, epos-bpos);
+                symbolsDieVector.push_back(symbolDice);
+                bpos = epos+1;
+                epos = symbolsDice.find("\n", bpos);
+            }
+            symbolsDiceVector.push_back(symbolsDieVector);
+        }
+
+        mid = env->GetMethodID(diceConfigClass, "getNumberOfDiceInt", "()I");
+        if (mid == 0) {
+            return env->NewStringUTF("Could not load dice models");
+        }
+        jint nbrDice = env->CallIntMethod(obj, mid);
+
+        for (int j = 0; j < nbrDice; j++) {
+            for (auto const &diceSymbols : symbolsDiceVector) {
+                diceGraphics->loadObject(diceSymbols);
+            }
+        }
+    }
+
+    try {
+        diceGraphics->initPipeline();
+    } catch (std::runtime_error &e) {
+        diceGraphics->cleanup();
+        diceGraphics.reset();
+        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
+        if (strlen(e.what()) > 0) {
+            return env->NewStringUTF(e.what());
+        } else {
+            return env->NewStringUTF("Error in initializing graphics.");
+        }
+    }
+
     return env->NewStringUTF("");
 }
 
