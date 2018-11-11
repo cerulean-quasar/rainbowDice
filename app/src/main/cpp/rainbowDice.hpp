@@ -6,7 +6,7 @@
 
 class RainbowDice {
 public:
-    virtual void initPipeline()=0;
+    virtual void initModels()=0;
 
     virtual void initThread()=0;
 

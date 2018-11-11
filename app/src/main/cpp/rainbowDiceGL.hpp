@@ -24,6 +24,7 @@
 #include "rainbowDice.hpp"
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
+#include "TextureAtlasGL.hpp"
 
 namespace graphicsGL {
     class Surface {
@@ -111,10 +112,12 @@ public:
     RainbowDiceGL(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
                   uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
             : m_surface{window},
-              m_textureAtlas{new TextureAtlas{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap}}
-    {}
+              m_textureAtlas{new TextureAtlasGL{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap}}
+    {
+        init();
+    }
 
-    virtual void initPipeline();
+    virtual void initModels();
 
     virtual void initThread() { m_surface.initThread(); }
 
@@ -145,16 +148,15 @@ public:
     virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
 
     virtual ~RainbowDiceGL() {
-        glDeleteTextures(1, &texture);
     }
 private:
     graphicsGL::Surface m_surface;
     GLuint programID;
-    GLuint texture;
-    std::shared_ptr<TextureAtlas> m_textureAtlas;
+    std::shared_ptr<TextureAtlasGL> m_textureAtlas;
 
     typedef std::list<std::shared_ptr<DiceGL> > DiceList;
     DiceList dice;
 
     GLuint loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile);
+    void init();
 };

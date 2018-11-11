@@ -31,16 +31,14 @@ struct TextureImage {
 typedef std::map<std::string, TextureImage>::iterator texture_iterator;
 
 class TextureAtlas {
-private:
+protected:
     uint32_t heightImage;
     uint32_t heightBlankSpace;
     uint32_t width;
     uint32_t heightTexture;
-    std::vector<char> bitmap;
     std::map<std::string, TextureImage> textureImages;
 
 public:
-    std::vector<char> &getImage() { return bitmap; }
     uint32_t getImageHeight() { return heightImage; }
     uint32_t getImageWidth() { return width; }
     uint32_t getTextureHeight() {return heightTexture; }
@@ -59,9 +57,9 @@ public:
     }
 
     TextureAtlas(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                 uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
+                 uint32_t inHeightImage, uint32_t inHeightBlankSpace)
         :heightImage(inHeightImage), heightBlankSpace(inHeightBlankSpace), width(inWidth),
-         heightTexture(inHeightTexture), bitmap(inBitmap), textureImages()
+         heightTexture(inHeightTexture), textureImages()
     {
         for (uint32_t i=0; i < symbols.size(); i++) {
             TextureImage tex = { i };

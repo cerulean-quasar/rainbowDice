@@ -215,7 +215,7 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-void RainbowDiceVulkan::initPipeline() {
+void RainbowDiceVulkan::initModels() {
     for (auto && die : dice) {
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height, m_textureAtlas);
         std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};

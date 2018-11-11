@@ -115,7 +115,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
     env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
 
     std::vector<std::string> symbols;
-    size_t nbrSymbols = env->GetArrayLength(jSymbols);
+    size_t nbrSymbols = static_cast<size_t>(env->GetArrayLength(jSymbols));
     for (int i = 0; i < nbrSymbols; i++) {
         jstring obj = (jstring)env->GetObjectArrayElement(jSymbols, i);
         char const *csymbol = env->GetStringUTFChars(obj, 0);
@@ -197,7 +197,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
     }
 
     try {
-        diceGraphics->initPipeline();
+        diceGraphics->initModels();
     } catch (std::runtime_error &e) {
         diceGraphics.reset();
         ASensorManager_destroyEventQueue(sensorManager, eventQueue);

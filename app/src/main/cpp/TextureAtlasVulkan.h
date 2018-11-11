@@ -32,8 +32,8 @@ class TextureAtlasVulkan : public TextureAtlas {
 public:
     TextureAtlasVulkan(std::shared_ptr<vulkan::ImageSampler> inSampler,
                        std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                       uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
-        : TextureAtlas{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap},
+                       uint32_t inHeightImage, uint32_t inHeightBlankSpace)
+        : TextureAtlas{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace},
           m_textureSampler{inSampler}
     {}
 

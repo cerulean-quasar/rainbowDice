@@ -152,9 +152,14 @@ namespace graphicsGL {
 std::string const SHADER_VERT_FILE("shaderGL.vert");
 std::string const SHADER_FRAG_FILE("shaderGL.frag");
 
-void RainbowDiceGL::initPipeline() {
+void RainbowDiceGL::init() {
     programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
 
+    // set the shader to use
+    glUseProgram(programID);
+}
+
+void RainbowDiceGL::initModels() {
     for (auto &&die : dice) {
         die->loadModel(m_surface.width(), m_surface.height(), m_textureAtlas);
     }
@@ -173,28 +178,6 @@ void RainbowDiceGL::initPipeline() {
                      die->die->indices.data(), GL_STATIC_DRAW);
     }
 
-    // set the shader to use
-    glUseProgram(programID);
-
-    // load the textures
-    glGenTextures(1, &texture);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    // when sampling outside of the texture
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    // when the texture is scaled up or down
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, /*GL_LINEAR_MIPMAP_LINEAR*/GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, /*GL_LINEAR*/ GL_NEAREST);
-
-    std::vector<char> &texture = m_textureAtlas->getImage();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, m_textureAtlas->getImageWidth(),
-                 m_textureAtlas->getTextureHeight(), 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture.data());
-
-    glGenerateMipmap(GL_TEXTURE_2D);
-
     // needed because we are going to switch to another thread now
     m_surface.cleanupThread();
 }
@@ -204,7 +187,7 @@ void RainbowDiceGL::drawFrame() {
 
     GLint textureID = glGetUniformLocation(programID, "texSampler");
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, m_textureAtlas->texture());
     glUniform1i(textureID, 0);
 
     GLint viewPos = glGetUniformLocation(programID, "viewPosition");

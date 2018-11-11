@@ -157,14 +157,14 @@ public:
                         std::shared_ptr<vulkan::ImageView>{new vulkan::ImageView{
                             createTextureImage(inWidth, inHeightTexture, inBitmap), VK_FORMAT_R8_UNORM,
                                 VK_IMAGE_ASPECT_COLOR_BIT}}}},
-                  symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap}}
+                  symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace}}
     {
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
         m_viewPointBuffer->copyRawTo(&viewPoint, sizeof(viewPoint));
     }
 
-    virtual void initPipeline();
+    virtual void initModels();
 
     virtual void initThread() {}
 
