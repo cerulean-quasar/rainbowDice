@@ -94,8 +94,8 @@ struct DiceGL {
         }
     }
 
-    void loadModel(int width, int height) {
-        die->loadModel();
+    void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
+        die->loadModel(texAtlas);
         die->setView();
         die->updatePerspectiveMatrix(width, height);
     }
@@ -108,8 +108,10 @@ struct DiceGL {
 
 class RainbowDiceGL : public RainbowDice {
 public:
-    RainbowDiceGL(WindowType *window)
-            : m_surface{window}
+    RainbowDiceGL(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                  uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
+            : m_surface{window},
+              m_textureAtlas{new TextureAtlas{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap}}
     {}
 
     virtual void initPipeline();
@@ -117,8 +119,6 @@ public:
     virtual void initThread() { m_surface.initThread(); }
 
     virtual void cleanupThread() { m_surface.cleanupThread(); }
-
-    virtual void cleanup();
 
     virtual void drawFrame();
 
@@ -129,8 +129,6 @@ public:
     virtual std::vector<std::string> getDiceResults();
 
     virtual void loadObject(std::vector<std::string> const &symbols);
-
-    virtual void destroyModels();
 
     virtual void recreateModels();
 
@@ -146,11 +144,14 @@ public:
 
     virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
 
-    virtual ~RainbowDiceGL() {}
+    virtual ~RainbowDiceGL() {
+        glDeleteTextures(1, &texture);
+    }
 private:
     graphicsGL::Surface m_surface;
     GLuint programID;
     GLuint texture;
+    std::shared_ptr<TextureAtlas> m_textureAtlas;
 
     typedef std::list<std::shared_ptr<DiceGL> > DiceList;
     DiceList dice;

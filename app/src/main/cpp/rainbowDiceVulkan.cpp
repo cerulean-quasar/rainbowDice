@@ -160,7 +160,8 @@ void DiceDescriptorSetLayout::createDescriptorSetLayout() {
 /* descriptor set for the MVP matrix and texture samplers */
 void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
                                                   std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
-                                            std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) {
+                                            std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet,
+                                                  std::vector<VkDescriptorImageInfo> const &imageInfos) {
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = uniformBuffer->buffer().get();
     bufferInfo.offset = 0;
@@ -189,8 +190,6 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     descriptorWrites[0].pImageInfo = nullptr; // Optional
     descriptorWrites[0].pTexelBufferView = nullptr; // Optional
 
-    std::vector<VkDescriptorImageInfo> imageInfos = ((TextureAtlasVulkan*)texAtlas.get())->getImageInfosForDescriptorSet();
-
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[1].dstSet = descriptorSet->descriptorSet().get();
     descriptorWrites[1].dstBinding = 1;
@@ -217,27 +216,20 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
 }
 
 void RainbowDiceVulkan::initPipeline() {
-    createTextureImages();
-
     for (auto && die : dice) {
-        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
+        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height, m_textureAtlas);
         std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device,
             sizeof (UniformBufferObject))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet,
+                                                   m_textureAtlas->getImageInfosForDescriptorSet());
         die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
     }
     updateDepthResources();
 
     initializeCommandBuffers();
-}
-
-void RainbowDiceVulkan::cleanup() {
-    if (texAtlas.get() != nullptr && m_device.get() != VK_NULL_HANDLE) {
-        (static_cast<TextureAtlasVulkan*>(texAtlas.get()))->destroy();
-    }
 }
 
 void RainbowDiceVulkan::recreateSwapChain() {
@@ -268,25 +260,18 @@ void RainbowDiceVulkan::recreateModels() {
     m_commandPool.reset(new vulkan::CommandPool{m_device});
     m_swapChainCommands.reset(new vulkan::SwapChainCommands{m_swapChain, m_commandPool, m_renderPass,
         m_depthImageView});
-    createTextureImages();
     for (auto && die : dice) {
-        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
+        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height, m_textureAtlas);
         std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (UniformBufferObject))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet,
+                                                   m_textureAtlas->getImageInfosForDescriptorSet());
         die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
     }
 
     initializeCommandBuffers();
-}
-
-void RainbowDiceVulkan::destroyModels() {
-    dice.clear();
-
-    ((TextureAtlasVulkan*)texAtlas.get())->destroy();
-
 }
 
 std::shared_ptr<vulkan::Buffer> RainbowDiceVulkan::createVertexBuffer(Dice *die) {
@@ -528,26 +513,15 @@ void RainbowDiceVulkan::drawFrame() {
     vkQueueWaitIdle(m_device->presentQueue());
 }
 
-
 void RainbowDiceVulkan::updateDepthResources() {
     m_depthImageView->image()->transitionImageLayout(m_device->depthFormat(),
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, m_commandPool);
 }
 
-void RainbowDiceVulkan::createTextureImages() {
-    std::shared_ptr<vulkan::Image> image{createTextureImage()};
-    std::shared_ptr<vulkan::ImageView> imageView{new vulkan::ImageView{image, VK_FORMAT_R8_UNORM,
-                                                                       VK_IMAGE_ASPECT_COLOR_BIT}};
-    std::shared_ptr<vulkan::ImageSampler> imageSampler{new vulkan::ImageSampler{m_device,
-        m_commandPool, imageView}};
-    ((TextureAtlasVulkan*)texAtlas.get())->addTextureImage(imageSampler);
-}
-
-std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage() {
-    uint32_t texHeight = texAtlas->getTextureHeight();
-    uint32_t texWidth = texAtlas->getImageWidth();
-    char *buffer = (texAtlas->getImage().data());
-    VkDeviceSize imageSize = texAtlas->getImage().size();
+std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t texWidth, uint32_t texHeight,
+        std::vector<char> const &bitmap) {
+    char const *buffer = bitmap.data();
+    VkDeviceSize imageSize = bitmap.size();
 
     /* copy the image to CPU accessable memory in the graphics card.  Make sure that it has the
      * VK_BUFFER_USAGE_TRANSFER_SRC_BIT set so that we can copy from it to an image later
@@ -658,12 +632,13 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         diceIt->get()->isBeingReRolled = true;
 
 
-        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height);
+        die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height, m_textureAtlas);
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (UniformBufferObject))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet,
+                                                   m_textureAtlas->getImageInfosForDescriptorSet());
         die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
         die->die->resetPosition();
 

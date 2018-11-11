@@ -289,7 +289,7 @@ public:
     bool isStoppedAnimationStarted() { return doneY != 0.0f; }
     std::string getResult() { return result; }
     void resetPosition();
-    virtual void loadModel() = 0;
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) = 0;
     uint32_t calculateUpFace();
     void randomizeUpFace();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
@@ -322,7 +322,7 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };
@@ -333,7 +333,8 @@ public:
 // loadModel will have to be changed of course.
 class DiceModelHedron : public DicePhysicsModel {
 protected:
-    void addVertices(glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
+    void addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
+                     glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
                      glm::vec3 const &p0Normal, glm::vec3 const &qNormal, glm::vec3 const &rNormal, uint32_t i);
     void bottomCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i);
     void topCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i);
@@ -355,7 +356,7 @@ public:
         }
     }
 
-    virtual void loadModel();
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual uint32_t getUpFaceIndex(uint32_t i);
     virtual void yAlign(uint32_t faceIndex);
@@ -375,7 +376,7 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
         return DicePhysicsModel::getFaceIndexForSymbol(symbol);
     }
@@ -396,7 +397,7 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
     virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
         return DicePhysicsModel::getFaceIndexForSymbol(symbol);
@@ -405,7 +406,8 @@ public:
 
 class DiceModelDodecahedron : public DicePhysicsModel {
 private:
-    void addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e,
+    void addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
+                     glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e,
                      glm::vec3 cornerNormalA, glm::vec3 cornerNormalB, glm::vec3 cornerNormalC,
                      glm::vec3 cornerNormalD, glm::vec3 cornerNormalE, uint32_t i);
     void corners(glm::vec3 &a, glm::vec3 &b, glm::vec3 &c, glm::vec3 &d, glm::vec3 &e, uint32_t i);
@@ -420,7 +422,7 @@ public:
     {
     }
 
-    virtual void loadModel();
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };

@@ -31,8 +31,6 @@ typedef ANativeWindow WindowType;
 #include <GLES2/gl2.h>
 #include <glm/vec3.hpp>
 
-extern std::unique_ptr<TextureAtlas> texAtlas;
-
 extern float const screenWidth;
 extern float const screenHeight;
 extern glm::vec3 const viewPoint;

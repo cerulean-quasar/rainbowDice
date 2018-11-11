@@ -46,6 +46,7 @@
 #include "text.hpp"
 #include "dice.hpp"
 #include "graphicsVulkan.hpp"
+#include "TextureAtlasVulkan.h"
 
 VkVertexInputBindingDescription getBindingDescription();
 std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
@@ -61,7 +62,8 @@ public:
 
     void updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
                              std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
-                             std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet);
+                             std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet,
+                             std::vector<VkDescriptorImageInfo> const &imageInfos);
 
     inline virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
 private:
@@ -108,8 +110,8 @@ struct Dice {
         }
     }
 
-    void loadModel(int width, int height) {
-        die->loadModel();
+    void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
+        die->loadModel(texAtlas);
         die->setView();
         die->updatePerspectiveMatrix(width, height);
     }
@@ -132,7 +134,8 @@ struct Dice {
 
 class RainbowDiceVulkan : public RainbowDice {
 public:
-    RainbowDiceVulkan(WindowType *window)
+    RainbowDiceVulkan(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                      uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
             : m_instance{new vulkan::Instance{window}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
@@ -148,7 +151,13 @@ public:
               m_depthImageView{new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
                                                      m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT}},
               m_swapChainCommands{new vulkan::SwapChainCommands{m_swapChain, m_commandPool,
-                                                                m_renderPass, m_depthImageView}}
+                                                                m_renderPass, m_depthImageView}},
+              m_textureAtlas{new TextureAtlasVulkan{std::shared_ptr<vulkan::ImageSampler>{
+                  new vulkan::ImageSampler{m_device, m_commandPool,
+                        std::shared_ptr<vulkan::ImageView>{new vulkan::ImageView{
+                            createTextureImage(inWidth, inHeightTexture, inBitmap), VK_FORMAT_R8_UNORM,
+                                VK_IMAGE_ASPECT_COLOR_BIT}}}},
+                  symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap}}
     {
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
@@ -161,8 +170,6 @@ public:
 
     virtual void cleanupThread() {}
 
-    virtual void cleanup();
-
     virtual void drawFrame();
 
     virtual bool updateUniformBuffer();
@@ -172,8 +179,6 @@ public:
     virtual std::vector<std::string> getDiceResults();
 
     virtual void loadObject(std::vector<std::string> const &symbols);
-
-    virtual void destroyModels();
 
     virtual void recreateModels();
 
@@ -222,6 +227,8 @@ private:
 
     std::shared_ptr<vulkan::SwapChainCommands> m_swapChainCommands;
 
+    std::shared_ptr<TextureAtlasVulkan> m_textureAtlas;
+
     std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
     std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
     void updatePerspectiveMatrix();
@@ -229,7 +236,7 @@ private:
     void cleanupSwapChain();
     void initializeCommandBuffers();
     void updateDepthResources();
-    void createTextureImages();
-    std::shared_ptr<vulkan::Image> createTextureImage();
+    std::shared_ptr<vulkan::Image> createTextureImage(uint32_t texWidth, uint32_t texHeight,
+                                                      std::vector<char> const &bitmap);
 };
 #endif

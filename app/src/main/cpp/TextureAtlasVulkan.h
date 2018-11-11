@@ -30,24 +30,12 @@ class TextureAtlasVulkan : public TextureAtlas {
     std::shared_ptr<vulkan::ImageSampler> m_textureSampler;
 
 public:
-    TextureAtlasVulkan(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+    TextureAtlasVulkan(std::shared_ptr<vulkan::ImageSampler> inSampler,
+                       std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
                        uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
         : TextureAtlas{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap},
-          m_textureSampler{}
+          m_textureSampler{inSampler}
     {}
-
-    void destroy() {
-        m_textureSampler.reset();
-    }
-
-    void addTextureImage(std::shared_ptr<vulkan::ImageSampler> const &inImageSampler) {
-        if (m_textureSampler.get() == nullptr) {
-            m_textureSampler = inImageSampler;
-        } else {
-            /* should not happen */
-            throw std::runtime_error(std::string("Already have the texture image Vulkan structures."));
-        }
-    }
 
     std::vector<VkDescriptorImageInfo> getImageInfosForDescriptorSet() {
         std::vector<VkDescriptorImageInfo> imageInfos;

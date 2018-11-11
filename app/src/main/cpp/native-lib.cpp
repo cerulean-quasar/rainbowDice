@@ -84,59 +84,6 @@ bool initSensors() {
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_initWindow(
-        JNIEnv *env,
-        jobject jthis,
-        jboolean useVulkan,
-        jobject surface,
-        jobject manager) {
-    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
-    if (window == nullptr) {
-        return env->NewStringUTF("Unable to acquire window from surface.");
-    }
-
-    setAssetManager(AAssetManager_fromJava(env, manager));
-
-    try {
-#ifdef CQ_ENABLE_VULKAN
-        if (useVulkan) {
-            diceGraphics.reset(new RainbowDiceVulkan(window));
-        } else {
-            diceGraphics.reset(new RainbowDiceGL(window));
-        }
-#else
-        if (useVulkan) {
-            return env->NewStringUTF("Vulkan disabled");
-        } else {
-            diceGraphics.reset(new RainbowDiceGL(window));
-        }
-#endif
-    } catch (std::runtime_error &e) {
-        diceGraphics.reset();
-        return env->NewStringUTF(e.what());
-    }
-
-    return env->NewStringUTF("");
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_initPipeline(
-        JNIEnv *env,
-        jobject jthis) {
-    try {
-        diceGraphics->initPipeline();
-    } catch (std::runtime_error &e) {
-        diceGraphics->cleanup();
-        if (strlen(e.what()) > 0) {
-            return env->NewStringUTF(e.what());
-        } else {
-            return env->NewStringUTF("Error in initializing OpenGL.");
-        }
-    }
-    return env->NewStringUTF("");
-}
-
-extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         JNIEnv *env,
         jobject jthis,
@@ -144,12 +91,10 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         jobject manager,
         jobjectArray jDiceConfigs,
         jobjectArray jSymbols,
-        jint nbrSymbols,
         jint width,
         jint height,
         jint imageHeight,
         jint heightBlankSpace,
-        jint bitmapSize,
         jbyteArray jbitmap) {
     if (!initSensors()) {
         return env->NewStringUTF("Failed to initialize accelerometer");
@@ -162,10 +107,29 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
 
     setAssetManager(AAssetManager_fromJava(env, manager));
 
+    // get the texture data
+    jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
+    size_t bitmapSize = static_cast<size_t>(env->GetArrayLength(jbitmap));
+    std::vector<char> bitmap(static_cast<size_t>(bitmapSize));
+    memcpy(bitmap.data(), bytes, bitmap.size());
+    env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
+
+    std::vector<std::string> symbols;
+    size_t nbrSymbols = env->GetArrayLength(jSymbols);
+    for (int i = 0; i < nbrSymbols; i++) {
+        jstring obj = (jstring)env->GetObjectArrayElement(jSymbols, i);
+        char const *csymbol = env->GetStringUTFChars(obj, 0);
+        std::string symbol(csymbol);
+        env->ReleaseStringUTFChars(obj, csymbol);
+        symbols.push_back(symbol);
+    }
+
     bool useGl = false;
 #ifdef CQ_ENABLE_VULKAN
     try {
-        diceGraphics.reset(new RainbowDiceVulkan(window));
+        diceGraphics.reset(new RainbowDiceVulkan(window, symbols, static_cast<uint32_t>(width),
+                                                 static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
+                                                 static_cast<uint32_t>(heightBlankSpace), bitmap));
     } catch (std::runtime_error &e) {
         useGl = true;
     }
@@ -175,42 +139,16 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
 
     if (useGl) {
         try {
-            diceGraphics.reset(new RainbowDiceGL(window));
+            diceGraphics.reset(new RainbowDiceGL(window, symbols, static_cast<uint32_t>(width),
+                                                 static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
+                                                 static_cast<uint32_t>(heightBlankSpace), bitmap));
         } catch (std::runtime_error &e) {
             ANativeWindow_release(window);
             return env->NewStringUTF(e.what());
         }
     }
 
-    jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
-    std::vector<char> bitmap(static_cast<size_t>(bitmapSize));
-    memcpy(bitmap.data(), bytes, bitmap.size());
-    env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
-
-    std::vector<std::string> symbols;
-    for (int i = 0; i < nbrSymbols; i++) {
-        jstring obj = (jstring)env->GetObjectArrayElement(jSymbols, i);
-        std::string symbol(env->GetStringUTFChars(obj, 0));
-        symbols.push_back(symbol);
-    }
-
-    try {
-#ifdef CQ_ENABLE_VULKAN
-        texAtlas.reset(new TextureAtlasVulkan(symbols, static_cast<uint32_t>(width),
-                                              static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
-                                              static_cast<uint32_t>(heightBlankSpace), bitmap));
-#else
-        texAtlas.reset(new TextureAtlas(symbols, static_cast<uint32_t>(width), static_cast<uint32_t>(height),
-            static_cast<uint32_t>(imageHeight), static_cast<uint32_t>(heightBlankSpace), bitmap));
-#endif
-    } catch (std::runtime_error &e) {
-        diceGraphics->cleanup();
-        diceGraphics.reset();
-        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
-        return env->NewStringUTF(e.what());
-    }
-
-    // todo: call diceConfig
+    // Load the models.
     jint nbrDiceConfigs = env->GetArrayLength(jDiceConfigs);
     for (int i = 0; i < nbrDiceConfigs; i++) {
         jobject obj = env->GetObjectArrayElement(jDiceConfigs, i);
@@ -229,7 +167,9 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         }
         for (int j = 0; j < nbrDiceInRepresentation; j++) {
             jstring jSymbolsDice = (jstring) env->CallObjectMethod(obj, mid, j);
-            std::string symbolsDice(env->GetStringUTFChars(jSymbolsDice, 0));
+            char const *cSymbolsDice = env->GetStringUTFChars(jSymbolsDice, 0);
+            std::string symbolsDice(cSymbolsDice);
+            env->ReleaseStringUTFChars(jSymbolsDice, cSymbolsDice);
 
             std::size_t epos = symbolsDice.find("\n");
             std::size_t bpos = 0;
@@ -259,7 +199,6 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
     try {
         diceGraphics->initPipeline();
     } catch (std::runtime_error &e) {
-        diceGraphics->cleanup();
         diceGraphics.reset();
         ASensorManager_destroyEventQueue(sensorManager, eventQueue);
         if (strlen(e.what()) > 0) {
@@ -363,33 +302,8 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyResources(
     // If this function is being called, it is assumed that the caller already stopped
     // and joined the draw thread.
     if (diceGraphics.get() != nullptr) {
-        diceGraphics->cleanup();
         diceGraphics.reset();
     }
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_loadModel(
-        JNIEnv *env,
-        jobject jthis,
-        jobjectArray jsymbols) {
-    int symbolCount = env->GetArrayLength(jsymbols);
-    std::vector<std::string> symbols;
-    for (int i=0; i < symbolCount; i ++) {
-        jstring jsymbol = (jstring) (env->GetObjectArrayElement(jsymbols, i));
-        const char *csymbol = env->GetStringUTFChars(jsymbol, 0);
-        std::string symbol = csymbol;
-        env->ReleaseStringUTFChars(jsymbol, csymbol);
-        symbols.push_back(symbol);
-    }
-    diceGraphics->loadObject(symbols);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyModels(
-        JNIEnv *env,
-        jobject jthis) {
-    diceGraphics->destroyModels();
 }
 
 extern "C" JNIEXPORT void JNICALL

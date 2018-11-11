@@ -156,7 +156,7 @@ void RainbowDiceGL::initPipeline() {
     programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
 
     for (auto &&die : dice) {
-        die->loadModel(m_surface.width(), m_surface.height());
+        die->loadModel(m_surface.width(), m_surface.height(), m_textureAtlas);
     }
 
     for (auto &&die : dice) {
@@ -189,18 +189,14 @@ void RainbowDiceGL::initPipeline() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, /*GL_LINEAR_MIPMAP_LINEAR*/GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, /*GL_LINEAR*/ GL_NEAREST);
 
-    std::vector<char> &texture = texAtlas->getImage();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, texAtlas->getImageWidth(), texAtlas->getTextureHeight(), 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture.data());
+    std::vector<char> &texture = m_textureAtlas->getImage();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, m_textureAtlas->getImageWidth(),
+                 m_textureAtlas->getTextureHeight(), 0, GL_ALPHA, GL_UNSIGNED_BYTE, texture.data());
 
     glGenerateMipmap(GL_TEXTURE_2D);
 
     // needed because we are going to switch to another thread now
     m_surface.cleanupThread();
-}
-
-void RainbowDiceGL::cleanup() {
-    dice.clear();
-    glDeleteTextures(1, &texture);
 }
 
 void RainbowDiceGL::drawFrame() {
@@ -526,10 +522,6 @@ void RainbowDiceGL::loadObject(std::vector<std::string> const &symbols) {
     dice.push_back(o);
 }
 
-void RainbowDiceGL::destroyModels() {
-    dice.clear();
-}
-
 void RainbowDiceGL::recreateModels() {
     for (auto die : dice) {
         // create 1 buffer for the vertices (includes color and texture coordinates and which texture to use too).
@@ -587,7 +579,7 @@ void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         diceIt->get()->isBeingReRolled = true;
         int32_t w = m_surface.width();
         int32_t h = m_surface.height();
-        die->loadModel(w, h);
+        die->loadModel(w, h, m_textureAtlas);
 
         // the vertex buffer
         glGenBuffers(1, &die->vertexBuffer);

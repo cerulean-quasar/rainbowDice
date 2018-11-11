@@ -10,8 +10,6 @@ public:
 
     virtual void initThread()=0;
 
-    virtual void cleanup()=0;
-
     virtual void drawFrame()=0;
 
     virtual bool updateUniformBuffer()=0;
@@ -21,8 +19,6 @@ public:
     virtual std::vector<std::string> getDiceResults()=0;
 
     virtual void loadObject(std::vector<std::string> const &symbols)=0;
-
-    virtual void destroyModels()=0;
 
     virtual void recreateModels()=0;
 

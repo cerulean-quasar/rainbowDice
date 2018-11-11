@@ -511,7 +511,7 @@ void DicePhysicsModel::randomizeUpFace() {
     velocity.x = random.getFloat(-factor, factor);
 }
 
-void DiceModelCube::loadModel() {
+void DiceModelCube::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     Vertex vertex = {};
 
     uint32_t totalNbrImages = texAtlas->getNbrImages();
@@ -744,7 +744,7 @@ void DiceModelCube::yAlign(uint32_t faceIndex) {
     stoppedAngle = angle;
 }
 
-void DiceModelHedron::loadModel() {
+void DiceModelHedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     glm::vec3 p0TopCornerNormal = {};
     glm::vec3 p0BottomCornerNormal = {};
     for (uint32_t i = 0; i < numberFaces/2; i ++) {
@@ -796,11 +796,11 @@ void DiceModelHedron::loadModel() {
 
         // bottom
         bottomCorners(p0, q, r, i);
-        addVertices(p0, q, r, p0BottomCornerNormal, rNormal, qNormal, i);
+        addVertices(texAtlas, p0, q, r, p0BottomCornerNormal, rNormal, qNormal, i);
 
         // top
         topCorners(p0, q, r, i);
-        addVertices(p0, q, r, p0TopCornerNormal, qNormal, rNormal, i+numberFaces/2);
+        addVertices(texAtlas, p0, q, r, p0TopCornerNormal, qNormal, rNormal, i+numberFaces/2);
     }
 
     // indices - not really using these
@@ -821,7 +821,8 @@ void DiceModelHedron::bottomCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, i
     r = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
 }
 
-void DiceModelHedron::addVertices(glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
+void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
+                                  glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
                                   glm::vec3 const &p0Normal, glm::vec3 const &qNormal, glm::vec3 const &rNormal,
                                   uint32_t i) {
     float textureToUse = texAtlas->getImageIndex(symbols[i%symbols.size()]);
@@ -939,7 +940,7 @@ void DiceModelHedron::yAlign(uint32_t faceIndex) {
     stoppedAngle = angle;
 }
 
-void DiceModelTetrahedron::loadModel() {
+void DiceModelTetrahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     glm::vec3 p0Normal = {};
     glm::vec3 qNormal = {};
     glm::vec3 rNormal = {};
@@ -970,7 +971,7 @@ void DiceModelTetrahedron::loadModel() {
     rNormal = glm::normalize(rNormal);
 
     corners(p0,q,r,0);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 0);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, 0);
 
     // p0Normal stays the same, r becomes q.
     qNormal = rNormal;
@@ -984,7 +985,7 @@ void DiceModelTetrahedron::loadModel() {
     rNormal = glm::normalize(rNormal);
 
     corners(p0,q,r,1);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 1);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, 1);
 
     // p0Normal stays the same, r becomes q.
     qNormal = rNormal;
@@ -998,7 +999,7 @@ void DiceModelTetrahedron::loadModel() {
     rNormal = glm::normalize(rNormal);
 
     corners(p0,q,r,2);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 2);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, 2);
 
     // rNormal stays the same, q becomes p0.
     p0Normal = qNormal;
@@ -1012,7 +1013,7 @@ void DiceModelTetrahedron::loadModel() {
     qNormal = glm::normalize(qNormal);
 
     corners(p0,q,r,3);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, 3);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, 3);
 
     // indices - not really using these
     for (uint32_t i = 0; i < numberFaces*15; i ++) {
@@ -1040,7 +1041,7 @@ void DiceModelTetrahedron::corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, ui
     }
 }
 
-void DiceModelIcosahedron::loadModel() {
+void DiceModelIcosahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     uint32_t i = 0;
     glm::vec3 p0, q, r;
     glm::vec3 p0Normal = {};
@@ -1060,27 +1061,27 @@ void DiceModelIcosahedron::loadModel() {
     qNormal = glm::normalize(faceNormals[0] + faceNormals[4] + faceNormals[12] + faceNormals[13] + faceNormals[14]);
     rNormal = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[10] + faceNormals[11] + faceNormals[12]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10] + faceNormals[18] + faceNormals[19]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[2] + faceNormals[3] + faceNormals[16] + faceNormals[17] + faceNormals[18]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[14] + faceNormals[15] + faceNormals[16]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[0] + faceNormals[4] + faceNormals[12] + faceNormals[13] + faceNormals[14]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     // now for the bottom
     // the normal for p0.
@@ -1089,97 +1090,97 @@ void DiceModelIcosahedron::loadModel() {
     qNormal = glm::normalize(faceNormals[5] + faceNormals[9] + faceNormals[15] + faceNormals[16] + faceNormals[17]);
     rNormal = glm::normalize(faceNormals[5] + faceNormals[6] + faceNormals[17] + faceNormals[18] + faceNormals[19]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[6] + faceNormals[7] + faceNormals[10] + faceNormals[11] + faceNormals[19]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[7] + faceNormals[8] + faceNormals[11] + faceNormals[12] + faceNormals[13]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[8] + faceNormals[9] + faceNormals[13] + faceNormals[14] + faceNormals[15]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = glm::normalize(faceNormals[5] + faceNormals[9] + faceNormals[15] + faceNormals[16] + faceNormals[17]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     // now the middle
     p0Normal = glm::normalize(faceNormals[6] + faceNormals[7] + faceNormals[10] + faceNormals[11] + faceNormals[19]);
     qNormal = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10] + faceNormals[18] + faceNormals[19]);
     rNormal = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[10] + faceNormals[11] + faceNormals[12]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = p0Normal;
     p0Normal = qNormal;
     qNormal = glm::normalize(faceNormals[7] + faceNormals[8] + faceNormals[11] + faceNormals[12] + faceNormals[13]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     rNormal = qNormal;
     qNormal = p0Normal;
     p0Normal = rNormal;
     rNormal = glm::normalize(faceNormals[0] + faceNormals[4] + faceNormals[12] + faceNormals[13] + faceNormals[14]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = p0Normal;
     p0Normal = qNormal;
     qNormal = glm::normalize(faceNormals[8] + faceNormals[9] + faceNormals[13] + faceNormals[14] + faceNormals[15]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     rNormal = qNormal;
     qNormal = p0Normal;
     p0Normal = rNormal;
     rNormal = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[14] + faceNormals[15] + faceNormals[16]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = p0Normal;
     p0Normal = qNormal;
     qNormal = glm::normalize(faceNormals[5] + faceNormals[9] + faceNormals[15] + faceNormals[16] + faceNormals[17]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     rNormal = qNormal;
     qNormal = p0Normal;
     p0Normal = rNormal;
     rNormal = glm::normalize(faceNormals[2] + faceNormals[3] + faceNormals[16] + faceNormals[17] + faceNormals[18]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = p0Normal;
     p0Normal = qNormal;
     qNormal = glm::normalize(faceNormals[5] + faceNormals[6] + faceNormals[17] + faceNormals[18] + faceNormals[19]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     rNormal = qNormal;
     qNormal = p0Normal;
     p0Normal = rNormal;
     rNormal = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10] + faceNormals[18] + faceNormals[19]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     qNormal = rNormal;
     rNormal = p0Normal;
     p0Normal = qNormal;
     qNormal = glm::normalize(faceNormals[6] + faceNormals[7] + faceNormals[10] + faceNormals[11] + faceNormals[19]);
     corners(p0,q,r,i);
-    addVertices(p0, q, r, p0Normal, qNormal, rNormal, i++);
+    addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i++);
 
     // indices - not really using these
     for (i = 0; i < numberFaces*15; i ++) {
@@ -1332,7 +1333,8 @@ void DiceModelIcosahedron::corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, ui
     // i == 19
 }
 
-void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e,
+void DiceModelDodecahedron::addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
+                                        glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 e,
                                         glm::vec3 cornerNormalA, glm::vec3 cornerNormalB, glm::vec3 cornerNormalC,
                                         glm::vec3 cornerNormalD, glm::vec3 cornerNormalE, uint32_t i) {
     uint32_t totalNbrImages = texAtlas->getNbrImages();
@@ -1453,7 +1455,7 @@ void DiceModelDodecahedron::addVertices(glm::vec3 a, glm::vec3 b, glm::vec3 c, g
     vertices.push_back(vertex);
 }
 
-void DiceModelDodecahedron::loadModel() {
+void DiceModelDodecahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     uint32_t i = 0;
     float scaleFactor = 2.0f;
     glm::vec3 a,b,c,d,e;
@@ -1473,7 +1475,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[0] + faceNormals[6] + faceNormals[7]);
     cornerNormalD = glm::normalize(faceNormals[0] + faceNormals[7] + faceNormals[8]);
     cornerNormalE = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[8]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1481,7 +1483,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[1] + faceNormals[8] + faceNormals[9]);
     cornerNormalD = glm::normalize(faceNormals[1] + faceNormals[9] + faceNormals[10]);
     cornerNormalE = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1489,7 +1491,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[2] + faceNormals[10] + faceNormals[11]);
     cornerNormalD = glm::normalize(faceNormals[2] + faceNormals[6] + faceNormals[11]);
     cornerNormalE = glm::normalize(faceNormals[0] + faceNormals[2] + faceNormals[6]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     // the other side
@@ -1499,7 +1501,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[3] + faceNormals[10] + faceNormals[11]);
     cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[9] + faceNormals[10]);
     cornerNormalE = glm::normalize(faceNormals[3] + faceNormals[5] + faceNormals[9]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1507,7 +1509,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[7]);
     cornerNormalD = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[11]);
     cornerNormalE = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[11]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1515,7 +1517,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[5] + faceNormals[8] + faceNormals[9]);
     cornerNormalD = glm::normalize(faceNormals[5] + faceNormals[7] + faceNormals[8]);
     cornerNormalE = glm::normalize(faceNormals[4] + faceNormals[5] + faceNormals[7]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     // the middle
@@ -1525,7 +1527,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalC = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[11]);
     cornerNormalD = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[7]);
     cornerNormalE = glm::normalize(faceNormals[0] + faceNormals[6] + faceNormals[7]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1534,7 +1536,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalA = glm::normalize(faceNormals[0] + faceNormals[7] + faceNormals[8]);
     cornerNormalD = glm::normalize(faceNormals[4] + faceNormals[5] + faceNormals[7]);
     cornerNormalE = glm::normalize(faceNormals[5] + faceNormals[7] + faceNormals[8]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1543,7 +1545,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalA = glm::normalize(faceNormals[0] + faceNormals[1] + faceNormals[8]);
     cornerNormalD = glm::normalize(faceNormals[5] + faceNormals[8] + faceNormals[9]);
     cornerNormalE = glm::normalize(faceNormals[1] + faceNormals[8] + faceNormals[9]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1552,7 +1554,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalA = glm::normalize(faceNormals[1] + faceNormals[9] + faceNormals[10]);
     cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[5] + faceNormals[9]);
     cornerNormalE = glm::normalize(faceNormals[3] + faceNormals[9] + faceNormals[10]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1561,7 +1563,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalA = glm::normalize(faceNormals[1] + faceNormals[2] + faceNormals[10]);
     cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[10] + faceNormals[11]);
     cornerNormalE = glm::normalize(faceNormals[2] + faceNormals[10] + faceNormals[11]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     corners(a,b,c,d,e,i);
@@ -1570,7 +1572,7 @@ void DiceModelDodecahedron::loadModel() {
     cornerNormalA = glm::normalize(faceNormals[2] + faceNormals[6] + faceNormals[11]);
     cornerNormalD = glm::normalize(faceNormals[3] + faceNormals[4] + faceNormals[11]);
     cornerNormalE = glm::normalize(faceNormals[4] + faceNormals[6] + faceNormals[11]);
-    addVertices(a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
+    addVertices(texAtlas, a/scaleFactor, b/scaleFactor, c/scaleFactor, d/scaleFactor, e/scaleFactor,
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     // indices - not really using these

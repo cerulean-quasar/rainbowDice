@@ -518,42 +518,14 @@ public class MainActivity extends AppCompatActivity {
 
         Surface drawSurface = holder.getSurface();
         String err = initDice(drawSurface, manager, diceConfig,
-                symbolSet.toArray(new String[symbolSet.size()]), symbolSet.size(),
+                symbolSet.toArray(new String[symbolSet.size()]),
                 TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
-                TEX_BLANK_HEIGHT, texture.length, texture);
-        if (err != null && err.length() != 0) {
-            publishError(err);
-            return;
-        }
-/*
-        boolean usingVulkan = false;
-        String err = initWindow(usingVulkan, drawSurface, manager);
-        if (err != null && err.length() != 0) {
-            usingVulkan = false;
-            // Vulkan failed, try with OpenGL instead
-            err = initWindow(usingVulkan, drawSurface, manager);
-            if (err != null && err.length() != 0) {
-                publishError(err);
-                return;
-            }
-        }
-
-        if (!loadModelsAndTextures()) {
-            return;
-        }
-
-        err = initPipeline();
+                TEX_BLANK_HEIGHT, texture);
         if (err != null && err.length() != 0) {
             publishError(err);
             return;
         }
 
-        err = initSensors();
-        if (err != null && err.length() != 0) {
-            publishError(err);
-            return;
-        }
-*/
         surfaceReady = true;
     }
 
@@ -600,20 +572,14 @@ public class MainActivity extends AppCompatActivity {
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    private native String initWindow(boolean useVulkan, Surface surface, AssetManager manager);
-    private native String initPipeline();
     private native void destroyResources();
     private native void tellDrawerStop();
-    private native void destroyModels();
     private native void recreateModels();
     private native void recreateSwapChain();
-    private native void loadModel(String[] symbols);
-    private native String addSymbols(String[] symbols, int nbrSymbols, int width, int height, int heightImage, int heightBlankSpace, int bitmapSize, byte[] bitmap);
     private native String initDice(Surface surface, AssetManager manager, DieConfiguration[] diceConfig,
-                                   String[] symbols, int nbrSymbols, int width, int height, int heightImage,
-                                   int heightBlankSpace, int bitmapSize, byte[] bitmap);
+                                   String[] symbols, int width, int height, int heightImage,
+                                   int heightBlankSpace,  byte[] bitmap);
     private native void roll();
     private native void reRoll(int[] indices);
     private native String drawOnce(String[] symbols);
-    private native String initSensors();
 }

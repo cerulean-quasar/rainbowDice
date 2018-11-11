@@ -21,8 +21,6 @@
 #include "rainbowDiceGlobal.hpp"
 #include "text.hpp"
 
-std::unique_ptr<TextureAtlas> texAtlas;
-
 float const screenWidth = 1.2f;
 float const screenHeight = 1.6f;
 
