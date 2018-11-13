@@ -172,6 +172,7 @@ std::shared_ptr<RainbowDice> initDice(
 
     bool useGl = false;
     std::shared_ptr<RainbowDice> diceGraphics;
+#undef CQ_ENABLE_VULKAN
 #ifdef CQ_ENABLE_VULKAN
     try {
         diceGraphics.reset(new RainbowDiceVulkan(window, symbols, static_cast<uint32_t>(width),
@@ -270,7 +271,6 @@ std::string drawRollingDice(std::shared_ptr<RainbowDice> const &diceGraphics)
 {
     Sensors sensor;
 
-    diceGraphics->initThread();
     while (!stopDrawing.load()) {
         if (sensor.hasEvents()) {
             std::vector<Sensors::AccelerationEvent> events = sensor.getEvents();
@@ -324,6 +324,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
     try {
         std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
                 jSymbols, width, height, imageHeight, heightBlankSpace, jbitmap);
+        diceGraphics->resetPositions();
         std::string results = drawRollingDice(diceGraphics);
         return env->NewStringUTF(results.c_str());
     } catch (std::runtime_error &e) {
@@ -346,7 +347,7 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         JNIEnv *env,
         jobject jthis,
-        jobjectArray jsymbols,
+        jobjectArray jSymbolsUp,
         jobject surface,
         jobject manager,
         jobjectArray jDiceConfigs,
@@ -357,10 +358,10 @@ Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         jint heightBlankSpace,
         jbyteArray jbitmap)
 {
-    int count = env->GetArrayLength(jsymbols);
+    int count = env->GetArrayLength(jSymbolsUp);
     std::vector<std::string> symbols;
     for (int i = 0; i < count; i++) {
-        jstring jsymbol = (jstring) env->GetObjectArrayElement(jsymbols, i);
+        jstring jsymbol = (jstring) env->GetObjectArrayElement(jSymbolsUp, i);
         char const *csymbol = env->GetStringUTFChars(jsymbol, nullptr);
         symbols.push_back(csymbol);
         env->ReleaseStringUTFChars(jsymbol, csymbol);

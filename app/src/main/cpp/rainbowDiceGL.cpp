@@ -177,9 +177,6 @@ void RainbowDiceGL::initModels() {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * die->die->indices.size(),
                      die->die->indices.data(), GL_STATIC_DRAW);
     }
-
-    // needed because we are going to switch to another thread now
-    m_surface.cleanupThread();
 }
 
 void RainbowDiceGL::drawFrame() {
