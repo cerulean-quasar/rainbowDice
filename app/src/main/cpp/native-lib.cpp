@@ -172,7 +172,6 @@ std::shared_ptr<RainbowDice> initDice(
 
     bool useGl = false;
     std::shared_ptr<RainbowDice> diceGraphics;
-#undef CQ_ENABLE_VULKAN
 #ifdef CQ_ENABLE_VULKAN
     try {
         diceGraphics.reset(new RainbowDiceVulkan(window, symbols, static_cast<uint32_t>(width),
