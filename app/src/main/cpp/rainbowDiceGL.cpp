@@ -485,23 +485,38 @@ bool RainbowDiceGL::allStopped() {
     return true;
 }
 
-std::vector<std::string> RainbowDiceGL::getDiceResults() {
-    std::vector<std::string> results;
-    for (auto &&die : dice) {
-        if (!die->die->isStopped()) {
+std::vector<std::vector<std::string>> RainbowDiceGL::getDiceResults() {
+    std::vector<std::vector<std::string>> results;
+    for (DiceList::iterator dieIt = dice.begin(); dieIt != dice.end(); dieIt++) {
+        if (!dieIt->get()->die->isStopped()) {
             // Should not happen
             throw std::runtime_error("Not all die are stopped!");
         }
-        if (!die->isBeingReRolled) {
-            results.push_back(die->die->getResult());
+        std::vector<std::string> dieResults;
+        while (dieIt->get()->isBeingReRolled) {
+            dieResults.push_back(dieIt->get()->die->getResult());
+            dieIt++;
         }
+        dieResults.push_back(dieIt->get()->die->getResult());
+        results.push_back(dieResults);
     }
 
     return results;
 }
 
-void RainbowDiceGL::loadObject(std::vector<std::string> const &symbols) {
-    std::shared_ptr<DiceGL> o(new DiceGL(symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+bool RainbowDiceGL::needsReroll() {
+    for (auto const &die : dice) {
+        if (die->needsReroll()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void RainbowDiceGL::loadObject(std::vector<std::string> const &symbols, std::string const &inRerollSymbol) {
+    glm::vec3 position(0.0f, 0.0f, -1.0f);
+    std::shared_ptr<DiceGL> o(new DiceGL(symbols, inRerollSymbol, position));
     dice.push_back(o);
 }
 
@@ -544,21 +559,22 @@ void RainbowDiceGL::resetPositions(std::set<int> &diceIndices) {
         i++;
     }
 }
-void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
-    int i = 0;
-    DiceList::iterator diceIt = dice.begin();
-    for (std::set<int>::iterator it = diceIndices.begin(); it != diceIndices.end(); it++) {
-        for (; i < *it; i++, diceIt++) {
-            while (diceIt->get()->isBeingReRolled) {
-                diceIt++;
-            }
+void RainbowDiceGL::addRollingDice() {
+    for (DiceList::iterator diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
+        // Skip dice already being rerolled or does not get rerolled.
+        if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollSymbol.size() == 0) {
+            continue;
         }
-        while (diceIt->get()->isBeingReRolled) {
-            diceIt++;
+
+        std::string result = diceIt->get()->die->getResult();
+        if (result != diceIt->get()->rerollSymbol) {
+            continue;
         }
 
         DiceGL *currentDie = diceIt->get();
-        std::shared_ptr<DiceGL> die(new DiceGL(currentDie->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+        glm::vec3 position(0.0f, 0.0f, -1.0f);
+        std::shared_ptr<DiceGL> die(new DiceGL(currentDie->die->symbols, currentDie->rerollSymbol,
+                                               position));
         diceIt->get()->isBeingReRolled = true;
         int32_t w = m_surface.width();
         int32_t h = m_surface.height();
@@ -582,7 +598,7 @@ void RainbowDiceGL::addRollingDiceAtIndices(std::set<int> &diceIndices) {
         diceIt--;
     }
 
-    i=0;
+    int i=0;
     for (auto &&die : dice) {
         if (die->die->isStopped()) {
             float width = screenWidth;

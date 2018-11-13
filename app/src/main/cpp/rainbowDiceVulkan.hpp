@@ -89,25 +89,15 @@ struct Dice {
     std::shared_ptr<vulkan::Buffer> uniformBuffer;
 
     bool isBeingReRolled;
+    std::string rerollSymbol;
 
     Dice(std::shared_ptr<vulkan::Device> const &inDevice,
-         std::vector<std::string> const &symbols, glm::vec3 position)
+         std::vector<std::string> const &symbols, std::string const &inRerollSymbol, glm::vec3 &position)
             : m_device{inDevice},
-              die(nullptr)
+              die(nullptr),
+              rerollSymbol{inRerollSymbol}
     {
-        isBeingReRolled = false;
-        long nbrSides = symbols.size();
-        if (nbrSides == 4) {
-            die.reset(new DiceModelTetrahedron(symbols, position));
-        } else if (nbrSides == 12) {
-            die.reset(new DiceModelDodecahedron(symbols, position));
-        } else if (nbrSides == 20) {
-            die.reset(new DiceModelIcosahedron(symbols, position));
-        } else if (6 % nbrSides == 0) {
-            die.reset(new DiceModelCube(symbols, position));
-        } else {
-            die.reset(new DiceModelHedron(symbols, position));
-        }
+        initDice(symbols, position);
     }
 
     void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
@@ -130,6 +120,31 @@ struct Dice {
         uniformBuffer->copyRawTo(&die->ubo, sizeof(die->ubo));
     }
 
+    bool needsReroll() {
+        if (!die->isStopped()) {
+            // should not happen!
+            return false;
+        }
+
+        return !isBeingReRolled && rerollSymbol == die->getResult();
+    }
+
+private:
+    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position) {
+        isBeingReRolled = false;
+        long nbrSides = symbols.size();
+        if (nbrSides == 4) {
+            die.reset(new DiceModelTetrahedron(symbols, position));
+        } else if (nbrSides == 12) {
+            die.reset(new DiceModelDodecahedron(symbols, position));
+        } else if (nbrSides == 20) {
+            die.reset(new DiceModelIcosahedron(symbols, position));
+        } else if (6 % nbrSides == 0) {
+            die.reset(new DiceModelCube(symbols, position));
+        } else {
+            die.reset(new DiceModelHedron(symbols, position));
+        }
+    }
 };
 
 class RainbowDiceVulkan : public RainbowDice {
@@ -176,9 +191,9 @@ public:
 
     virtual bool allStopped();
 
-    virtual std::vector<std::string> getDiceResults();
+    virtual std::vector<std::vector<std::string>> getDiceResults();
 
-    virtual void loadObject(std::vector<std::string> const &symbols);
+    virtual void loadObject(std::vector<std::string> const &symbols, std::string const &rerollSymbol);
 
     virtual void recreateModels();
 
@@ -192,7 +207,9 @@ public:
 
     virtual void resetToStoppedPositions(std::vector<std::string> const &symbols);
 
-    virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
+    virtual void addRollingDice();
+
+    virtual bool needsReroll();
 
     virtual ~RainbowDiceVulkan() { }
 private:

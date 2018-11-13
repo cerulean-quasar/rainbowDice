@@ -16,9 +16,11 @@ public:
 
     virtual bool allStopped()=0;
 
-    virtual std::vector<std::string> getDiceResults()=0;
+    virtual std::vector<std::vector<std::string>> getDiceResults()=0;
 
-    virtual void loadObject(std::vector<std::string> const &symbols)=0;
+    virtual bool needsReroll()=0;
+
+    virtual void loadObject(std::vector<std::string> const &symbols, std::string const &rerollSymbol)=0;
 
     virtual void recreateModels()=0;
 
@@ -32,7 +34,7 @@ public:
 
     virtual void resetToStoppedPositions(std::vector<std::string> const &symbols)=0;
 
-    virtual void addRollingDiceAtIndices(std::set<int> &diceIndices)=0;
+    virtual void addRollingDice()=0;
 
     virtual void cleanupThread()=0;
 

@@ -78,8 +78,37 @@ struct DiceGL {
     // and then uses the index to determine what the reroll value was.
     bool isBeingReRolled;
 
-    DiceGL(std::vector<std::string> const &symbols, glm::vec3 position) : die(nullptr)
+    std::string rerollSymbol;
+
+    DiceGL(std::vector<std::string> const &symbols, std::string const &inRerollSymbol, glm::vec3 &position)
+            : die(nullptr),
+              rerollSymbol{inRerollSymbol}
     {
+        initDice(symbols, position);
+    }
+
+    void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
+        die->loadModel(texAtlas);
+        die->setView();
+        die->updatePerspectiveMatrix(width, height);
+    }
+
+    bool needsReroll() {
+        if (!die->isStopped()) {
+            // should not happen!
+            return false;
+        }
+
+        return !isBeingReRolled && rerollSymbol == die->getResult();
+    }
+
+    ~DiceGL() {
+        glDeleteBuffers(1, &vertexBuffer);
+        glDeleteBuffers(1, &indexBuffer);
+    }
+
+private:
+    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position) {
         isBeingReRolled = false;
         long nbrSides = symbols.size();
         if (nbrSides == 4) {
@@ -93,17 +122,6 @@ struct DiceGL {
         } else {
             die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, nbrSides, true));
         }
-    }
-
-    void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
-        die->loadModel(texAtlas);
-        die->setView();
-        die->updatePerspectiveMatrix(width, height);
-    }
-
-    ~DiceGL() {
-        glDeleteBuffers(1, &vertexBuffer);
-        glDeleteBuffers(1, &indexBuffer);
     }
 };
 
@@ -129,9 +147,11 @@ public:
 
     virtual bool allStopped();
 
-    virtual std::vector<std::string> getDiceResults();
+    virtual std::vector<std::vector<std::string>> getDiceResults();
 
-    virtual void loadObject(std::vector<std::string> const &symbols);
+    virtual bool needsReroll();
+
+    virtual void loadObject(std::vector<std::string> const &symbols, std::string const &inRerollSymbol);
 
     virtual void recreateModels();
 
@@ -145,7 +165,7 @@ public:
 
     virtual void resetToStoppedPositions(std::vector<std::string> const &symbols);
 
-    virtual void addRollingDiceAtIndices(std::set<int> &diceIndices);
+    virtual void addRollingDice();
 
     virtual ~RainbowDiceGL() {
     }

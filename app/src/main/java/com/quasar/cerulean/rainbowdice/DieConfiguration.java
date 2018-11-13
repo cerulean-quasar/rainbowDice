@@ -324,4 +324,8 @@ public class DieConfiguration implements Parcelable {
     public int getNumberOfDiceInt() {
         return numberOfDice;
     }
+    public int getReRollOnInt() {
+        return reRollOn;
+    }
+    public int getNumberOfSidesInt() { return numberOfSides; }
 }

@@ -86,18 +86,9 @@ public class DiceResult {
             for (int j = 0; j < numberOfDice; j++) {
                 boolean needsReRoll = false;
                 if (die.isRepresentableByTwoTenSided()) {
-                    ArrayList<DieResult> dieResults = new ArrayList<>();
-                    ArrayList<DieResult> dieResults2 = new ArrayList<>();
-                    int value = Integer.valueOf(values[i++]);
-                    int value2 = Integer.valueOf(values[i]);
-                    if (value + value2 == reRollOn) {
-                        needsReRoll = true;
-                    }
-                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation, false);
-                    dieResults.add(dieResult);
+                    ArrayList<DieResult> dieResults = getResultForString(values[i++], isAddOperation);
+                    ArrayList<DieResult> dieResults2 = getResultForString(values[i], isAddOperation);
                     diceResults.add(dieResults);
-                    dieResult = new DieResult(value2, needsReRoll, isAddOperation, false);
-                    dieResults2.add(dieResult);
                     diceResults.add(dieResults2);
                     i++;
                 } else if (die.getNumberOfSides() == 1) {
@@ -106,18 +97,23 @@ public class DiceResult {
                     dieResults.add(dieResult);
                     diceResults.add(dieResults);
                 } else {
-                    ArrayList<DieResult> dieResults = new ArrayList<>();
-                    int value = Integer.valueOf(values[i]);
-                    if (value == reRollOn) {
-                        needsReRoll = true;
-                    }
-                    DieResult dieResult = new DieResult(value, needsReRoll, isAddOperation, false);
-                    dieResults.add(dieResult);
+                    ArrayList<DieResult> dieResults = getResultForString(values[i], isAddOperation);
                     diceResults.add(dieResults);
                     i++;
                 }
             }
         }
+    }
+
+    private ArrayList<DieResult> getResultForString(String dieResultsString, boolean isAddOperation) {
+        ArrayList<DieResult> dieResults = new ArrayList<>();
+        String[] values = dieResultsString.split("\t");
+        for (String value: values) {
+            int valueInt = Integer.valueOf(value);
+            DieResult dieResult = new DieResult(valueInt, false, isAddOperation, false);
+            dieResults.add(dieResult);
+        }
+        return dieResults;
     }
 
     public JSONArray toJSON() throws JSONException {

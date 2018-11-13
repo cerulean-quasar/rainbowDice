@@ -83,10 +83,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // for the texture dimensions.
-    private static final int TEXWIDTH = 64;
-    private static final int TEXHEIGHT = 64;
-    private static final int TEX_BLANK_HEIGHT = 56;
-
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
     private boolean surfaceReady = false;
@@ -148,11 +144,7 @@ public class MainActivity extends AppCompatActivity {
                     result.setText(getString(R.string.diceMessageToStartRolling));
                     Button b = (Button) v;
                     joinDrawer();
-                    destroySurface();
                     loadFromFile(b.getText().toString());
-                    SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-                    SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-                    startDrawing(drawSurfaceHolder);
                     rollTheDice();
                 }
             });
@@ -188,7 +180,6 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
 
         joinDrawer();
-        destroySurface();
     }
 
     @Override
@@ -265,7 +256,14 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        drawOnce(symbols);
+        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        Draw draw = new Draw(null, drawSurfaceHolder, diceConfig, manager, null);
+        String err = draw.startDrawingStoppedDice(symbols);
+        if (err != null && err.length() > 0) {
+            TextView text = findViewById(R.id.rollResult);
+            text.setText(err);
+        }
     }
 
     public boolean loadFromLog() {
@@ -403,28 +401,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void rollTheDice() {
-        if (surfaceReady) {
-            joinDrawer();
-            diceResult = null;
-            roll();
-            startDrawer();
+        if (!surfaceReady) {
+            // shouldn't happen.
+            return;
         }
-    }
 
-    public void destroySurface() {
-        if (surfaceReady) {
-            surfaceReady = false;
-            destroyResources();
-        }
-    }
-
-    private void startDrawer() {
-        if (drawer == null && surfaceReady) {
-            TextView resultView = findViewById(R.id.rollResult);
-            Handler notify = new Handler(new ResultHandler(resultView));
-            drawer = new Thread(new Draw(notify));
-            drawer.start();
-        }
+        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        joinDrawer();
+        diceResult = null;
+        TextView resultView = findViewById(R.id.rollResult);
+        Handler notify = new Handler(new ResultHandler(resultView));
+        drawer = new Thread(new Draw(notify, drawSurfaceHolder, diceConfig, manager, null));
+        drawer.start();
     }
 
     public void joinDrawer() {
@@ -440,93 +429,11 @@ public class MainActivity extends AppCompatActivity {
         drawer = null;
     }
 
-    private byte[] createTexture(Collection<String> symbolSet) {
-        Bitmap bitmap;
-        try {
-            bitmap = Bitmap.createBitmap(TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT) * symbolSet.size(), ALPHA_8);
-        } catch (Exception e) {
-            if (e.getMessage() != null) {
-                publishError(e.getMessage());
-            } else {
-                publishError("Could not generate dice textures.");
-            }
-            return null;
-        }
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setUnderlineText(true);
-        paint.setFakeBoldText(true);
-        paint.setTextAlign(Paint.Align.CENTER);
-        canvas.drawARGB(0,0,0,0);
-        int i = 0;
-        for (String symbol : symbolSet) {
-            if (symbol.length() < 3) {
-                paint.setTextSize(48.0f);
-            } else {
-                paint.setTextSize(25.0f);
-            }
-            canvas.drawText(symbol, 28, i*(TEXHEIGHT+TEX_BLANK_HEIGHT) + 47, paint);
-            i++;
-        }
-        int bitmapSize = bitmap.getAllocationByteCount();
-        ByteBuffer imageBuffer = ByteBuffer.allocate(bitmapSize);
-        bitmap.copyPixelsToBuffer(imageBuffer);
-        byte[] bytes = new byte[bitmapSize];
-        try {
-            imageBuffer.position(0);
-            imageBuffer.get(bytes);
-        } catch (Exception e) {
-            publishError(e.getMessage() != null ? e.getMessage() : e.getClass().toString());
-            return null;
-        }
-
-        return bytes;
-    }
-
     public void publishError(String err) {
         if (err != null && err.length() > 0) {
             TextView view = findViewById(R.id.rollResult);
             view.setText(err);
         }
-    }
-
-    public void startDrawing(SurfaceHolder holder) {
-        if (diceConfig == null || diceConfig.length == 0) {
-            // somehow someone managed to crash the code by having dice config null.  I don't know
-            // how they did this, but returning here avoids the crash.
-            publishError("No dice configurations exist, please choose dice.");
-            return;
-        }
-
-        TreeSet<String> symbolSet = new TreeSet<>();
-
-        // First we need to load all the textures in the texture Atlas (in cpp), then
-        // we can load the models.  Since the model depends on the size of the textures.
-        for (DieConfiguration dieConfig : diceConfig) {
-            for (int i=0; i < dieConfig.getNumberDiceInRepresentation(); i++) {
-                String[] symbols = dieConfig.getSymbols(i);
-                for (String symbol : symbols) {
-                    symbolSet.add(symbol);
-                }
-            }
-        }
-
-        byte[] texture = createTexture(symbolSet);
-        if (texture == null) {
-            return;
-        }
-
-        Surface drawSurface = holder.getSurface();
-        String err = initDice(drawSurface, manager, diceConfig,
-                symbolSet.toArray(new String[symbolSet.size()]),
-                TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
-                TEX_BLANK_HEIGHT, texture);
-        if (err != null && err.length() != 0) {
-            publishError(err);
-            return;
-        }
-
-        surfaceReady = true;
     }
 
     public boolean isDrawing() {
@@ -545,25 +452,15 @@ public class MainActivity extends AppCompatActivity {
                 text.setText(svalue);
                 return true;
             }
-            if (diceResult != null) {
-                diceResult.updateWithReRolls(svalue);
-            } else {
-                diceResult = new DiceResult(svalue, diceConfig);
-            }
 
-            int[] indicesNeedReRoll = diceResult.reRollRequiredOnIndices();
-            if (indicesNeedReRoll == null) {
-                // no dice need reroll, just update the results text view with the results.
-                logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
-                drawingStarted = false;
-                text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
-                        getString(R.string.addition), getString(R.string.subtraction)));
-                diceResult = null;
-            } else {
-                text.setText(getString(R.string.diceMessageReRoll));
-                reRoll(indicesNeedReRoll);
-                startDrawer();
-            }
+            diceResult = new DiceResult(svalue, diceConfig);
+
+            // no dice need reroll, just update the results text view with the results.
+            logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
+            drawingStarted = false;
+            text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
+                    getString(R.string.addition), getString(R.string.subtraction)));
+            diceResult = null;
             return true;
         }
     }
@@ -572,14 +469,5 @@ public class MainActivity extends AppCompatActivity {
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    private native void destroyResources();
     private native void tellDrawerStop();
-    private native void recreateModels();
-    private native void recreateSwapChain();
-    private native String initDice(Surface surface, AssetManager manager, DieConfiguration[] diceConfig,
-                                   String[] symbols, int width, int height, int heightImage,
-                                   int heightBlankSpace,  byte[] bitmap);
-    private native void roll();
-    private native void reRoll(int[] indices);
-    private native String drawOnce(String[] symbols);
 }

@@ -36,38 +36,77 @@
 #endif
 
 /* Used to communicate between the gui thread and the drawing thread.  When the GUI thread wants
- * the drawer to stop drawing, cleanup, and exit, it sets this value to true.  The GUI will set
- * this value to false before starting a new drawer.
+ * the drawer to stop drawing, cleanup, and exit, it sets this value to true.  The drawing thread
+ * will set this value to false before starting drawing.
  */
 std::atomic<bool> stopDrawing(false);
 
+class Sensors {
+public:
+    struct AccelerationEvent {
+        float x;
+        float y;
+        float z;
+    };
 
-/* The following data are per program data and are to be accessed by one thread at a time.
- * Note: there are only two threads in this program; the drawer and the GUI.  Some of the data
- * below are set up by one thread and accessed by another but are guaranteed to not be accessed at
- * the same time because when the GUI thread sets up the data, the drawer has not started yet, or
- * has exited and been joined by the GUI.
- */
+    Sensors() {
+        initSensors();
+    }
+
+    inline bool hasEvents() {
+        return ASensorEventQueue_hasEvents(eventQueue) > 0;
+    }
+
+    inline std::vector<AccelerationEvent> getEvents() {
+        std::vector<ASensorEvent> events;
+        events.resize(100);
+        ssize_t nbrEvents = ASensorEventQueue_getEvents(eventQueue, events.data(), events.size());
+        if (nbrEvents < 0) {
+            // an error has occurred
+            throw std::runtime_error("Error on retrieving sensor events.");
+        }
+
+        std::vector<AccelerationEvent> avector;
+        for (int i = 0; i < nbrEvents; i++) {
+            AccelerationEvent a{
+                events[i].acceleration.x,
+                events[i].acceleration.y,
+                events[i].acceleration.z};
+            avector.push_back(a);
+        }
+
+        return avector;
+    }
+
+    ~Sensors(){
+        ASensorEventQueue_disableSensor(eventQueue, sensor);
+        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
+    }
+private:
 // microseconds
-int const MAX_EVENT_REPORT_TIME = 20000;
+    static int const MAX_EVENT_REPORT_TIME;
 
 // event identifier for identifying an event that occurs during a poll.  It doesn't matter what this
 // value is, it just has to be unique among all the other sensors the program receives events for.
-int const EVENT_TYPE_ACCELEROMETER = 462;
+    static int const EVENT_TYPE_ACCELEROMETER;
 
-ASensorManager *sensorManager = nullptr;
-ASensor const *sensor = nullptr;
-ASensorEventQueue *eventQueue = nullptr;
-ALooper *looper = nullptr;
-std::unique_ptr<RainbowDice> diceGraphics;
+    ASensorManager *sensorManager = nullptr;
+    ASensor const *sensor = nullptr;
+    ASensorEventQueue *eventQueue = nullptr;
+    ALooper *looper = nullptr;
 
-bool initSensors() {
+    void initSensors();
+};
+
+int const Sensors::MAX_EVENT_REPORT_TIME = 20000;
+int const Sensors::EVENT_TYPE_ACCELEROMETER = 462;
+
+void Sensors::initSensors() {
     sensorManager = ASensorManager_getInstance();
-    //sensorManager = ASensorManager_getInstanceForPackage("com.indigo.rainbodice");
     sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
     if (sensor == nullptr) {
         // TODO: use a flick gesture instead?
-        return false;
+        throw std::runtime_error("Accelerometer not present.");
     }
 
     looper = ALooper_forThread();
@@ -76,17 +115,27 @@ bool initSensors() {
     }
 
     if (looper == nullptr) {
-        return false;
+        throw std::runtime_error("Could not initialize looper.");
     }
 
     eventQueue = ASensorManager_createEventQueue(sensorManager, looper, EVENT_TYPE_ACCELEROMETER, nullptr, nullptr);
-    return eventQueue != nullptr;
+
+    int rc = ASensorEventQueue_enableSensor(eventQueue, sensor);
+    if (rc < 0) {
+        throw std::runtime_error("Could not enable sensor");
+    }
+    int minDelay = ASensor_getMinDelay(sensor);
+    minDelay = std::max(minDelay, MAX_EVENT_REPORT_TIME);
+
+    rc = ASensorEventQueue_setEventRate(eventQueue, sensor, minDelay);
+    if (rc < 0) {
+        ASensorEventQueue_disableSensor(eventQueue, sensor);
+        throw std::runtime_error("Could not set event rate");
+    }
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
+std::shared_ptr<RainbowDice> initDice(
         JNIEnv *env,
-        jobject jthis,
         jobject surface,
         jobject manager,
         jobjectArray jDiceConfigs,
@@ -96,16 +145,6 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         jint imageHeight,
         jint heightBlankSpace,
         jbyteArray jbitmap) {
-    if (!initSensors()) {
-        return env->NewStringUTF("Failed to initialize accelerometer");
-    }
-
-    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
-    if (window == nullptr) {
-        return env->NewStringUTF("Unable to acquire window from surface.");
-    }
-
-    setAssetManager(AAssetManager_fromJava(env, manager));
 
     // get the texture data
     jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
@@ -124,7 +163,15 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         symbols.push_back(symbol);
     }
 
+    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
+    if (window == nullptr) {
+        throw std::runtime_error("Unable to acquire window from surface.");
+    }
+
+    setAssetManager(AAssetManager_fromJava(env, manager));
+
     bool useGl = false;
+    std::shared_ptr<RainbowDice> diceGraphics;
 #ifdef CQ_ENABLE_VULKAN
     try {
         diceGraphics.reset(new RainbowDiceVulkan(window, symbols, static_cast<uint32_t>(width),
@@ -144,7 +191,7 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
                                                  static_cast<uint32_t>(heightBlankSpace), bitmap));
         } catch (std::runtime_error &e) {
             ANativeWindow_release(window);
-            return env->NewStringUTF(e.what());
+            throw;
         }
     }
 
@@ -154,16 +201,26 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
         jobject obj = env->GetObjectArrayElement(jDiceConfigs, i);
         jclass diceConfigClass = env->GetObjectClass(obj);
 
-        jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberDiceInRepresentation", "()I");
+        jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberOfSidesInt", "()I");
         if (mid == 0) {
-            return env->NewStringUTF("Could not load dice models");
+            throw std::runtime_error("Could not load dice models");
+        }
+        jint nbrSides = env->CallIntMethod(obj, mid);
+        if (nbrSides < 2) {
+            // dice is a constant - ignore this dice.
+            continue;
+        }
+
+        mid = env->GetMethodID(diceConfigClass, "getNumberDiceInRepresentation", "()I");
+        if (mid == 0) {
+            throw std::runtime_error("Could not load dice models");
         }
         jint nbrDiceInRepresentation = env->CallIntMethod(obj, mid);
 
         std::vector<std::vector<std::string>> symbolsDiceVector;
         mid = env->GetMethodID(diceConfigClass, "getSymbolsString", "(I)Ljava/lang/String;");
         if (mid == 0) {
-            return env->NewStringUTF("Could not load dice models");
+            throw std::runtime_error("Could not load dice models");
         }
         for (int j = 0; j < nbrDiceInRepresentation; j++) {
             jstring jSymbolsDice = (jstring) env->CallObjectMethod(obj, mid, j);
@@ -185,107 +242,97 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_initDice(
 
         mid = env->GetMethodID(diceConfigClass, "getNumberOfDiceInt", "()I");
         if (mid == 0) {
-            return env->NewStringUTF("Could not load dice models");
+            throw std::runtime_error("Could not load dice models");
         }
         jint nbrDice = env->CallIntMethod(obj, mid);
 
+        mid = env->GetMethodID(diceConfigClass, "getReRollOnInt", "()I");
+        if (mid == 0) {
+            throw std::runtime_error("Could not load dice models");
+        }
+        jint reroll = env->CallIntMethod(obj, mid);
+
+        std::string rerollSymbol{std::to_string(reroll)};
+
         for (int j = 0; j < nbrDice; j++) {
             for (auto const &diceSymbols : symbolsDiceVector) {
-                diceGraphics->loadObject(diceSymbols);
+                diceGraphics->loadObject(diceSymbols, rerollSymbol);
             }
         }
     }
 
-    try {
-        diceGraphics->initModels();
-    } catch (std::runtime_error &e) {
-        diceGraphics.reset();
-        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
-        if (strlen(e.what()) > 0) {
-            return env->NewStringUTF(e.what());
-        } else {
-            return env->NewStringUTF("Error in initializing graphics.");
+    diceGraphics->initModels();
+
+    return diceGraphics;
+}
+
+std::string drawRollingDice(std::shared_ptr<RainbowDice> const &diceGraphics)
+{
+    Sensors sensor;
+
+    diceGraphics->initThread();
+    while (!stopDrawing.load()) {
+        if (sensor.hasEvents()) {
+            std::vector<Sensors::AccelerationEvent> events = sensor.getEvents();
+            for (auto const &event : events) {
+                diceGraphics->updateAcceleration(event.x, event.y, event.z);
+            }
+
+        }
+        bool needsRedraw = diceGraphics->updateUniformBuffer();
+        if (needsRedraw) {
+            diceGraphics->drawFrame();
+        }
+
+        if (diceGraphics->allStopped()) {
+            if (diceGraphics->needsReroll()) {
+                diceGraphics->addRollingDice();
+                continue;
+            }
+            std::vector<std::vector<std::string>> results = diceGraphics->getDiceResults();
+            std::string totalResult;
+            for (auto result : results) {
+                for (auto dieResult : result) {
+                    totalResult += dieResult + "\t";
+                }
+                totalResult[totalResult.length() - 1] = '\n';
+            }
+            totalResult[totalResult.length() - 1] = '\0';
+            return totalResult;
         }
     }
 
-    return env->NewStringUTF("");
+    return std::string();
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_Draw_draw(
+Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
         JNIEnv *env,
-        jobject jthis)
-{
-    if (stopDrawing.load()) {
-        // There is nothing to do.  Just return, no results, no error.
-        return env->NewStringUTF("");
-    }
+        jobject jthis,
+        jobject surface,
+        jobject manager,
+        jobjectArray jDiceConfigs,
+        jobjectArray jSymbols,
+        jint width,
+        jint height,
+        jint imageHeight,
+        jint heightBlankSpace,
+        jbyteArray jbitmap) {
+
+    stopDrawing.store(false);
 
     try {
-        diceGraphics->initThread();
-        int rc = ASensorEventQueue_enableSensor(eventQueue, sensor);
-        if (rc < 0) {
-            return env->NewStringUTF("error: Could not enable sensor");
-        }
-        int minDelay = ASensor_getMinDelay(sensor);
-        minDelay = std::max(minDelay, MAX_EVENT_REPORT_TIME);
-
-        rc = ASensorEventQueue_setEventRate(eventQueue, sensor, minDelay);
-        if (rc < 0) {
-            ASensorEventQueue_disableSensor(eventQueue, sensor);
-            diceGraphics->cleanupThread();
-            return env->NewStringUTF("error: Could not set event rate");
-        }
-        std::vector<std::string> results;
-        while (!stopDrawing.load()) {
-            rc = ASensorEventQueue_hasEvents(eventQueue);
-            if (rc > 0) {
-                std::vector<ASensorEvent> events;
-                events.resize(100);
-                ssize_t nbrEvents = ASensorEventQueue_getEvents(eventQueue, events.data(), events.size());
-                if (nbrEvents < 0) {
-                    // an error has occurred
-                    ASensorEventQueue_disableSensor(eventQueue, sensor);
-                    diceGraphics->cleanupThread();
-                    return env->NewStringUTF("error: Error on retrieving sensor events.");
-                }
-
-                for (int i = 0; i < nbrEvents; i++) {
-                    float x = events[i].acceleration.x;
-                    float y = events[i].acceleration.y;
-                    float z = events[i].acceleration.z;
-                    diceGraphics->updateAcceleration(x, y, z);
-                }
-
-            }
-            bool needsRedraw = diceGraphics->updateUniformBuffer();
-            if (needsRedraw) {
-                diceGraphics->drawFrame();
-            }
-
-            if (diceGraphics->allStopped()) {
-                ASensorEventQueue_disableSensor(eventQueue, sensor);
-                results = diceGraphics->getDiceResults();
-                std::string totalResult;
-                for (auto result : results) {
-                    totalResult += result + "\n";
-                }
-                totalResult[totalResult.length() - 1] = '\0';
-                ASensorEventQueue_disableSensor(eventQueue, sensor);
-                diceGraphics->cleanupThread();
-                return env->NewStringUTF(totalResult.c_str());
-            }
-        }
+        std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
+                jSymbols, width, height, imageHeight, heightBlankSpace, jbitmap);
+        std::string results = drawRollingDice(diceGraphics);
+        return env->NewStringUTF(results.c_str());
     } catch (std::runtime_error &e) {
-        // no need to draw another frame - we are failing.
-        ASensorEventQueue_disableSensor(eventQueue, sensor);
-        diceGraphics->cleanupThread();
-        return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+        if (strlen(e.what()) > 0) {
+            return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+        } else {
+            return env->NewStringUTF("error: Error in initializing graphics.");
+        }
     }
-
-    diceGraphics->cleanupThread();
-    ASensorEventQueue_disableSensor(eventQueue, sensor);
-    return env->NewStringUTF("");
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -295,65 +342,20 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_tellDrawerStop(
     stopDrawing.store(true);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_destroyResources(
-        JNIEnv *env,
-        jobject jthis) {
-    // If this function is being called, it is assumed that the caller already stopped
-    // and joined the draw thread.
-    if (diceGraphics.get() != nullptr) {
-        diceGraphics.reset();
-    }
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateModels(
-        JNIEnv *env,
-        jobject jthis) {
-    diceGraphics->recreateModels();
-    stopDrawing.store(false);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_recreateSwapChain(
-        JNIEnv *env,
-        jobject jthis) {
-    diceGraphics->recreateSwapChain();
-    stopDrawing.store(false);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_roll(
-        JNIEnv *env,
-        jobject jthis) {
-    stopDrawing.store(false);
-    diceGraphics->resetPositions();
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_reRoll(
-        JNIEnv *env,
-        jobject jthis,
-        jintArray jIndices) {
-    int count = env->GetArrayLength(jIndices);
-    std::set<int> indices;
-    jboolean isCopy;
-    jint *cIndices = env->GetIntArrayElements(jIndices, &isCopy);
-    for (int i = 0; i < count; i++) {
-        indices.insert(cIndices[i]);
-    }
-    env->ReleaseIntArrayElements(jIndices, cIndices, JNI_COMMIT);
-    stopDrawing.store(false);
-    diceGraphics->initThread();
-    diceGraphics->addRollingDiceAtIndices(indices);
-    diceGraphics->cleanupThread();
-}
-
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_drawOnce(
+Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         JNIEnv *env,
         jobject jthis,
-        jobjectArray jsymbols)
+        jobjectArray jsymbols,
+        jobject surface,
+        jobject manager,
+        jobjectArray jDiceConfigs,
+        jobjectArray jSymbols,
+        jint width,
+        jint height,
+        jint imageHeight,
+        jint heightBlankSpace,
+        jbyteArray jbitmap)
 {
     int count = env->GetArrayLength(jsymbols);
     std::vector<std::string> symbols;
@@ -365,17 +367,13 @@ Java_com_quasar_cerulean_rainbowdice_MainActivity_drawOnce(
     }
 
     try {
-        if (diceGraphics.get() == nullptr) {
-            return env->NewStringUTF("No dice being rolled.");
-        }
-
-        diceGraphics->initThread();
+        std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
+                                                             jSymbols, width, height, imageHeight,
+                                                             heightBlankSpace, jbitmap);
         diceGraphics->resetToStoppedPositions(symbols);
         diceGraphics->drawFrame();
-        diceGraphics->cleanupThread();
         return env->NewStringUTF("");
     } catch (std::runtime_error &e) {
-        diceGraphics->cleanupThread();
         return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
     }
 }

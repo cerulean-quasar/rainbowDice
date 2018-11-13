@@ -554,8 +554,9 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t te
     return textureImage;
 }
 
-void RainbowDiceVulkan::loadObject(std::vector<std::string> const &symbols) {
-    std::shared_ptr<Dice> o(new Dice(m_device, symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+void RainbowDiceVulkan::loadObject(std::vector<std::string> const &symbols, std::string const &rerollSymbol) {
+    glm::vec3 position(0.0f, 0.0f, -1.0f);
+    std::shared_ptr<Dice> o(new Dice(m_device, symbols, rerollSymbol, position));
     dice.push_back(o);
 }
 
@@ -615,22 +616,22 @@ void RainbowDiceVulkan::resetPositions(std::set<int> &diceIndices) {
     }
 }
 
-void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
-    int i = 0;
-    DiceList::iterator diceIt = dice.begin();
-    for (std::set<int>::iterator it = diceIndices.begin(); it != diceIndices.end(); it++) {
-        for (; i < *it; i++, diceIt++) {
-            while (diceIt->get()->isBeingReRolled) {
-                diceIt++;
-            }
-        }
-        while (diceIt->get()->isBeingReRolled) {
-            diceIt++;
+void RainbowDiceVulkan::addRollingDice() {
+    for (DiceList::iterator diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
+        // Skip dice already being rerolled or does not get rerolled.
+        if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollSymbol.size() == 0) {
+            continue;
         }
 
-        std::shared_ptr<Dice> die(new Dice(m_device, diceIt->get()->die->symbols, glm::vec3(0.0f, 0.0f, -1.0f)));
+        std::string result = diceIt->get()->die->getResult();
+        if (result != diceIt->get()->rerollSymbol) {
+            continue;
+        }
+
+        glm::vec3 position(0.0f, 0.0f, -1.0f);
+        std::shared_ptr<Dice> die(new Dice(m_device, diceIt->get()->die->symbols,
+                                           diceIt->get()->rerollSymbol, position));
         diceIt->get()->isBeingReRolled = true;
-
 
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height, m_textureAtlas);
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
@@ -649,7 +650,7 @@ void RainbowDiceVulkan::addRollingDiceAtIndices(std::set<int> &diceIndices) {
 
     initializeCommandBuffers();
 
-    i=0;
+    int i = 0;
     for (auto &&die : dice) {
         if (die->die->isStopped()) {
             float width = screenWidth;
@@ -674,19 +675,33 @@ bool RainbowDiceVulkan::allStopped() {
     return true;
 }
 
-std::vector<std::string> RainbowDiceVulkan::getDiceResults() {
-    std::vector<std::string> results;
-    for (auto &&die : dice) {
-        if (!die->die->isStopped()) {
+std::vector<std::vector<std::string>> RainbowDiceVulkan::getDiceResults() {
+    std::vector<std::vector<std::string>> results;
+    for (DiceList::iterator dieIt = dice.begin(); dieIt != dice.end(); dieIt++) {
+        if (!dieIt->get()->die->isStopped()) {
             // Should not happen
             throw std::runtime_error("Not all die are stopped!");
         }
-        if (!die->isBeingReRolled) {
-            results.push_back(die->die->getResult());
+        std::vector<std::string> dieResults;
+        while (dieIt->get()->isBeingReRolled) {
+            dieResults.push_back(dieIt->get()->die->getResult());
+            dieIt++;
         }
+        dieResults.push_back(dieIt->get()->die->getResult());
+        results.push_back(dieResults);
     }
 
     return results;
+}
+
+bool RainbowDiceVulkan::needsReroll() {
+    for (auto const &die : dice) {
+        if (die->needsReroll()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::string> const &symbols) {
