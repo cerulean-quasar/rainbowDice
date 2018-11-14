@@ -36,16 +36,20 @@ public class MySurfaceCallback implements SurfaceHolder.Callback {
         // If the app is drawing, let the drawer detect the change and fix it.  Otherwise we need
         // to draw once here to avoid the dice looking squashed after the dice are done rolling
         // and the result is delivered (the drawer is stopped if this is the case).
-        if (!app.isDrawing() && app.loadFromLog()) {
-            app.drawStoppedDice();
+        if (!app.isDrawing()) {
+            MainActivity.LogFileLoadedResult result = app.loadFromLog();
+            if (result != null) {
+                app.drawStoppedDice(result.diceConfig, result.diceResult);
+            }
         }
     }
 
 
     public void surfaceCreated(SurfaceHolder holder) {
         app.setSurfaceReady(true);
-        if (app.loadFromLog()) {
-            app.drawStoppedDice();
+        MainActivity.LogFileLoadedResult result = app.loadFromLog();
+        if (result != null) {
+            app.drawStoppedDice(result.diceConfig, result.diceResult);
         }
     }
 

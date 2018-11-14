@@ -19,54 +19,34 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.opengl.GLUtils;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedList;
-import java.util.Locale;
-import java.util.TreeSet;
 
-import static android.graphics.Bitmap.Config.ALPHA_8;
-import static android.graphics.Bitmap.Config.ARGB_4444;
-import static android.graphics.Bitmap.Config.ARGB_8888;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.themeNameConfigValue;
@@ -87,13 +67,16 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean surfaceReady = false;
     private Thread drawer = null;
-    private DieConfiguration[] diceConfig = null;
-    private DiceResult diceResult = null;
+
+    public class LogFileLoadedResult {
+        public DieConfiguration[] diceConfig = null;
+        public DiceResult diceResult = null;
+    }
+
     private DiceConfigurationManager configurationFile = null;
     private LogFile logFile = null;
-    private String diceFileLoaded = null;
     private boolean drawingStarted = false;
-    private AssetManager manager = null;
+    private AssetManager assetManager = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
 
-        manager = getAssets();
+        assetManager = getAssets();
         createDefaults();
         logFile = new LogFile(this);
         initGui();
@@ -144,8 +127,9 @@ public class MainActivity extends AppCompatActivity {
                     result.setText(getString(R.string.diceMessageToStartRolling));
                     Button b = (Button) v;
                     joinDrawer();
-                    loadFromFile(b.getText().toString());
-                    rollTheDice();
+                    String diceFileName = b.getText().toString();
+                    DieConfiguration[] diceConfig = loadFromFile(diceFileName);
+                    rollTheDice(diceConfig, diceFileName);
                 }
             });
             layout.addView(button);
@@ -240,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
         surfaceReady = inIsReady;
     }
 
-    public void drawStoppedDice() {
+    public void drawStoppedDice(DieConfiguration[] diceConfig, DiceResult diceResult) {
         ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
         int len = 0;
         for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
@@ -258,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
 
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        Draw draw = new Draw(null, drawSurfaceHolder, diceConfig, manager, null);
+        Draw draw = new Draw(null, drawSurfaceHolder, diceConfig, assetManager, null);
         String err = draw.startDrawingStoppedDice(symbols);
         if (err != null && err.length() > 0) {
             TextView text = findViewById(R.id.rollResult);
@@ -266,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public boolean loadFromLog() {
+    public LogFileLoadedResult loadFromLog() {
         TextView text = findViewById(R.id.rollResult);
         LogFile.LogItem item = null;
         int logFileSize = logFile.size();
@@ -276,18 +260,19 @@ public class MainActivity extends AppCompatActivity {
 
         if (item == null || item.getVersion() != 1) {
             text.setText(R.string.diceMessageStartup);
-            return false;
+            return null;
         }
 
-        diceResult = item.getRollResults();
-        ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
+        LogFileLoadedResult result = new LogFileLoadedResult();
+        result.diceResult = item.getRollResults();
+        ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = result.diceResult.getDiceResults();
         int len = 0;
         for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
             len += dieResults.size();
         }
 
         DieConfiguration[] configs = item.getDiceConfiguration();
-        diceConfig = new DieConfiguration[len];
+        result.diceConfig = new DieConfiguration[len];
 
         int k = 0;
         int l = 0;
@@ -298,19 +283,19 @@ public class MainActivity extends AppCompatActivity {
                 DiceResult.DieResult dieResult = dieResults.get(i);
                 if (configs[l].isRepresentableByTwoTenSided()) {
                     if (configs[l].getStartAt() == 0) {
-                        diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
+                        result.diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
                                 configs[l].getReRollOn(), configs[l].isAddOperation());
-                        diceConfig[k++] = new DieConfiguration(1, 10, 0, 1,
+                        result.diceConfig[k++] = new DieConfiguration(1, 10, 0, 1,
                                 configs[l].getReRollOn(), configs[l].isAddOperation());
                     } else {
-                        diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
+                        result.diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
                                 configs[l].getReRollOn(), configs[l].isAddOperation());
-                        diceConfig[k++] = new DieConfiguration(1, 10, 1, 1,
+                        result.diceConfig[k++] = new DieConfiguration(1, 10, 1, 1,
                                 configs[l].getReRollOn(), configs[l].isAddOperation());
                     }
                     j++;
                 } else {
-                    diceConfig[k++] = new DieConfiguration(configs[l], 1);
+                    result.diceConfig[k++] = new DieConfiguration(configs[l], 1);
                 }
             }
             if (m == configs[l].getNumberOfDice()-1) {
@@ -321,12 +306,12 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
+        text.setText(result.diceResult.generateResultsString(getString(R.string.diceMessageResult),
                 getString(R.string.addition), getString(R.string.subtraction)));
-        return true;
+        return result;
     }
 
-    private void loadFromFile(String filename) {
+    private DieConfiguration[] loadFromFile(String filename) {
         StringBuilder json = new StringBuilder();
 
         try {
@@ -341,20 +326,19 @@ public class MainActivity extends AppCompatActivity {
             inputStream.close();
         } catch (FileNotFoundException e) {
             System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
-            return;
+            return null;
         } catch (IOException e) {
             System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
-            return;
+            return null;
         }
 
         try {
             JSONArray jsonArray = new JSONArray(json.toString());
-            diceConfig = DieConfiguration.fromJsonArray(jsonArray);
+            return DieConfiguration.fromJsonArray(jsonArray);
         } catch (JSONException e) {
             System.out.println("Exception on reading JSON from file: " + filename + " message: " + e.getMessage());
-            return;
+            return null;
         }
-        diceFileLoaded = filename;
     }
 
     private void createDefaults() {
@@ -400,7 +384,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void rollTheDice() {
+    private void rollTheDice(DieConfiguration[] diceConfig, String diceFileName) {
         if (!surfaceReady) {
             // shouldn't happen.
             return;
@@ -409,10 +393,9 @@ public class MainActivity extends AppCompatActivity {
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         joinDrawer();
-        diceResult = null;
         TextView resultView = findViewById(R.id.rollResult);
-        Handler notify = new Handler(new ResultHandler(resultView));
-        drawer = new Thread(new Draw(notify, drawSurfaceHolder, diceConfig, manager, null));
+        Handler notify = new Handler(new ResultHandler(resultView, diceConfig, diceFileName));
+        drawer = new Thread(new Draw(notify, drawSurfaceHolder, diceConfig, assetManager, null));
         drawer.start();
     }
 
@@ -442,7 +425,13 @@ public class MainActivity extends AppCompatActivity {
 
     private class ResultHandler implements Handler.Callback {
         private TextView text;
-        public ResultHandler(TextView textToUpdate) { text = textToUpdate; }
+        private DieConfiguration[] diceConfig;
+        private String diceFileLoaded;
+        public ResultHandler(TextView textToUpdate, DieConfiguration[] inDiceConfig, String inDiceFileName) {
+            text = textToUpdate;
+            diceConfig = inDiceConfig;
+            diceFileLoaded = inDiceFileName;
+        }
         public boolean handleMessage(Message message) {
             Bundle data = message.getData();
             String svalue = data.getString("results");
@@ -453,14 +442,13 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
-            diceResult = new DiceResult(svalue, diceConfig);
+            DiceResult diceResult = new DiceResult(svalue, diceConfig);
 
             // no dice need reroll, just update the results text view with the results.
             logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
             drawingStarted = false;
             text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
                     getString(R.string.addition), getString(R.string.subtraction)));
-            diceResult = null;
             return true;
         }
     }
