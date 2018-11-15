@@ -22,7 +22,7 @@
     <string name="diceConfigIncrement">next</string>
     <string name="diceConfigReRoll">reroll on</string>
     <string name="diceConfigConstant">Value</string>
-    <string name="diceMessageStartup">Click on a dice name above to roll, or add new dice by selecting "Choose Dice->New"</string>
+    <string name="diceMessageStartup">Click on a dice name above to roll, or add new dice by selecting "New Dice" from the menu.</string>
     <string name="errorNoDiceDefinitions">There are dice listed.  Create some with "Choose Dice->New".</string>
     <string name="confirm">Delete dice configuration: %s?</string>
     <string name="D1">Bonus</string>
