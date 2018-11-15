@@ -47,7 +47,11 @@ find_library( # Sets the name of the path variable.
 include_directories(${ANDROID_NDK}/sysroot/usr/include/android)
 include_directories(${ANDROID_NDK}/sources/third_party/vulkan/src/libs)
 include_directories(APP_GLUE_DIR ${ANDROID_NDK}/sources/android/native_app_glue)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -std=c++14")
+set(CQ_COMPILE_FLAGS)
+if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
+    list(APPEND CQ_COMPILE_FLAGS -DDEBUG)
+endif(${CMAKE_BUILD_TYPE} STREQUAL Debug)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -std=c++14 ${CQ_COMPILE_FLAGS}")
 
 target_compile_definitions(native-lib PUBLIC -DVK_USE_PLATFORM_ANDROID_KHR)
 

@@ -31,7 +31,6 @@
 #include "android.hpp"
 
 namespace vulkan {
-#define DEBUG
 #ifdef DEBUG
     const bool enableValidationLayers = true;
 #else
