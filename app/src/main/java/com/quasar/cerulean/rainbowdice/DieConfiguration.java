@@ -275,6 +275,8 @@ public class DieConfiguration implements Parcelable {
     public int getNumberDiceInRepresentation() {
         if (isRepresentableByTwoTenSided()) {
             return 2;
+        } else if (numberOfSides == 1) {
+            return 0;
         } else {
             return 1;
         }

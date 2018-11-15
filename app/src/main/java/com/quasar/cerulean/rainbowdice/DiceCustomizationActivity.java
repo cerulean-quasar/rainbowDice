@@ -23,6 +23,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.os.Parcelable;
 import android.support.v7.app.AlertDialog;
@@ -803,10 +804,27 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             edit = findViewById(R.id.die_next);
             edit.setText(String.format(Locale.getDefault(), "%d", config.getIncrement() + config.getStartAt()));
             edit = findViewById(R.id.die_reroll);
-            if (config.getReRollOn() >= config.getStartAt()) {
-                edit.setText(String.format(Locale.getDefault(), "%d", config.getReRollOn()));
-            } else {
+            TextView textView = findViewById(R.id.die_reroll_label);
+            if (config.getNumberDiceInRepresentation() > 1) {
+                // reroll does not make sense for percentile dice
+                edit.setEnabled(false);
+                textView.setTextColor(Color.GRAY);
                 edit.setText("");
+            } else {
+                edit.setEnabled(true);
+                TypedArray themeArray = getTheme().obtainStyledAttributes(new int[] {android.R.attr.textColor});
+                try {
+                    int textColor = themeArray.getColor(0, 0);
+                    textView.setTextColor(textColor);
+                } finally {
+                    // Free up resources.
+                    themeArray.recycle();
+                }
+                if (config.getReRollOn() >= config.getStartAt()) {
+                    edit.setText(String.format(Locale.getDefault(), "%d", config.getReRollOn()));
+                } else {
+                    edit.setText("");
+                }
             }
         }
     }

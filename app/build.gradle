@@ -6,8 +6,8 @@ android {
         applicationId "com.quasar.cerulean.rainbowdice"
         minSdkVersion 21
         targetSdkVersion 27
-        versionCode 11
-        versionName "1.10"
+        versionCode 12
+        versionName "1.11"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
         shaders {
@@ -37,6 +37,12 @@ android {
             jniLibs {
                 srcDir "/home/cerulean.quasar/Android/Sdk/ndk-bundle/sources/third_party/vulkan/src/build-android/jniLibs"
             }
+        }
+    }
+
+    allprojects {
+        tasks.withType(JavaCompile) {
+            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
         }
     }
 }

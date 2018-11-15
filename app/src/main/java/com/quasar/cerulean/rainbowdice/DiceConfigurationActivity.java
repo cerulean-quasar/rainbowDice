@@ -31,6 +31,7 @@ import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.IBinder;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -199,7 +200,13 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                     mimeTypes[0] = ClipDescription.MIMETYPE_TEXT_PLAIN;
                     ClipData data = new ClipData(diceName, mimeTypes, item);
 
-                    view.startDrag(data, new MyDragShadowBuilder(editDeleteLayout), null, 0);
+                    // startDrag is deprecated, but its replacement was added in API level 24.  When only
+                    // API level 24 and above is supported, remove this conditional code.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        view.startDragAndDrop(data, new MyDragShadowBuilder(editDeleteLayout), null, 0);
+                    } else {
+                        view.startDrag(data, new MyDragShadowBuilder(editDeleteLayout), null, 0);
+                    }
                     return true;
                 }
             });
