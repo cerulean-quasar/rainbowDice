@@ -282,10 +282,11 @@ namespace vulkan {
         inline std::shared_ptr<VkDescriptorSet_T> const &descriptorSet() { return m_descriptorSet; }
     };
 
-    class Buffer;
     class DescriptorSetLayout {
     public:
         virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() = 0;
+        virtual uint32_t numberOfDescriptors() = 0;
+        virtual VkDescriptorPoolCreateInfo const &poolCreateInfo() = 0;
         virtual ~DescriptorSetLayout() {}
     };
 
@@ -297,30 +298,17 @@ namespace vulkan {
         uint32_t m_totalDescriptorsInPool;
         uint32_t m_totalDescriptorsAllocated;
 
-        DescriptorPool(std::shared_ptr<Device> const &inDevice, uint32_t totalDescriptors)
+        DescriptorPool(std::shared_ptr<Device> const &inDevice,
+                       std::shared_ptr<DescriptorSetLayout> const &inLayout)
                 : m_device{inDevice},
                   m_descriptorPool{},
-                  m_totalDescriptorsInPool{totalDescriptors},
+                  m_totalDescriptorsInPool{inLayout->numberOfDescriptors()},
                   m_totalDescriptorsAllocated{0} {
             // no more descriptors in all the descriptor pools.  create another descriptor pool...
-            std::array<VkDescriptorPoolSize, 3> poolSizes = {};
-
-            // one for each wall and +3 for the floor, ball, and hole.
-            poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            poolSizes[0].descriptorCount = m_totalDescriptorsInPool;
-            poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            poolSizes[1].descriptorCount = m_totalDescriptorsInPool;
-            poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            poolSizes[2].descriptorCount = m_totalDescriptorsInPool;
-            VkDescriptorPoolCreateInfo poolInfo = {};
-            poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-            poolInfo.pPoolSizes = poolSizes.data();
-            poolInfo.maxSets = m_totalDescriptorsInPool;
 
             VkDescriptorPool descriptorPoolRaw;
-            if (vkCreateDescriptorPool(m_device->logicalDevice().get(), &poolInfo, nullptr,
-                                       &descriptorPoolRaw) != VK_SUCCESS) {
+            if (vkCreateDescriptorPool(m_device->logicalDevice().get(), &inLayout->poolCreateInfo(),
+                                       nullptr, &descriptorPoolRaw) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create descriptor pool!");
             }
 
@@ -366,7 +354,6 @@ namespace vulkan {
         friend DescriptorSet;
     private:
         std::shared_ptr<Device> m_device;
-        static uint32_t constexpr m_numberOfDescriptorSetsInPool = 1024;
         std::shared_ptr<vulkan::DescriptorSetLayout> m_descriptorSetLayout;
         std::vector<DescriptorPool> m_descriptorPools;
         std::vector<VkDescriptorSet> m_unusedDescriptors;
@@ -409,7 +396,7 @@ namespace vulkan {
                 }
 
 
-                DescriptorPool newDescriptorPool(m_device, m_numberOfDescriptorSetsInPool);
+                DescriptorPool newDescriptorPool(m_device, m_descriptorSetLayout);
                 m_descriptorPools.push_back(newDescriptorPool);
                 VkDescriptorSet descriptorSet = newDescriptorPool.allocateDescriptor(
                         m_descriptorSetLayout);

@@ -55,8 +55,21 @@ class DiceDescriptorSetLayout : public vulkan::DescriptorSetLayout {
 public:
     DiceDescriptorSetLayout(std::shared_ptr<vulkan::Device> const &inDevice)
             : m_device{inDevice},
-              m_descriptorSetLayout{}
+              m_descriptorSetLayout{},
+              m_poolInfo{},
+              m_poolSizes{}
     {
+        m_poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        m_poolSizes[0].descriptorCount = m_numberOfDescriptorSetsInPool;
+        m_poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        m_poolSizes[1].descriptorCount = m_numberOfDescriptorSetsInPool;
+        m_poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        m_poolSizes[2].descriptorCount = m_numberOfDescriptorSetsInPool;
+        m_poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        m_poolInfo.poolSizeCount = static_cast<uint32_t>(m_poolSizes.size());
+        m_poolInfo.pPoolSizes = m_poolSizes.data();
+        m_poolInfo.maxSets = m_numberOfDescriptorSetsInPool;
+
         createDescriptorSetLayout();
     }
 
@@ -65,10 +78,21 @@ public:
                              std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet,
                              std::vector<VkDescriptorImageInfo> const &imageInfos);
 
-    inline virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() { return m_descriptorSetLayout; }
+    virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() {
+        return m_descriptorSetLayout;
+    }
+
+    virtual uint32_t numberOfDescriptors() { return m_numberOfDescriptorSetsInPool; }
+
+    virtual VkDescriptorPoolCreateInfo const &poolCreateInfo() {
+        return m_poolInfo;
+    }
 private:
+    static uint32_t constexpr m_numberOfDescriptorSetsInPool = 1024;
     std::shared_ptr<vulkan::Device> m_device;
     std::shared_ptr<VkDescriptorSetLayout_T> m_descriptorSetLayout;
+    VkDescriptorPoolCreateInfo m_poolInfo;
+    std::array<VkDescriptorPoolSize, 3> m_poolSizes;
 
     void createDescriptorSetLayout();
 };
