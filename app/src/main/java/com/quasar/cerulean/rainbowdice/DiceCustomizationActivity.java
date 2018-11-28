@@ -82,8 +82,14 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     private class DiceSidesInfo {
         DiceSidesInfo(Button inButton, int inDrawableClicked, int inDrawableUnclicked) {
             button = inButton;
-            drawableClicked = inDrawableClicked;
-            drawableUnclicked = inDrawableUnclicked;
+
+            TypedValue value = new TypedValue();
+            getTheme().resolveAttribute(inDrawableClicked, value, true);
+            drawableClicked = value.resourceId;
+
+            value = new TypedValue();
+            getTheme().resolveAttribute(inDrawableUnclicked, value, true);
+            drawableUnclicked = value.resourceId;
         }
         public Button button;
         public int drawableClicked;
@@ -118,17 +124,28 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         diceSidesInfos = new DiceSidesInfo[11];
         int i = 0;
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d1Button), R.drawable.constant, R.drawable.constant_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d3Button), R.drawable.d6, R.drawable.d6_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d4Button), R.drawable.d4, R.drawable.d4_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d6Button), R.drawable.d6, R.drawable.d6_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d8Button), R.drawable.d8, R.drawable.d8_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d10Button), R.drawable.d10, R.drawable.d10_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d12Button), R.drawable.d12, R.drawable.d12_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d20Button), R.drawable.d20, R.drawable.d20_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d30Button), R.drawable.d30, R.drawable.d30_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d100Button), R.drawable.percentile, R.drawable.percentile_grayscale);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.otherButton), R.drawable.d10, R.drawable.d10_grayscale);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d1Button),
+                R.attr.constant_clicked, R.attr.constant_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d3Button),
+                R.attr.d6_clicked, R.attr.d6_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d4Button),
+                R.attr.d4_clicked, R.attr.d4_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d6Button),
+                R.attr.d6_clicked, R.attr.d6_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d8Button),
+                R.attr.d8_clicked, R.attr.d8_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d10Button),
+                R.attr.d10_clicked, R.attr.d10_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d12Button),
+                R.attr.d12_clicked, R.attr.d12_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d20Button),
+                R.attr.d20_clicked, R.attr.d20_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d30Button),
+                R.attr.d30_clicked, R.attr.d30_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d100Button),
+                R.attr.percentile_clicked, R.attr.percentile_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.otherButton),
+                R.attr.d10_clicked, R.attr.d10_unclicked);
 
         DieConfiguration[] configs = null;
         Parcelable[] parcelableConfigs = null;

@@ -1740,3 +1740,481 @@ void DiceModelDodecahedron::yAlign(uint32_t faceIndex){
     stoppedRotationAxis = zaxis;
     stoppedAngle = angle;
 }
+
+void DiceModelRhombicTriacontahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
+    glm::vec3 p0, p1, p2, p3;
+    uint32_t vertices[4];
+    glm::vec3 cornerNormal[4];
+
+    for (uint32_t faceIndex = 0; faceIndex < 30; faceIndex++) {
+        corners(faceIndex, vertices[0], vertices[1], vertices[2], vertices[3]);
+        for (uint32_t i = 0; i < 4; i++) {
+            cornerNormal[i] = {0.0f, 0.0f, 0.0f};
+            for (auto &&faceIndexForVertex : facesForVertex(vertices[i])) {
+                corners(faceIndexForVertex, p0, p1, p2, p3);
+                cornerNormal[i] += glm::cross(p3 - p0, p1 - p0);
+            }
+            cornerNormal[i] = glm::normalize(cornerNormal[i]);
+        }
+
+        addVertices(texAtlas, cornerNormal[0], cornerNormal[1], cornerNormal[2], cornerNormal[3],
+                    faceIndex);
+    }
+}
+
+void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
+                                                  glm::vec3 const &cornerNormal0,
+                                                  glm::vec3 const &cornerNormal1,
+                                                  glm::vec3 const &cornerNormal2,
+                                                  glm::vec3 const &cornerNormal3,
+                                                  uint32_t faceIndex) {
+    glm::vec3 p0{};
+    glm::vec3 p1{};
+    glm::vec3 p2{};
+    glm::vec3 p3{};
+    corners(faceIndex, p0, p1, p2, p3);
+    uint32_t totalNbrImages = texAtlas->getNbrImages();
+    float paddingTotal = totalNbrImages * (float)texAtlas->getPaddingHeight()/(float)texAtlas->getTextureHeight();
+    uint32_t textureToUse = texAtlas->getImageIndex(symbols[faceIndex%symbols.size()]);
+    float paddingHeight = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse);
+
+    float lengthFactorX = 1.0f/(2.0f * glm::length((p1-p3)/4.0f));
+    float lengthFactorY = ((1.0f - paddingTotal) / totalNbrImages)/(2.0f * glm::length((2.0f*p0 - p2)/4.0f));
+
+    Vertex vertex{};
+    vertex.corner1 = p3;
+    vertex.corner2 = p2;
+    vertex.corner3 = p1;
+    vertex.corner4 = p0;
+    vertex.corner5 = {1000.0, 1000.0, 1000.0};
+    vertex.normal = glm::normalize(glm::cross(p3-p0, p1-p0));
+
+    vertex.pos = p0;
+    vertex.color = colors[faceIndex % colors.size()];
+    vertex.cornerNormal = cornerNormal0;
+    vertex.texCoord = {glm::length((p1-p3)/4.0f)*lengthFactorX,
+                       ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight -
+                                     glm::length((p1+p3-2.0f*p0)/4.0f)*lengthFactorY};
+    vertices.push_back(vertex);
+
+    vertex.pos = p1;
+    vertex.color = colors[(faceIndex+1) % colors.size()];
+    vertex.cornerNormal = cornerNormal1;
+    vertex.texCoord = {1.0f + glm::length((p2+p0-2.0f*p1)/4.0f)*lengthFactorX,
+                       ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight +
+                                     glm::length((2.0f*p0 - p2)/4.0f)*lengthFactorY};
+    vertices.push_back(vertex);
+
+    vertex.pos = p2;
+    vertex.color = colors[(faceIndex+2) % colors.size()];
+    vertex.cornerNormal = cornerNormal2;
+    vertex.texCoord = {glm::length((p1-p3)/4.0f)*lengthFactorX,
+                       ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse+1) + paddingHeight +
+                                     glm::length((p1+p3-2.0f*p0)/4.0f)*lengthFactorY};
+    vertices.push_back(vertex);
+
+    vertex.pos = p3;
+    vertex.color = colors[(faceIndex+3) % colors.size()];
+    vertex.cornerNormal = cornerNormal3;
+    vertex.texCoord = {0.0f - glm::length((p2+p0-2.0f*p1)/4.0f)*lengthFactorX,
+                       ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight +
+                       glm::length((2.0f*p0 - p2)/4.0f)*lengthFactorY};
+    vertices.push_back(vertex);
+
+    indices.push_back(0 + faceIndex*4);
+    indices.push_back(3 + faceIndex*4);
+    indices.push_back(1 + faceIndex*4);
+    indices.push_back(1 + faceIndex*4);
+    indices.push_back(3 + faceIndex*4);
+    indices.push_back(2 + faceIndex*4);
+}
+
+std::vector<uint32_t> DiceModelRhombicTriacontahedron::facesForVertex(uint32_t vertexNumber) {
+    switch (vertexNumber) {
+        case 0:
+            return std::vector<uint32_t>{0, 12, 5};
+        case 1:
+            return std::vector<uint32_t>{0, 19, 23};
+        case 2:
+            return std::vector<uint32_t>{12, 5, 1, 7, 28};
+        case 3:
+            return std::vector<uint32_t>{19, 23, 8, 22, 13};
+        case 4:
+            return std::vector<uint32_t>{16, 29, 7, 6, 9};
+        case 5:
+            return std::vector<uint32_t>{21, 2, 8, 11, 15};
+        case 6:
+            return std::vector<uint32_t>{26, 16, 29};
+        case 7:
+            return std::vector<uint32_t>{26, 21, 2};
+        case 8:
+            return std::vector<uint32_t>{0, 12, 3, 27, 23};
+        case 9:
+            return std::vector<uint32_t>{0, 5, 17, 10, 19};
+        case 10:
+            return std::vector<uint32_t>{27, 3, 14};
+        case 11:
+            return std::vector<uint32_t>{17, 10, 4};
+        case 12:
+            return std::vector<uint32_t>{24, 20, 14};
+        case 13:
+            return std::vector<uint32_t>{18, 25, 4};
+        case 14:
+            return std::vector<uint32_t>{26, 16, 2, 24, 20};
+        case 15:
+            return std::vector<uint32_t>{26, 29, 18, 25, 21};
+        case 16:
+            return std::vector<uint32_t>{3, 1, 20, 14, 9};
+        case 17:
+            return std::vector<uint32_t>{1, 7, 9};
+        case 18:
+            return std::vector<uint32_t>{7, 28, 6};
+        case 19:
+            return std::vector<uint32_t>{17, 18, 4, 28, 6};
+        case 20:
+            return std::vector<uint32_t>{10, 25, 4, 13, 15};
+        case 21:
+            return std::vector<uint32_t>{8, 13, 15};
+        case 22:
+            return std::vector<uint32_t>{8, 22, 11};
+        case 23:
+            return std::vector<uint32_t>{27, 24, 14, 22, 11};
+        case 24:
+            return std::vector<uint32_t>{12, 3, 1};
+        case 25:
+            return std::vector<uint32_t>{5, 17, 28};
+        case 26:
+            return std::vector<uint32_t>{19, 10, 13};
+        case 27:
+            return std::vector<uint32_t>{23, 27, 22};
+        case 28:
+            return std::vector<uint32_t>{16, 20, 9};
+        case 29:
+            return std::vector<uint32_t>{29, 18, 6};
+        case 30:
+            return std::vector<uint32_t>{25, 21, 15};
+        case 31:
+            return std::vector<uint32_t>{2, 24, 11};
+        default:
+            throw std::runtime_error("Invalid vertex number for rhombic triacontahedron");
+    }
+}
+
+void DiceModelRhombicTriacontahedron::corners(uint32_t faceIndex,
+                                              glm::vec3 &p0, glm::vec3 &p1,
+                                              glm::vec3 &p2, glm::vec3 &p3) {
+    uint32_t v0, v1, v2, v3;
+    corners(faceIndex, v0, v1, v2, v3);
+    p0 = vertex(v0);
+    p1 = vertex(v1);
+    p2 = vertex(v2);
+    p3 = vertex(v3);
+}
+
+void DiceModelRhombicTriacontahedron::corners(uint32_t faceIndex,
+                                              uint32_t &p0, uint32_t &p1,
+                                              uint32_t &p2, uint32_t &p3) {
+
+    switch (faceIndex) {
+        case 0:
+            p0 = 8;
+            p1 = 0;
+            p2 = 9;
+            p3 = 1;
+            return;
+        case 1:
+            p0 = 16;
+            p1 = 17;
+            p2 = 2;
+            p3 = 24;
+            return;
+        case 2:
+            p0 = 14;
+            p1 = 31;
+            p2 = 5;
+            p3 = 7;
+            return;
+        case 3:
+            p0 = 16;
+            p1 = 24;
+            p2 = 8;
+            p3 = 10;
+            return;
+        case 4:
+            p0 = 20;
+            p1 = 11;
+            p2 = 19;
+            p3 = 13;
+            return;
+        case 5:
+            p0 = 2;
+            p1 = 25;
+            p2 = 9;
+            p3 = 0;
+            return;
+        case 6:
+            p0 = 4;
+            p1 = 29;
+            p2 = 19;
+            p3 = 18;
+            return;
+        case 7:
+            p0 = 4;
+            p1 = 18;
+            p2 = 2;
+            p3 = 17;
+            return;
+        case 8:
+            p0 = 5;
+            p1 = 22;
+            p2 = 3;
+            p3 = 21;
+            return;
+        case 9:
+            p0 = 4;
+            p1 = 17;
+            p2 = 16;
+            p3 = 28;
+            return;
+        case 10:
+            p0 = 9;
+            p1 = 11;
+            p2 = 20;
+            p3 = 26;
+            return;
+        case 11:
+            p0 = 5;
+            p1 = 31;
+            p2 = 23;
+            p3 = 22;
+            return;
+        case 12:
+            p0 = 8;
+            p1 = 24;
+            p2 = 2;
+            p3 = 0;
+            return;
+        case 13:
+            p0 = 20;
+            p1 = 21;
+            p2 = 3;
+            p3 = 26;
+            return;
+        case 14:
+            p0 = 16;
+            p1 = 10;
+            p2 = 23;
+            p3 = 12;
+            return;
+        case 15:
+            p0 = 5;
+            p1 = 21;
+            p2 = 20;
+            p3 = 30;
+            return;
+        case 16:
+            p0 = 14;
+            p1 = 6;
+            p2 = 4;
+            p3 = 28;
+            return;
+        case 17:
+            p0 = 9;
+            p1 = 25;
+            p2 = 19;
+            p3 = 11;
+            return;
+        case 18:
+            p0 = 15;
+            p1 = 13;
+            p2 = 19;
+            p3 = 29;
+            return;
+        case 19:
+            p0 = 3;
+            p1 = 1;
+            p2 = 9;
+            p3 = 26;
+            return;
+        case 20:
+            p0 = 14;
+            p1 = 28;
+            p2 = 16;
+            p3 = 12;
+            return;
+        case 21:
+            p0 = 15;
+            p1 = 7;
+            p2 = 5;
+            p3 = 30;
+            return;
+        case 22:
+            p0 = 23;
+            p1 = 27;
+            p2 = 3;
+            p3 = 22;
+            return;
+        case 23:
+            p0 = 8;
+            p1 = 1;
+            p2 = 3;
+            p3 = 27;
+            return;
+        case 24:
+            p0 = 14;
+            p1 = 12;
+            p2 = 23;
+            p3 = 31;
+            return;
+        case 25:
+            p0 = 15;
+            p1 = 30;
+            p2 = 20;
+            p3 = 13;
+            return;
+        case 26:
+            p0 = 15;
+            p1 = 6;
+            p2 = 14;
+            p3 = 7;
+            return;
+        case 27:
+            p0 = 23;
+            p1 = 10;
+            p2 = 8;
+            p3 = 27;
+            return;
+        case 28:
+            p0 = 2;
+            p1 = 18;
+            p2 = 19;
+            p3 = 25;
+            return;
+        case 29:
+            p0 = 15;
+            p1 = 29;
+            p2 = 4;
+            p3 = 6;
+            return;
+        default:
+            throw std::runtime_error("Invalid face index for rhombic triacontahedron");
+    }
+}
+
+glm::vec3 DiceModelRhombicTriacontahedron::vertex(uint32_t vertexIndex) {
+    float phi = (1+sqrtf(5.0f))/2;
+    float scaleFactor = 2.5f;
+    float nbr1 = 1.0f/scaleFactor;
+    float nbr2 = phi/scaleFactor;
+    float nbr3 = (1.0f + phi)/scaleFactor;
+
+    switch (vertexIndex) {
+        case 0:
+            return {0.0f, nbr1, nbr3};
+        case 1:
+            return {0.0f, -nbr1, nbr3};
+        case 2:
+            return {0.0f, nbr3, nbr2};
+        case 3:
+            return {0.0f, -nbr3, nbr2};
+        case 4:
+            return {0.0f, nbr3, -nbr2};
+        case 5:
+            return {0.0f, -nbr3, -nbr2};
+        case 6:
+            return {0.0f, nbr1, -nbr3};
+        case 7:
+            return {0.0f, -nbr1, -nbr3};
+        case 8:
+            return {nbr2, 0.0f, nbr3};
+        case 9:
+            return {-nbr2, 0.0f, nbr3};
+        case 10:
+            return {nbr3, 0.0f, nbr1};
+        case 11:
+            return {-nbr3, 0.0f, nbr1};
+        case 12:
+            return {nbr3, 0.0f, -nbr1};
+        case 13:
+            return {-nbr3, 0.0f, -nbr1};
+        case 14:
+            return {nbr2, 0.0f, -nbr3};
+        case 15:
+            return {-nbr2, 0.0f, -nbr3};
+        case 16:
+            return {nbr3, nbr2, 0.0f};
+        case 17:
+            return {nbr1, nbr3, 0.0f};
+        case 18:
+            return {-nbr1, nbr3, 0.0f};
+        case 19:
+            return {-nbr3, nbr2, 0.0f};
+        case 20:
+            return {-nbr3, -nbr2, 0.0f};
+        case 21:
+            return {-nbr1, -nbr3, 0.0f};
+        case 22:
+            return {nbr1, -nbr3, 0.0f};
+        case 23:
+            return {nbr3, -nbr2, 0.0f};
+        case 24:
+            return {nbr2, nbr2, nbr2};
+        case 25:
+            return {-nbr2, nbr2, nbr2};
+        case 26:
+            return {-nbr2, -nbr2, nbr2};
+        case 27:
+            return {nbr2, -nbr2, nbr2};
+        case 28:
+            return {nbr2, nbr2, -nbr2};
+        case 29:
+            return {-nbr2, nbr2, -nbr2};
+        case 30:
+            return {-nbr2, -nbr2, -nbr2};
+        case 31:
+            return {nbr2, -nbr2, -nbr2};
+        default:
+            throw std::runtime_error("Incorrect vertex number for rhombic triacontahedron");
+    }
+}
+
+void DiceModelRhombicTriacontahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
+    uint32_t const nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
+    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+
+    glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 p14 = ubo.model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 p24 = ubo.model * glm::vec4(vertices[2 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
+    glm::vec3 p1 = glm::vec3(p14.x, p14.y, p14.z);
+    glm::vec3 p2 = glm::vec3(p24.x, p24.y, p24.z);
+    axis = glm::normalize(glm::cross(p0-p1, p2-p1));
+    angle = glm::acos(glm::dot(axis, zaxis));
+}
+
+void DiceModelRhombicTriacontahedron::yAlign(uint32_t faceIndex) {
+    const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
+    glm::vec3 yaxis;
+    glm::vec3 zaxis;
+    if (isOpenGl) {
+        zaxis = {0.0f, 0.0f, -1.0f};
+        yaxis = {0.0f, -1.0f, 0.0f};
+    } else {
+        zaxis = {0.0f, 0.0f, 1.0f};
+        yaxis = {0.0f, 1.0f, 0.0f};
+    }
+    glm::vec3 axis;
+
+    glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 p24 = ubo.model * glm::vec4(vertices[2 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec3 p0 = {p04.x, p04.y, p04.z};
+    glm::vec3 p2 = {p24.x, p24.y, p24.z};
+    axis = p0 - p2;
+
+    float angle = glm::acos(glm::dot(glm::normalize(axis), yaxis));
+    if (axis.x < 0) {
+        angle = -angle;
+    }
+    stoppedRotationAxis = zaxis;
+    stoppedAngle = angle;
+}

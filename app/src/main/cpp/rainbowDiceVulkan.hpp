@@ -163,6 +163,8 @@ private:
             die.reset(new DiceModelDodecahedron(symbols, position));
         } else if (nbrSides == 20) {
             die.reset(new DiceModelIcosahedron(symbols, position));
+        } else if (nbrSides == 30) {
+            die.reset(new DiceModelRhombicTriacontahedron(symbols, position));
         } else if (6 % nbrSides == 0) {
             die.reset(new DiceModelCube(symbols, position));
         } else {

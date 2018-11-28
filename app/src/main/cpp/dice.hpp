@@ -17,8 +17,9 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#ifndef DICE_HPP
-#define DICE_HPP
+#ifndef RAINBOWDICE_DICE_HPP
+#define RAINBOWDICE_DICE_HPP
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -426,4 +427,38 @@ public:
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };
-#endif
+
+class DiceModelRhombicTriacontahedron : public DicePhysicsModel {
+private:
+    void addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
+                     glm::vec3 const &cornerNormal0, glm::vec3 const &cornerNormal1,
+                     glm::vec3 const &cornerNormal2, glm::vec3 const &cornerNormal3,
+                     uint32_t faceIndex);
+    glm::vec3 vertex(uint32_t vertexIndex);
+
+    // this version of corners returns the four vectors describing the vertices defining the face
+    // given by faceIndex.
+    void corners(uint32_t faceIndex, glm::vec3 &p0, glm::vec3 &p1, glm::vec3 &p2, glm::vec3 &p3);
+
+    // this version of corners returns the four indices describing the vertices defining the face
+    // given by faceIndex.
+    void corners(uint32_t faceIndex, uint32_t &p0, uint32_t &p1, uint32_t &p2, uint32_t &p3);
+
+    // returns a vector of face indices that contain the given vertex number.
+    std::vector<uint32_t> facesForVertex(uint32_t vertexNumber);
+public:
+    DiceModelRhombicTriacontahedron(std::vector<std::string> const &inSymbols, bool inIsOpenGl = false)
+            : DicePhysicsModel(inSymbols, 30, inIsOpenGl)
+    {
+    }
+
+    DiceModelRhombicTriacontahedron(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition, bool inIsOpenGl = false)
+            : DicePhysicsModel(inSymbols, inPosition, 30, inIsOpenGl)
+    {
+    }
+
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
+    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
+    virtual void yAlign(uint32_t faceIndex);
+};
+#endif /* RAINBOWDICE_DICE_HPP */

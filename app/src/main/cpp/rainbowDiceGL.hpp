@@ -112,15 +112,17 @@ private:
         isBeingReRolled = false;
         long nbrSides = symbols.size();
         if (nbrSides == 4) {
-            die.reset((DicePhysicsModel*)new DiceModelTetrahedron(symbols, position, true));
+            die.reset(new DiceModelTetrahedron(symbols, position, true));
         } else if (nbrSides == 12) {
-            die.reset((DicePhysicsModel*)new DiceModelDodecahedron(symbols, position, true));
+            die.reset(new DiceModelDodecahedron(symbols, position, true));
         } else if (nbrSides == 20) {
-            die.reset((DicePhysicsModel*)new DiceModelIcosahedron(symbols, position, true));
+            die.reset(new DiceModelIcosahedron(symbols, position, true));
+        } else if (nbrSides == 30) {
+            die.reset(new DiceModelRhombicTriacontahedron(symbols, position, true));
         } else if (6 % nbrSides == 0) {
-            die.reset((DicePhysicsModel*)new DiceModelCube(symbols, position, true));
+            die.reset(new DiceModelCube(symbols, position, true));
         } else {
-            die.reset((DicePhysicsModel*)new DiceModelHedron(symbols, position, nbrSides, true));
+            die.reset(new DiceModelHedron(symbols, position, nbrSides, true));
         }
     }
 };

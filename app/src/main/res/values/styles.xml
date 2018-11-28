@@ -3,6 +3,24 @@
     <attr name="divider" format="reference"/>
     <attr name="divider_vertical" format="reference"/>
     <attr name="background_landscape" format="reference"/>
+    <attr name="constant_clicked" format="reference"/>
+    <attr name="constant_unclicked" format="reference"/>
+    <attr name="d4_clicked" format="reference"/>
+    <attr name="d4_unclicked" format="reference"/>
+    <attr name="d6_clicked" format="reference"/>
+    <attr name="d6_unclicked" format="reference"/>
+    <attr name="d8_clicked" format="reference"/>
+    <attr name="d8_unclicked" format="reference"/>
+    <attr name="d10_clicked" format="reference"/>
+    <attr name="d10_unclicked" format="reference"/>
+    <attr name="d12_clicked" format="reference"/>
+    <attr name="d12_unclicked" format="reference"/>
+    <attr name="d20_clicked" format="reference"/>
+    <attr name="d20_unclicked" format="reference"/>
+    <attr name="d30_clicked" format="reference"/>
+    <attr name="d30_unclicked" format="reference"/>
+    <attr name="percentile_clicked" format="reference"/>
+    <attr name="percentile_unclicked" format="reference"/>
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -13,13 +31,30 @@
     </style>
 
     <style name="Space" parent="Theme.AppCompat">
-        <item name="android:textColor">#3333ff</item>
+        <item name="android:textColor">#ffffff</item>
         <item name="android:background">@null</item>
         <item name="android:windowBackground">@drawable/space</item>
         <item name="divider">@drawable/space_supernova</item>
         <item name="divider_vertical">@drawable/space_supernova_vertical</item>
         <item name="background_landscape">@drawable/space_landscape</item>
-        <item name="android:textSize">20sp</item>
+        <item name="constant_clicked">@drawable/constant_dark</item>
+        <item name="constant_unclicked">@drawable/constant_dark_grayscale</item>
+        <item name="d4_clicked">@drawable/d4_dark</item>
+        <item name="d4_unclicked">@drawable/d4_dark_grayscale</item>
+        <item name="d6_clicked">@drawable/d6_dark</item>
+        <item name="d6_unclicked">@drawable/d6_dark_grayscale</item>
+        <item name="d8_clicked">@drawable/d8_dark</item>
+        <item name="d8_unclicked">@drawable/d8_dark_grayscale</item>
+        <item name="d10_clicked">@drawable/d10_dark</item>
+        <item name="d10_unclicked">@drawable/d10_dark_grayscale</item>
+        <item name="d12_clicked">@drawable/d12_dark</item>
+        <item name="d12_unclicked">@drawable/d12_dark_grayscale</item>
+        <item name="d20_clicked">@drawable/d20_dark</item>
+        <item name="d20_unclicked">@drawable/d20_dark_grayscale</item>
+        <item name="d30_clicked">@drawable/d30_dark</item>
+        <item name="d30_unclicked">@drawable/d30_dark_grayscale</item>
+        <item name="percentile_clicked">@drawable/percentile_dark</item>
+        <item name="percentile_unclicked">@drawable/percentile_dark_grayscale</item>
     </style>
 
     <style name="Space.Launcher" parent="Space">
@@ -33,7 +68,24 @@
         <item name="divider">@drawable/sky_vine</item>
         <item name="divider_vertical">@drawable/sky_vine_vertical</item>
         <item name="background_landscape">@drawable/sky_landscape</item>
-        <item name="android:textSize">20sp</item>
+        <item name="constant_clicked">@drawable/constant</item>
+        <item name="constant_unclicked">@drawable/constant_grayscale</item>
+        <item name="d4_clicked">@drawable/d4</item>
+        <item name="d4_unclicked">@drawable/d4_grayscale</item>
+        <item name="d6_clicked">@drawable/d6</item>
+        <item name="d6_unclicked">@drawable/d6_grayscale</item>
+        <item name="d8_clicked">@drawable/d8</item>
+        <item name="d8_unclicked">@drawable/d8_grayscale</item>
+        <item name="d10_clicked">@drawable/d10</item>
+        <item name="d10_unclicked">@drawable/d10_grayscale</item>
+        <item name="d12_clicked">@drawable/d12</item>
+        <item name="d12_unclicked">@drawable/d12_grayscale</item>
+        <item name="d20_clicked">@drawable/d20</item>
+        <item name="d20_unclicked">@drawable/d20_grayscale</item>
+        <item name="d30_clicked">@drawable/d30</item>
+        <item name="d30_unclicked">@drawable/d30_grayscale</item>
+        <item name="percentile_clicked">@drawable/percentile</item>
+        <item name="percentile_unclicked">@drawable/percentile_grayscale</item>
     </style>
 
     <style name="Trees" parent="Theme.AppCompat.Light">
@@ -43,7 +95,24 @@
         <item name="divider">@drawable/trees_branch</item>
         <item name="divider_vertical">@drawable/trees_branch_vertical</item>
         <item name="background_landscape">@drawable/trees_landscape</item>
-        <item name="android:textSize">20sp</item>
+        <item name="constant_clicked">@drawable/constant</item>
+        <item name="constant_unclicked">@drawable/constant_grayscale</item>
+        <item name="d4_clicked">@drawable/d4</item>
+        <item name="d4_unclicked">@drawable/d4_grayscale</item>
+        <item name="d6_clicked">@drawable/d6</item>
+        <item name="d6_unclicked">@drawable/d6_grayscale</item>
+        <item name="d8_clicked">@drawable/d8</item>
+        <item name="d8_unclicked">@drawable/d8_grayscale</item>
+        <item name="d10_clicked">@drawable/d10</item>
+        <item name="d10_unclicked">@drawable/d10_grayscale</item>
+        <item name="d12_clicked">@drawable/d12</item>
+        <item name="d12_unclicked">@drawable/d12_grayscale</item>
+        <item name="d20_clicked">@drawable/d20</item>
+        <item name="d20_unclicked">@drawable/d20_grayscale</item>
+        <item name="d30_clicked">@drawable/d30</item>
+        <item name="d30_unclicked">@drawable/d30_grayscale</item>
+        <item name="percentile_clicked">@drawable/percentile</item>
+        <item name="percentile_unclicked">@drawable/percentile_grayscale</item>
     </style>
 
     <style name="Adventure" parent="Theme.AppCompat.Light">
@@ -53,6 +122,23 @@
         <item name="divider">@drawable/adventure_arrow</item>
         <item name="divider_vertical">@drawable/adventure_arrow_vertical</item>
         <item name="background_landscape">@drawable/adventure_landscape</item>
-        <item name="android:textSize">20sp</item>
+        <item name="constant_clicked">@drawable/constant</item>
+        <item name="constant_unclicked">@drawable/constant_grayscale</item>
+        <item name="d4_clicked">@drawable/d4</item>
+        <item name="d4_unclicked">@drawable/d4_grayscale</item>
+        <item name="d6_clicked">@drawable/d6</item>
+        <item name="d6_unclicked">@drawable/d6_grayscale</item>
+        <item name="d8_clicked">@drawable/d8</item>
+        <item name="d8_unclicked">@drawable/d8_grayscale</item>
+        <item name="d10_clicked">@drawable/d10</item>
+        <item name="d10_unclicked">@drawable/d10_grayscale</item>
+        <item name="d12_clicked">@drawable/d12</item>
+        <item name="d12_unclicked">@drawable/d12_grayscale</item>
+        <item name="d20_clicked">@drawable/d20</item>
+        <item name="d20_unclicked">@drawable/d20_grayscale</item>
+        <item name="d30_clicked">@drawable/d30</item>
+        <item name="d30_unclicked">@drawable/d30_grayscale</item>
+        <item name="percentile_clicked">@drawable/percentile</item>
+        <item name="percentile_unclicked">@drawable/percentile_grayscale</item>
     </style>
 </resources>
