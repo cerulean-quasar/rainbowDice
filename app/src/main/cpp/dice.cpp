@@ -1800,7 +1800,8 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.pos = p1;
     vertex.color = colors[(faceIndex+1) % colors.size()];
     vertex.cornerNormal = cornerNormal1;
-    vertex.texCoord = {1.0f + glm::length((p2+p0-2.0f*p1)/4.0f)*lengthFactorX,
+    float xadj = glm::length((p2+p0-2.0f*p1)/4.0f)*lengthFactorX;
+    vertex.texCoord = {1.0f + xadj,
                        ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight +
                                      glm::length((2.0f*p0 - p2)/4.0f)*lengthFactorY};
     vertices.push_back(vertex);
@@ -1816,7 +1817,7 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.pos = p3;
     vertex.color = colors[(faceIndex+3) % colors.size()];
     vertex.cornerNormal = cornerNormal3;
-    vertex.texCoord = {0.0f - glm::length((p2+p0-2.0f*p1)/4.0f)*lengthFactorX,
+    vertex.texCoord = {0.0f - xadj,
                        ((1.0f - paddingTotal) / totalNbrImages) * (textureToUse) + paddingHeight +
                        glm::length((2.0f*p0 - p2)/4.0f)*lengthFactorY};
     vertices.push_back(vertex);
@@ -2180,7 +2181,7 @@ glm::vec3 DiceModelRhombicTriacontahedron::vertex(uint32_t vertexIndex) {
 
 void DiceModelRhombicTriacontahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
     uint32_t const nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
-    glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
+    glm::vec3 zaxis{0.0f, 0.0f, 1.0f};
 
     glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
     glm::vec4 p14 = ubo.model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
@@ -2217,4 +2218,17 @@ void DiceModelRhombicTriacontahedron::yAlign(uint32_t faceIndex) {
     }
     stoppedRotationAxis = zaxis;
     stoppedAngle = angle;
+}
+
+void DiceModelRhombicTriacontahedron::updatePerspectiveMatrix(uint32_t surfaceWidth,
+                                                              uint32_t surfaceHeight) {
+    DicePhysicsModel::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
+
+    // I don't know why, but we need to invert the z-axis if using OpenGL for this dice type only.
+    if (isOpenGl) {
+        ubo.proj[0][2] *= -1;
+        ubo.proj[1][2] *= -1;
+        ubo.proj[2][2] *= -1;
+        ubo.proj[3][2] *= -1;
+    }
 }

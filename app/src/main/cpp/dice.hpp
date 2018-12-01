@@ -260,7 +260,7 @@ public:
     }
 
     void setView();
-    void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
+    virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
     void updateAcceleration(float x, float y, float z);
     bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
@@ -457,6 +457,7 @@ public:
     {
     }
 
+    virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
     virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
