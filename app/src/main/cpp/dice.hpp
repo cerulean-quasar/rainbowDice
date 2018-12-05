@@ -47,6 +47,9 @@ struct Vertex {
     glm::vec3 corner3;
     glm::vec3 corner4;
     glm::vec3 corner5;
+    float mode;
+    static const float MODE_EDGE_DISTANCE;
+    static const float MODE_CENTER_DISTANCE;
 
     bool operator==(const Vertex& other) const;
 };
@@ -458,6 +461,29 @@ public:
     }
 
     virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
+    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
+    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
+    virtual void yAlign(uint32_t faceIndex);
+};
+
+class DiceModelCoin : public DicePhysicsModel {
+private:
+    static constexpr uint32_t nbrPoints = 32;  // needs to be divisible by 8.
+    static constexpr float radius = 1.0f;
+    static constexpr float thickness = 0.3f;
+    void addEdgeVertices();
+    void addFaceVertices(std::shared_ptr<TextureAtlas> const &texAtlas);
+public:
+    DiceModelCoin(std::vector<std::string> const &inSymbols, bool inIsOpenGl = false)
+            : DicePhysicsModel(inSymbols, 2, inIsOpenGl)
+    {
+    }
+
+    DiceModelCoin(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition, bool inIsOpenGl = false)
+            : DicePhysicsModel(inSymbols, inPosition, 2, inIsOpenGl)
+    {
+    }
+
     virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);

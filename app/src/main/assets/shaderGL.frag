@@ -30,6 +30,7 @@ varying vec3 fragCorner2;
 varying vec3 fragCorner3;
 varying vec3 fragCorner4;
 varying vec3 fragCorner5;
+varying float fragMode;
 
 uniform sampler2D texSampler;
 uniform vec3 viewPosition;
@@ -77,41 +78,55 @@ void main() {
     vec3 f5 = vec3(0.0, 0.0, 0.0);
 
     vec3 value = vec3(0.0,0.0,0.0);
-    f1 = (fragCorner1 + fragCorner2)/2.0;
-    f2 = (fragCorner2 + fragCorner3)/2.0;
-    sideNormal1 = normalize(cross(fragCorner1 - fragCorner2, fragNormal));
-    sideNormal2 = normalize(cross(fragCorner2 - fragCorner3, fragNormal));
-    if (length(fragCorner4) < 1000.0) {
-        f3 = (fragCorner3 + fragCorner4)/2.0;
-        sideNormal3 = normalize(cross(fragCorner3 - fragCorner4, fragNormal));
-        if (length(fragCorner5) < 1000.0) {
-            f4 = (fragCorner4 + fragCorner5)/2.0;
-            f5 = (fragCorner5 + fragCorner1)/2.0;
-            sideNormal4 = normalize(cross(fragCorner4 - fragCorner5, fragNormal));
-            sideNormal5 = normalize(cross(fragCorner5 - fragCorner1, fragNormal));
+
+    if (fragMode <= 0.0) {
+        // consider the distance from the edges of the shape. fragCorner1-fragCorner4 are the
+        // vectors to the corners of the shape making up a face of the die.
+        f1 = (fragCorner1 + fragCorner2)/2.0;
+        f2 = (fragCorner2 + fragCorner3)/2.0;
+        sideNormal1 = normalize(cross(fragCorner1 - fragCorner2, fragNormal));
+        sideNormal2 = normalize(cross(fragCorner2 - fragCorner3, fragNormal));
+        if (length(fragCorner4) < 1000.0) {
+            f3 = (fragCorner3 + fragCorner4)/2.0;
+            sideNormal3 = normalize(cross(fragCorner3 - fragCorner4, fragNormal));
+            if (length(fragCorner5) < 1000.0) {
+                f4 = (fragCorner4 + fragCorner5)/2.0;
+                f5 = (fragCorner5 + fragCorner1)/2.0;
+                sideNormal4 = normalize(cross(fragCorner4 - fragCorner5, fragNormal));
+                sideNormal5 = normalize(cross(fragCorner5 - fragCorner1, fragNormal));
+            } else {
+                f4 = (fragCorner4 + fragCorner1)/2.0;
+                sideNormal4 = normalize(cross(fragCorner4 - fragCorner1, fragNormal));
+            }
         } else {
-            f4 = (fragCorner4 + fragCorner1)/2.0;
-            sideNormal4 = normalize(cross(fragCorner4 - fragCorner1, fragNormal));
+            f3 = (fragCorner3 + fragCorner1)/2.0;
+            sideNormal3 = normalize(cross(fragCorner3 - fragCorner1, fragNormal));
+        }
+
+        if (proximity(fragPosition, sideNormal1, factor, f1) <= 0.0) {
+            specNormal = normalize(fragCornerNormal);
+        } else if (proximity(fragPosition, sideNormal2, factor, f2) <= 0.0) {
+            specNormal = normalize(fragCornerNormal);
+        } else if (proximity(fragPosition, sideNormal3, factor, f3) <= 0.0) {
+            specNormal = normalize(fragCornerNormal);
+        } else if (proximity(fragPosition, sideNormal4, factor, f4) <= 0.0) {
+            specNormal = normalize(fragCornerNormal);
+        } else if (proximity(fragPosition, sideNormal5, factor, f5) <= 0.0) {
+            specNormal = normalize(fragCornerNormal);
+        } else {
+            specNormal = fragNormal;
+            shininess = 16.0;
         }
     } else {
-        f3 = (fragCorner3 + fragCorner1)/2.0;
-        sideNormal3 = normalize(cross(fragCorner3 - fragCorner1, fragNormal));
-    }
-
-    if (proximity(fragPosition, sideNormal1, factor, f1) <= 0.0) {
-        specNormal = normalize(fragCornerNormal);
-    } else if (proximity(fragPosition, sideNormal2, factor, f2) <= 0.0) {
-        specNormal = normalize(fragCornerNormal);
-    } else if (proximity(fragPosition, sideNormal3, factor, f3) <= 0.0) {
-        specNormal = normalize(fragCornerNormal);
-    } else if (proximity(fragPosition, sideNormal4, factor, f4) <= 0.0) {
-        specNormal = normalize(fragCornerNormal);
-    } else if (proximity(fragPosition, sideNormal5, factor, f5) <= 0.0) {
-        specNormal = normalize(fragCornerNormal);
-    } else {
-        specNormal = fragNormal;
-        shininess = 16.0;
-    }
+        // consider distance from center.  fragCorner1 is a vector to the center of the face
+        // of the die.  fragCorner2 is a vector to one of the outer points in the triangle.
+        if (length(fragCorner2 - fragCorner1) - length(fragPosition - fragCorner1) - factor <= 0.0) {
+            specNormal = normalize(fragCornerNormal);
+        } else {
+            specNormal = normalize(fragNormal);
+            shininess = 16.0;
+        }
+     }
 
     float spec = pow(max(dot(specNormal, halfWayDirection), 0.0), shininess);
     vec3 specular = lightColor * spec;

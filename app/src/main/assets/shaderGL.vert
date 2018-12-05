@@ -34,6 +34,7 @@ attribute vec3 inCorner2;
 attribute vec3 inCorner3;
 attribute vec3 inCorner4;
 attribute vec3 inCorner5;
+attribute float inMode;
 
 varying vec3 fragColor;
 varying vec2 fragTexCoord;
@@ -45,10 +46,13 @@ varying vec3 fragCorner2;
 varying vec3 fragCorner3;
 varying vec3 fragCorner4;
 varying vec3 fragCorner5;
+varying float fragMode;
 
 void main() {
     fragColor = inColor;
     fragTexCoord = inTexCoord;
+
+    fragMode = inMode;
 
     /* The transpose and inverse functions are not available
        in GLSL 100, so we passed in the normal matrix. */

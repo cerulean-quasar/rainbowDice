@@ -337,6 +337,18 @@ void RainbowDiceGL::drawFrame() {
         );
         glEnableVertexAttribArray(corner5ID);
 
+        // attribute buffer : vertices for die
+        GLint modeID = glGetAttribLocation(programID, "inMode");
+        glVertexAttribPointer(
+                modeID,                          // The position of the attribute in the shader.
+                1,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(Vertex),                  // stride
+                (void *) (offsetof(Vertex, mode)) // array buffer offset
+        );
+        glEnableVertexAttribArray(modeID);
+
         // Draw the triangles !
         //glDrawArrays(GL_TRIANGLES, 0, dice[0].die->vertices.size() /* total number of vertices*/);
         glDrawElements(GL_TRIANGLES, die->die->indices.size(), GL_UNSIGNED_INT, 0);
@@ -351,6 +363,7 @@ void RainbowDiceGL::drawFrame() {
         glDisableVertexAttribArray(corner3ID);
         glDisableVertexAttribArray(corner4ID);
         glDisableVertexAttribArray(corner5ID);
+        glDisableVertexAttribArray(modeID);
     }
     eglSwapBuffers(m_surface.display(), m_surface.surface());
 }

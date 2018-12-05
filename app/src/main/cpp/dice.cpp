@@ -37,6 +37,9 @@
 #include <unistd.h>
 #include <limits>
 
+const float Vertex::MODE_EDGE_DISTANCE = 0.0f;
+const float Vertex::MODE_CENTER_DISTANCE = 1.0f;
+
 float const DicePhysicsModel::errorVal = 0.15f;
 float const DicePhysicsModel::viscosity = 2.0f;
 float const DicePhysicsModel::radius = 0.2f;
@@ -437,13 +440,19 @@ void DicePhysicsModel::positionDice(std::string const &symbol, float x, float y)
 
     glm::vec3 normalVector;
     float angle = 0;
+
+    // getAngleAxis uses the model matrix... initialize here temporarily and then reinitialize
+    // once we get the rotation to do on the die.
+    glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
+    glm::mat4 translate = glm::translate(position);
+    ubo.model = translate * scale;
     getAngleAxis(faceIndex, angle, normalVector);
+
     glm::vec3 cross = glm::cross(normalVector, zaxis);
+    // if the cross product is zero, the normalVector must be along the z-axis. rotate along the
+    // y-axis.
     if (glm::length(cross) == 0.0f) {
-        cross = normalVector;
-    }
-    if (glm::length(cross) == 0.0f) {
-        cross = zaxis;
+        cross = {0.0f, 1.0f, 0.0f};
     }
 
     if (angle != 0) {
@@ -454,9 +463,7 @@ void DicePhysicsModel::positionDice(std::string const &symbol, float x, float y)
         checkQuaternion(qTotalRotated);
     }
 
-    glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
-    glm::mat4 translate = glm::translate(position);
     ubo.model = translate * rotate * scale;
 
     yAlign(faceIndex);
@@ -467,9 +474,7 @@ void DicePhysicsModel::positionDice(std::string const &symbol, float x, float y)
         qTotalRotated = glm::normalize(q*qTotalRotated);
     }
 
-    scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
     rotate = glm::toMat4(qTotalRotated);
-    translate = glm::translate(position);
     ubo.model = translate * rotate * scale;
 }
 
@@ -483,11 +488,10 @@ void DicePhysicsModel::randomizeUpFace() {
     float angle = 0;
     getAngleAxis(upFace, angle, normalVector);
     glm::vec3 cross = glm::cross(normalVector, zaxis);
+    // if the cross product is zero, the normalVector must be along the z-axis. rotate along the
+    // y-axis.
     if (glm::length(cross) == 0.0f) {
-        cross = normalVector;
-    }
-    if (glm::length(cross) == 0.0f) {
-        cross = zaxis;
+        cross = {0.0f, 1.0f, 0.0f};
     }
 
     if (angle != 0) {
@@ -513,6 +517,7 @@ void DicePhysicsModel::randomizeUpFace() {
 
 void DiceModelCube::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     Vertex vertex = {};
+    vertex.mode = Vertex::MODE_EDGE_DISTANCE;
 
     uint32_t totalNbrImages = texAtlas->getNbrImages();
     float paddingTotal = totalNbrImages * (float)texAtlas->getPaddingHeight()/(float)texAtlas->getTextureHeight();
@@ -832,6 +837,7 @@ void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &texAtlas,
     float paddingTotal = totalNbrImages * heightPadding;
 
     Vertex vertex = {};
+    vertex.mode = Vertex::MODE_EDGE_DISTANCE;
 
     float k = a * glm::length((r+q)/2.0f-p0) / glm::length(r-q);
 
@@ -1344,6 +1350,7 @@ void DiceModelDodecahedron::addVertices(std::shared_ptr<TextureAtlas> const &tex
     float paddingHeight = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse);
 
     Vertex vertex = {};
+    vertex.mode = Vertex::MODE_EDGE_DISTANCE;
 
     glm::vec3 p1 = 1.0f/2.0f * (e+b-d+c);
     glm::vec3 p2 = 1.0f/2.0f * (e+b+d-c);
@@ -1782,6 +1789,7 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     float lengthFactorY = ((1.0f - paddingTotal) / totalNbrImages)/(2.0f * glm::length((2.0f*p0 - p2)/4.0f));
 
     Vertex vertex{};
+    vertex.mode = Vertex::MODE_EDGE_DISTANCE;
     vertex.corner1 = p3;
     vertex.corner2 = p2;
     vertex.corner3 = p1;
@@ -2231,4 +2239,184 @@ void DiceModelRhombicTriacontahedron::updatePerspectiveMatrix(uint32_t surfaceWi
         ubo.proj[2][2] *= -1;
         ubo.proj[3][2] *= -1;
     }
+}
+
+constexpr float DiceModelCoin::radius;
+
+void DiceModelCoin::addEdgeVertices() {
+    Vertex vertex{};
+    glm::vec3 centerTop{0.0f, 0.0f, thickness/2};
+    glm::vec3 centerBottom{0.0f, 0.0f, -thickness/2};
+    size_t start = vertices.size();
+
+    // not using the edge detection for these vertices.  We just set the normal equal to the corner
+    // normal and let the shader interpolate the normal smoothly over the entire surface
+    vertex.mode = Vertex::MODE_EDGE_DISTANCE;
+    vertex.corner1 = {1000.0, 1000.0, 1000.0};
+    vertex.corner2 = {-1000.0, 0.0, 1000.0};
+    vertex.corner3 = {-1000.0, -1000.0, -1000.0};
+    vertex.corner4 = {1000.0, 1000.0, 1000.0};
+    vertex.corner5 = {1000.0, 1000.0, 1000.0};
+    vertex.texCoord = {0.0f, 0.0f}; // not using textures for these triangles.
+    for (uint32_t i = 0; i < nbrPoints; i++) {
+        vertex.color = colors[i%colors.size()];
+
+        vertex.pos = {radius * glm::cos(2 * pi * i / nbrPoints),
+                      radius * glm::sin(2 * pi * i / nbrPoints),
+                      thickness/2};
+        glm::vec3 normal = glm::normalize(vertex.pos - centerTop);
+        vertex.cornerNormal = glm::normalize(normal + glm::vec3{0.0f, 0.0f, 1.0f});
+        vertex.normal = vertex.cornerNormal;
+        vertices.push_back(vertex);
+
+        vertex.pos.z *= -1;
+        vertex.cornerNormal = glm::normalize(normal + glm::vec3{0.0f, 0.0f, -1.0f});
+        vertex.normal = vertex.cornerNormal;
+        vertices.push_back(vertex);
+    }
+
+    for (uint32_t i = 0; i < nbrPoints; i++) {
+        // the indices
+        indices.push_back(start+2*i);
+        indices.push_back(start+2*i+1);
+        indices.push_back(start+2*((i+1)%nbrPoints));
+
+        indices.push_back(start+2*((i+1)%nbrPoints));
+        indices.push_back(start+2*i+1);
+        indices.push_back(start+2*((i+1)%nbrPoints)+1);
+    }
+}
+
+void DiceModelCoin::addFaceVertices(std::shared_ptr<TextureAtlas> const &texAtlas) {
+    Vertex vertex{};
+    glm::vec3 centerTop{0.0f, 0.0f, thickness/2};
+    glm::vec3 centerBottom{0.0f, 0.0f, -thickness/2};
+    size_t start = vertices.size();
+    vertex.mode = Vertex::MODE_CENTER_DISTANCE;
+    vertex.corner3 = {0, 0, 0};
+    vertex.corner4 = {0, 0, 0};
+    vertex.corner5 = {0, 0, 0};
+
+    vertex.normal = {0.0f, 0.0f, 1.0f};
+    vertex.cornerNormal = {0.0f, 0.0f, 1.0f};
+    vertex.pos = centerTop;
+    vertex.color = colors[0];
+    vertex.corner1 = centerTop;
+    vertex.corner2 = {radius, 0, thickness/2};
+    vertices.push_back(vertex);
+
+    vertex.normal = {0.0f, 0.0f, -1.0f};
+    vertex.cornerNormal = {0.0f, 0.0f, -1.0f};
+    vertex.pos = centerBottom;
+    vertex.color = colors[2];
+    vertex.corner1 = centerBottom;
+    vertex.corner2 = {radius, 0, -thickness/2};
+    vertices.push_back(vertex);
+
+    for (uint32_t i = 0; i < nbrPoints; i++) {
+        vertex.color = colors[1];
+        vertex.pos = {radius * glm::cos(2 * pi * i / nbrPoints),
+                      radius * glm::sin(2 * pi * i / nbrPoints),
+                      thickness/2};
+        vertex.normal = {0.0f, 0.0f, 1.0f};
+        vertex.cornerNormal = glm::normalize(vertex.normal + glm::normalize(vertex.pos - centerTop));
+        vertex.corner1 = centerTop;
+        vertex.corner2 = {radius, 0, thickness/2};
+        vertices.push_back(vertex);
+
+        vertex.color = colors[3];
+        vertex.pos.z *= -1;
+        vertex.normal = {0.0f, 0.0f, -1.0f};
+        vertex.cornerNormal = glm::normalize(vertex.normal + glm::normalize(vertex.pos - centerBottom));
+        vertex.corner1 = centerBottom;
+        vertex.corner2 = {radius, 0, -thickness/2};
+        vertices.push_back(vertex);
+    }
+
+    uint32_t totalNbrImages = texAtlas->getNbrImages();
+    float paddingTotal = totalNbrImages * (float)texAtlas->getPaddingHeight()/(float)texAtlas->getTextureHeight();
+    uint32_t textureToUse1 = texAtlas->getImageIndex(symbols[0]);
+    float paddingHeight1 = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse1);
+    uint32_t textureToUse2 = texAtlas->getImageIndex(symbols[1]);
+    float paddingHeight2 = (float)texAtlas->getPaddingHeight() / (float)texAtlas->getTextureHeight()*(textureToUse2);
+
+    glm::vec3 o{vertices[start+2+3*nbrPoints/4].pos};
+    float xFactor = 1/glm::length(vertices[start+2+nbrPoints/4].pos - o);
+    float yFactor = ((1.0f - paddingTotal) / totalNbrImages)/glm::length(vertices[start+2+5*nbrPoints/4].pos - o);
+    glm::vec3 v{glm::normalize(vertices[start+2+nbrPoints/4].pos - o)};
+    vertices[start].texCoord = {glm::dot(vertices[start].pos - o, v)*xFactor,
+                            ((1.0f - paddingTotal) / totalNbrImages) * textureToUse1 + paddingHeight1 +
+                            glm::length(glm::cross(vertices[start].pos - o, v))*yFactor};
+    vertices[start+1].texCoord = {glm::dot(vertices[start].pos - o, v)*xFactor,
+                            ((1.0f - paddingTotal) / totalNbrImages) * textureToUse2 + paddingHeight2 +
+                            glm::length(glm::cross(vertices[start].pos - o, v))*yFactor};
+    for (uint32_t i = 0; i < nbrPoints; i++) {
+        // texture coordinates
+        glm::vec3 pos{vertices[start+2+2*i].pos};
+        vertices[start+2+2*i].texCoord = {glm::dot(pos-o, v)*xFactor,
+              ((1.0f - paddingTotal) / totalNbrImages) * textureToUse1 + paddingHeight1 +
+              glm::dot(glm::cross(pos-o, v), glm::vec3{0.0f,0.0f,1.0f})*yFactor};
+
+        // we just use all the vectors from the front face here since they are the same lengths
+        // as ones taken from the back face.
+        vertices[start+2+2*i+1].texCoord = {1.0f-glm::dot(pos-o, v)*xFactor,
+              ((1.0f - paddingTotal) / totalNbrImages) * textureToUse2 + paddingHeight2 +
+              glm::dot(glm::cross(pos-o, v), glm::vec3{0.0f,0.0f,1.0f})*yFactor};
+
+        // indices
+        indices.push_back(start);
+        indices.push_back(start+2+(2*i)%(nbrPoints*2));
+        indices.push_back(start+2+(2*(i+1))%(nbrPoints*2));
+
+        indices.push_back(start+1);
+        indices.push_back(start+2+(2*(i+1)+1)%(nbrPoints*2));
+        indices.push_back(start+2+(2*i+1)%(nbrPoints*2));
+    }
+}
+
+void DiceModelCoin::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
+    // if these functions' call order is changed, yAlign and getAngleAxis need to be changed too.
+    addFaceVertices(texAtlas);
+    addEdgeVertices();
+}
+
+void DiceModelCoin::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
+    glm::vec3 zaxis{0.0f, 0.0f, 1.0f};
+
+    glm::vec4 top4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
+    glm::vec4 bottom4 = ubo.model * glm::vec4(vertices[1].pos, 1.0f);
+    glm::vec3 top = glm::vec3(top4.x, top4.y, top4.z);
+    glm::vec3 bottom = glm::vec3(bottom4.x, bottom4.y, bottom4.z);
+    if (faceIndex == 0) {
+        axis = glm::normalize(top - bottom);
+    } else {
+        axis = glm::normalize(bottom - top);
+    }
+    angle = glm::acos(glm::dot(axis, zaxis));
+}
+
+void DiceModelCoin::yAlign(uint32_t faceIndex) {
+    glm::vec3 yaxis;
+    glm::vec3 zaxis;
+    if (isOpenGl) {
+        zaxis = {0.0f, 0.0f, -1.0f};
+        yaxis = {0.0f, -1.0f, 0.0f};
+    } else {
+        zaxis = {0.0f, 0.0f, 1.0f};
+        yaxis = {0.0f, 1.0f, 0.0f};
+    }
+    glm::vec3 axis;
+
+    glm::vec4 center4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
+    glm::vec4 top4 = ubo.model * glm::vec4(vertices[2 + nbrPoints/2].pos, 1.0f);
+    glm::vec3 center = {center4.x, center4.y, center4.z};
+    glm::vec3 top = {top4.x, top4.y, top4.z};
+    axis = top - center;
+
+    float angle = glm::acos(glm::dot(glm::normalize(axis), yaxis));
+    if (axis.x < 0) {
+        angle = -angle;
+    }
+    stoppedRotationAxis = zaxis;
+    stoppedAngle = angle;
 }

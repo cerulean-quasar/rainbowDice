@@ -45,7 +45,7 @@ VkVertexInputBindingDescription getBindingDescription() {
 std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
-    attributeDescriptions.resize(10);
+    attributeDescriptions.resize(11);
 
     /* position */
     attributeDescriptions[0].binding = 0; /* binding description to use */
@@ -105,6 +105,11 @@ std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
     attributeDescriptions[9].location = 9;
     attributeDescriptions[9].format = VK_FORMAT_R32G32B32_SFLOAT;
     attributeDescriptions[9].offset = offsetof(Vertex, corner5);
+
+    attributeDescriptions[10].binding = 0;
+    attributeDescriptions[10].location = 10;
+    attributeDescriptions[10].format = VK_FORMAT_R32_SFLOAT;
+    attributeDescriptions[10].offset = offsetof(Vertex, mode);
 
     return attributeDescriptions;
 }

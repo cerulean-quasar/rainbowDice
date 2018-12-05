@@ -111,7 +111,9 @@ private:
     void initDice(std::vector<std::string> const &symbols, glm::vec3 &position) {
         isBeingReRolled = false;
         long nbrSides = symbols.size();
-        if (nbrSides == 4) {
+        if (nbrSides == 2) {
+            die.reset(new DiceModelCoin(symbols, position, true));
+        } else if (nbrSides == 4) {
             die.reset(new DiceModelTetrahedron(symbols, position, true));
         } else if (nbrSides == 12) {
             die.reset(new DiceModelDodecahedron(symbols, position, true));

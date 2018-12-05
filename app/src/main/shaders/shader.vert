@@ -36,6 +36,7 @@ layout(location = 6) in vec3 inCorner2;
 layout(location = 7) in vec3 inCorner3;
 layout(location = 8) in vec3 inCorner4;
 layout(location = 9) in vec3 inCorner5;
+layout(location = 10) in float inMode;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
@@ -47,6 +48,7 @@ layout(location = 6) out vec3 fragCorner2;
 layout(location = 7) out vec3 fragCorner3;
 layout(location = 8) out vec3 fragCorner4;
 layout(location = 9) out vec3 fragCorner5;
+layout(location = 10) out int fragMode;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -56,6 +58,11 @@ void main() {
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
     fragColor = inColor;
     fragTexCoord = inTexCoord;
+    if (inMode > 0.0) {
+        fragMode = 1;
+    } else {
+        fragMode = 0;
+    }
     mat3 vecUBO = mat3(transpose(inverse(ubo.model)));
     fragNormal = normalize(vecUBO * inNormal);
     fragCornerNormal = normalize(vecUBO * inCornerNormal);
@@ -64,6 +71,7 @@ void main() {
     } else {
         fragCorner1 = inCorner1;
     }
+
     if (length(inCorner2) < 1000.0) {
         fragCorner2 = vec3(ubo.model * vec4(inCorner2, 1.0));
     } else {
