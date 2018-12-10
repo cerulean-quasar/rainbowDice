@@ -26,6 +26,7 @@ import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.os.Parcelable;
+import android.support.constraint.ConstraintLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -63,7 +64,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     private static final int DEFAULT_INCREMENT = 1;
     private static final int DEFAULT_NBR_DICE = 1;
     private static final int DEFAULT_NBR_SIDES = 6;
-    private static final int OTHER_BUTTON_INDEX = 10;
+    private static final int OTHER_BUTTON_INDEX = 11;
     private String saveFileName = null;
     private Dialog saveDialog = null;
 
@@ -111,21 +112,21 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         super.onCreate(savedInstanceState);
 
+        setContentView(R.layout.activity_dice_customization);
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            setContentView(R.layout.activity_dice_customization_landscape);
             LinearLayout layout = findViewById(R.id.dice_list);
             layout.setOrientation(LinearLayout.VERTICAL);
             TypedValue value = new TypedValue();
             getTheme().resolveAttribute(R.attr.background_landscape, value, true);
             getWindow().setBackgroundDrawableResource(value.resourceId);
-        } else {
-            setContentView(R.layout.activity_dice_customization);
         }
 
-        diceSidesInfos = new DiceSidesInfo[11];
+        diceSidesInfos = new DiceSidesInfo[12];
         int i = 0;
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d1Button),
                 R.attr.constant_clicked, R.attr.constant_unclicked);
+        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d2Button),
+                R.attr.d2_clicked, R.attr.d2_unclicked);
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d3Button),
                 R.attr.d6_clicked, R.attr.d6_unclicked);
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d4Button),
@@ -190,12 +191,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         configsToView(configs);
         DiceGuiConfig cfg = diceConfigs.get(0);
         DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
-        ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
+        ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
         int length = diceConfigs.size();
         for (int j = 1; j < length; j++) {
             cfg = diceConfigs.get(j);
             info = getInfoForDieSides(cfg.config.getNumberOfSides());
-            ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
+            ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
         }
 
         TextView text = findViewById(R.id.otherText);
@@ -495,11 +496,11 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         for (DiceGuiConfig cfg : diceConfigs) {
             DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
             if (cfg.button == view) {
-                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
+                ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
                 configBeingEdited = i;
                 editConfig(i, info == diceSidesInfos[OTHER_BUTTON_INDEX]);
             } else {
-                ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
+                ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
             }
             i++;
         }
@@ -531,7 +532,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         DiceGuiConfig cfg = diceConfigs.get(configBeingEdited);
         DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
         editConfig(configBeingEdited, info == diceSidesInfos[OTHER_BUTTON_INDEX]);
-        ((LinearLayout)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
+        ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
     }
 
     public void onNew(View view) {
@@ -554,19 +555,19 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
 
         // first add the divider (which contains the operation...
-        LinearLayout layoutNew = (LinearLayout)inflater.inflate(R.layout.dice_list_divider,
+        LinearLayout layoutDivider = (LinearLayout)inflater.inflate(R.layout.dice_list_divider,
                 layoutDiceList, false);
 
-        Spinner operationSpinner = layoutNew.findViewById(R.id.operation);
+        Spinner operationSpinner = layoutDivider.findViewById(R.id.operation);
 
         OperationAdapter spinAdapter = new OperationAdapter(this);
         operationSpinner.setAdapter(spinAdapter);
         operationSpinner.setOnItemSelectedListener(this);
 
-        layoutDiceList.addView(layoutNew);
+        layoutDiceList.addView(layoutDivider);
 
         // then add the new dice item and set up the fields
-        layoutNew = (LinearLayout)inflater.inflate(R.layout.dice_list_item, layoutDiceList, false);
+        ConstraintLayout layoutNew = (ConstraintLayout) inflater.inflate(R.layout.dice_list_item, layoutDiceList, false);
 
         Button button = layoutNew.findViewById(R.id.die_config_button);
         DieConfiguration config = new DieConfiguration(DEFAULT_NBR_DICE, DEFAULT_NBR_SIDES,
@@ -760,7 +761,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 }
             }
 
-            LinearLayout layoutDiceListItem = (LinearLayout) inflater.inflate(R.layout.dice_list_item, layout, false);
+            ConstraintLayout layoutDiceListItem = (ConstraintLayout) inflater.inflate(R.layout.dice_list_item, layout, false);
             Button diceButton = layoutDiceListItem.findViewById(R.id.die_config_button);
 
             // save all the config buttons so that we can easily find the one being clicked
@@ -862,22 +863,24 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             case 0:
                 return 1;
             case 1:
-                return 3;
+                return 2;
             case 2:
-                return 4;
+                return 3;
             case 3:
-                return 6;
+                return 4;
             case 4:
-                return 8;
+                return 6;
             case 5:
-                return 10;
+                return 8;
             case 6:
-                return 12;
+                return 10;
             case 7:
-                return 20;
+                return 12;
             case 8:
-                return 30;
+                return 20;
             case 9:
+                return 30;
+            case 10:
                 return 100;
             default:
                 TextView other = findViewById(R.id.otherText);
@@ -893,26 +896,28 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         switch (nbrSides) {
             case 1:
                 return diceSidesInfos[0];
-            case 3:
+            case 2:
                 return diceSidesInfos[1];
-            case 4:
+            case 3:
                 return diceSidesInfos[2];
-            case 6:
+            case 4:
                 return diceSidesInfos[3];
-            case 8:
+            case 6:
                 return diceSidesInfos[4];
-            case 10:
+            case 8:
                 return diceSidesInfos[5];
-            case 12:
+            case 10:
                 return diceSidesInfos[6];
-            case 20:
+            case 12:
                 return diceSidesInfos[7];
-            case 30:
+            case 20:
                 return diceSidesInfos[8];
-            case 100:
+            case 30:
                 return diceSidesInfos[9];
-            default:
+            case 100:
                 return diceSidesInfos[10];
+            default:
+                return diceSidesInfos[11];
         }
     }
 }

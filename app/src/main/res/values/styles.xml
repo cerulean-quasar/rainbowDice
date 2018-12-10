@@ -5,6 +5,8 @@
     <attr name="background_landscape" format="reference"/>
     <attr name="constant_clicked" format="reference"/>
     <attr name="constant_unclicked" format="reference"/>
+    <attr name="d2_clicked" format="reference"/>
+    <attr name="d2_unclicked" format="reference"/>
     <attr name="d4_clicked" format="reference"/>
     <attr name="d4_unclicked" format="reference"/>
     <attr name="d6_clicked" format="reference"/>
@@ -39,6 +41,8 @@
         <item name="background_landscape">@drawable/space_landscape</item>
         <item name="constant_clicked">@drawable/constant_dark</item>
         <item name="constant_unclicked">@drawable/constant_dark_grayscale</item>
+        <item name="d2_clicked">@drawable/coin_dark</item>
+        <item name="d2_unclicked">@drawable/coin_dark_grayscale</item>
         <item name="d4_clicked">@drawable/d4_dark</item>
         <item name="d4_unclicked">@drawable/d4_dark_grayscale</item>
         <item name="d6_clicked">@drawable/d6_dark</item>
@@ -70,6 +74,8 @@
         <item name="background_landscape">@drawable/sky_landscape</item>
         <item name="constant_clicked">@drawable/constant</item>
         <item name="constant_unclicked">@drawable/constant_grayscale</item>
+        <item name="d2_clicked">@drawable/coin</item>
+        <item name="d2_unclicked">@drawable/coin_grayscale</item>
         <item name="d4_clicked">@drawable/d4</item>
         <item name="d4_unclicked">@drawable/d4_grayscale</item>
         <item name="d6_clicked">@drawable/d6</item>
@@ -97,6 +103,8 @@
         <item name="background_landscape">@drawable/trees_landscape</item>
         <item name="constant_clicked">@drawable/constant</item>
         <item name="constant_unclicked">@drawable/constant_grayscale</item>
+        <item name="d2_clicked">@drawable/coin</item>
+        <item name="d2_unclicked">@drawable/coin_grayscale</item>
         <item name="d4_clicked">@drawable/d4</item>
         <item name="d4_unclicked">@drawable/d4_grayscale</item>
         <item name="d6_clicked">@drawable/d6</item>
@@ -124,6 +132,8 @@
         <item name="background_landscape">@drawable/adventure_landscape</item>
         <item name="constant_clicked">@drawable/constant</item>
         <item name="constant_unclicked">@drawable/constant_grayscale</item>
+        <item name="d2_clicked">@drawable/coin</item>
+        <item name="d2_unclicked">@drawable/coin_grayscale</item>
         <item name="d4_clicked">@drawable/d4</item>
         <item name="d4_unclicked">@drawable/d4_grayscale</item>
         <item name="d6_clicked">@drawable/d6</item>
