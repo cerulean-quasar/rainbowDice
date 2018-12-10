@@ -722,6 +722,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 stringDiceField = diceField.getText().toString();
                 if (!stringDiceField.isEmpty()) {
                     config.setReRollOn(Integer.valueOf(stringDiceField));
+                } else {
+                    config.setReRollOn(start-1);
                 }
 
                 diceField = findViewById(R.id.otherText);
