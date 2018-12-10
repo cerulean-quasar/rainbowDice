@@ -1,6 +1,6 @@
 # Rainbow Dice: dice roller
 Rainbow Dice is a dice roller aimed at supporting any game requiring dice
-including roll playing games.  When using this dice roller, gamers can specify
+including role playing games.  When using this dice roller, gamers can specify
 the number of dice, the number of sides, what number each die starts at, on
 what if any number the dice are re-rolled on, and whether two consecutive dice
 definitions should have their results added or subtracted.  The dice roller
