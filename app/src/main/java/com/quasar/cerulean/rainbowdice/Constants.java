@@ -30,4 +30,9 @@ public class Constants {
     public static final String themeNameConfigValue = "ThemeName";
 
     public static final int DICE_LOG_FILE_ACTIVITY = 4;
+
+    // DiceSidesActivity
+    public static final int DICE_SIDES_ACTIVITY = 5;
+    public static final String DICE_SIDE_CONFIGURATION = "DiceSideConfiguration";
+    public static final String DICE_SIDES_JSON = "DiceSidesJson";
 }

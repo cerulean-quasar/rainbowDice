@@ -20,7 +20,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(location = 0) in vec3 fragColor;
+layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec3 fragPosition;
@@ -53,12 +53,17 @@ float proximity(vec3 position, vec3 sideNormal, float factor, vec3 sideAvg) {
 void main() {
     vec3 color;
     float alpha;
-    if (texture(texSampler, fragTexCoord).r != 0) {
-        color = vec3(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b);
-        alpha = 1.0;
+    vec4 textureColor = texture(texSampler, fragTexCoord);
+    if (textureColor.a != 0.0) {
+        if (textureColor.r == 0.0 && textureColor.g == 0.0 && textureColor.b == 0.0) {
+            color = vec3(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b);
+        } else {
+            color = vec3(textureColor.r, textureColor.g, textureColor.b);
+        }
+        alpha = fragColor.a;
     } else {
-        color = fragColor;
-        alpha = 1.0;
+        color = vec3(fragColor.r, fragColor.g, fragColor.b);
+        alpha = fragColor.a;
     }
 
     float shininess = 8.0;

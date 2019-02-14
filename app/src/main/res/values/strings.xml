@@ -4,6 +4,13 @@
     <string name="subtraction">-</string>
     <string name="done">Done</string>
     <string name="roll">Roll</string>
+    <string name="sideColumnClearValue">Clear Value</string>
+    <string name="sideColumnRepeats">Repeats</string>
+    <string name="sideColumnSymbol">Symbol</string>
+    <string name="sideColumnValue">Value</string>
+    <string name="sideColumnReroll">Re-roll</string>
+    <string name="error">Error</string>
+    <string name="ok">OK</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="load">Load</string>
@@ -13,15 +20,16 @@
     <string name="favorites">Favorites:</string>
     <string name="configureDice">Reorder Dice</string>
     <string name="diceMessageRolling">Rolling...</string>
-    <string name="diceMessageResult">result: %s = %d</string>
+    <string name="diceMessageResult">result: %s = %s</string>
+    <string name="diceMessageResult2">result: %s</string>
     <string name="diceMessageToStartRolling">Shake while rolling</string>
     <string name="diceMessageReRoll">Shake while re-rolling required dice</string>
     <string name="diceConfigNbrDice"># Dice</string>
-    <string name="diceConfigNbrSides">Number of Sides</string>
-    <string name="diceConfigStart">start</string>
-    <string name="diceConfigIncrement">next</string>
-    <string name="diceConfigReRoll">reroll on</string>
-    <string name="diceConfigConstant">Value</string>
+    <string name="diceConfigColor">color</string>
+    <string name="diceConfigDetails">Details</string>
+    <string name="diceConfigSymbol">Symbol</string>
+    <string name="diceConfigValue">Value</string>
+    <string name="diceSides">Dice Sides</string>
     <string name="diceMessageStartup">Click on a dice name above to roll, or add new dice by selecting "New Dice" from the menu.</string>
     <string name="errorNoDiceDefinitions">There are dice listed.  Create some with "Choose Dice->New".</string>
     <string name="confirm">Delete dice configuration: %s?</string>
@@ -37,22 +45,55 @@
     <string name="D30">D30</string>
     <string name="D100">D100</string>
     <string name="diceNumberOfSidesOther">Other</string>
-    <string name="diceNumbersString">%d,%d,&#8230;,%d</string>
+    <string name="diceNumbersString">%s,\n%s,&#8230;,\n%s</string>
     <string name="diceConfigStringRepresentation">%dD%d</string>
-    <string name="constantConfigStringRepresentation">%d</string>
-    <string name="rerollText">re-roll on: %d</string>
+    <string name="constantConfigStringRepresentation">%s</string>
+    <string name="rerollText">re-roll on: %s</string>
     <string name="themeTextDisplay">Text for this theme</string>
     <string name="selectTheme">Choose a Theme:  </string>
     <string name="selectThemeMenuItem">Choose a Theme</string>
     <string name="openLogFile">Open Log File</string>
+    <string name="recipes">Recipes</string>
+    <string name="add">add</string>
+    <string name="replace">replace</string>
+
     <string-array name="themeArray">
         <item>Space</item>
         <item>Sky</item>
         <item>Trees</item>
         <item>Adventure</item>
     </string-array>
+
     <string-array name="operationArray">
         <item>@string/addition</item>
         <item>@string/subtraction</item>
+    </string-array>
+
+    <string name="percentile">Percentile</string>
+    <string name="fudge">Fudge</string>
+    <string-array name="recipes">
+        <item>@string/percentile</item>
+        <item>@string/fudge</item>
+    </string-array>
+
+    <string name="rainbow">rainbow</string>
+    <string name="red">red</string>
+    <string name="orange">orange</string>
+    <string name="yellow">yellow</string>
+    <string name="green">green</string>
+    <string name="blue">blue</string>
+    <string name="purple">purple</string>
+    <string name="black">black</string>
+    <string name="white">white</string>
+    <string-array name="diceColor">
+        <item>@string/rainbow</item>
+        <item>@string/red</item>
+        <item>@string/orange</item>
+        <item>@string/yellow</item>
+        <item>@string/green</item>
+        <item>@string/blue</item>
+        <item>@string/purple</item>
+        <item>@string/black</item>
+        <item>@string/white</item>
     </string-array>
 </resources>

@@ -18,6 +18,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:inputType="number"
+            android:maxLength="2"
             android:text="1" />
     </LinearLayout>
     <LinearLayout
@@ -25,48 +26,19 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content">
         <TextView
-            android:labelFor="@+id/die_start"
+            android:labelFor="@id/die_color"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/diceConfigStart"/>
-        <EditText
-            android:id="@+id/die_start"
+            android:layout_marginEnd="10dp"
+            android:text="@string/diceConfigColor"/>
+        <Spinner
+            android:id="@+id/die_color"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:inputType="numberSigned"
-            android:text="1" />
+            android:layout_height="wrap_content"/>
     </LinearLayout>
-    <LinearLayout
-        android:orientation="horizontal"
+    <Button
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
-        <TextView
-            android:labelFor="@+id/die_next"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/diceConfigIncrement"/>
-        <EditText
-            android:id="@+id/die_next"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:inputType="numberSigned"
-            android:text="2" />
-    </LinearLayout>
-    <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
-        <TextView
-            android:id="@+id/die_reroll_label"
-            android:labelFor="@+id/die_reroll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/diceConfigReRoll"/>
-        <EditText
-            android:id="@+id/die_reroll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:inputType="numberSigned"
-            android:text="" />
-    </LinearLayout>
+        android:layout_height="wrap_content"
+        android:onClick="onDetailsClick"
+        android:text="@string/diceConfigDetails"/>
 </LinearLayout>

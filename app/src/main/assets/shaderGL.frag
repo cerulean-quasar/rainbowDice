@@ -20,7 +20,7 @@ precision highp float;
  *
  */
 
-varying vec3 fragColor;
+varying vec4 fragColor;
 varying vec2 fragTexCoord;
 varying vec3 fragNormal;
 varying vec3 fragPosition;
@@ -48,10 +48,18 @@ float proximity(vec3 position, vec3 sideNormal, float factor, vec3 sideAvg) {
 
 void main() {
     vec3 color;
-    if (texture2D(texSampler, vec2(1.0-fragTexCoord.x, fragTexCoord.y)).a != 0.0) {
-        color = vec3(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b);
+    float alpha = 1.0;
+    vec4 textureColor = texture2D(texSampler, vec2(fragTexCoord.x, fragTexCoord.y));
+    if (textureColor.a != 0.0) {
+        if (textureColor.r == 0.0 && textureColor.g == 0.0 && textureColor.b == 0.0) {
+            color = vec3(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b);
+        } else {
+            color = vec3(textureColor.r, textureColor.g, textureColor.b);
+        }
+        alpha = fragColor.a;
     } else {
-        color = fragColor;
+        color = vec3(fragColor.r, fragColor.g, fragColor.b);
+        alpha = fragColor.a;
     }
 
     float shininess = 8.0;
@@ -134,5 +142,5 @@ void main() {
     vec3 diffuse = diff * color;
 
     vec3 ambient = 0.3 * color;
-    gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+    gl_FragColor = vec4(ambient + diffuse + specular, alpha);
 }

@@ -113,15 +113,16 @@ struct Dice {
     std::shared_ptr<vulkan::Buffer> uniformBuffer;
 
     bool isBeingReRolled;
-    std::string rerollSymbol;
+    std::vector<uint32_t> rerollIndices;
 
     Dice(std::shared_ptr<vulkan::Device> const &inDevice,
-         std::vector<std::string> const &symbols, std::string const &inRerollSymbol, glm::vec3 &position)
+         std::vector<std::string> const &symbols, std::vector<uint32_t> const &inRerollIndices,
+         glm::vec3 &position, std::vector<float> const &color)
             : m_device{inDevice},
               die(nullptr),
-              rerollSymbol{inRerollSymbol}
+              rerollIndices{inRerollIndices}
     {
-        initDice(symbols, position);
+        initDice(symbols, position, color);
     }
 
     void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
@@ -150,27 +151,39 @@ struct Dice {
             return false;
         }
 
-        return !isBeingReRolled && rerollSymbol == die->getResult();
+        if (isBeingReRolled) {
+            return false;
+        }
+
+        uint32_t result = die->getResult();
+
+        for (auto const & rerollIndex : rerollIndices) {
+            if (result % die->getNumberOfSymbols() == rerollIndex) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 private:
-    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position) {
+    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position, std::vector<float> const &color) {
         isBeingReRolled = false;
         long nbrSides = symbols.size();
         if (nbrSides == 2) {
-            die.reset(new DiceModelCoin(symbols, position));
+            die.reset(new DiceModelCoin(symbols, position, color));
         } else if (nbrSides == 4) {
-            die.reset(new DiceModelTetrahedron(symbols, position));
+            die.reset(new DiceModelTetrahedron(symbols, position, color));
         } else if (nbrSides == 12) {
-            die.reset(new DiceModelDodecahedron(symbols, position));
+            die.reset(new DiceModelDodecahedron(symbols, position, color));
         } else if (nbrSides == 20) {
-            die.reset(new DiceModelIcosahedron(symbols, position));
+            die.reset(new DiceModelIcosahedron(symbols, position, color));
         } else if (nbrSides == 30) {
-            die.reset(new DiceModelRhombicTriacontahedron(symbols, position));
+            die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color));
         } else if (6 % nbrSides == 0) {
-            die.reset(new DiceModelCube(symbols, position));
+            die.reset(new DiceModelCube(symbols, position, color));
         } else {
-            die.reset(new DiceModelHedron(symbols, position));
+            die.reset(new DiceModelHedron(symbols, position, color));
         }
     }
 };
@@ -178,7 +191,9 @@ private:
 class RainbowDiceVulkan : public RainbowDice {
 public:
     RainbowDiceVulkan(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                      uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
+                      std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
+                      std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
+                      std::unique_ptr<unsigned char[]> const &inBitmap, size_t inBitmapSize)
             : m_instance{new vulkan::Instance{window}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
@@ -198,9 +213,9 @@ public:
               m_textureAtlas{new TextureAtlasVulkan{std::shared_ptr<vulkan::ImageSampler>{
                   new vulkan::ImageSampler{m_device, m_commandPool,
                         std::shared_ptr<vulkan::ImageView>{new vulkan::ImageView{
-                            createTextureImage(inWidth, inHeightTexture, inBitmap), VK_FORMAT_R8_UNORM,
+                            createTextureImage(inWidth, inHeightTexture, inBitmap, inBitmapSize), VK_FORMAT_R8G8B8A8_UNORM,
                                 VK_IMAGE_ASPECT_COLOR_BIT}}}},
-                  symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace}}
+                  symbols, inWidth, inHeightTexture, textureCoordsLeftRight, textureCoordsTopBottom}}
     {
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
@@ -219,9 +234,11 @@ public:
 
     virtual bool allStopped();
 
-    virtual std::vector<std::vector<std::string>> getDiceResults();
+    virtual std::vector<std::vector<uint32_t>> getDiceResults();
 
-    virtual void loadObject(std::vector<std::string> const &symbols, std::string const &rerollSymbol);
+    virtual void loadObject(std::vector<std::string> const &symbols,
+                            std::vector<uint32_t> const &rerollIndices,
+                            std::vector<float> const &color);
 
     virtual void recreateModels();
 
@@ -233,7 +250,7 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
-    virtual void resetToStoppedPositions(std::vector<std::string> const &symbols);
+    virtual void resetToStoppedPositions(std::vector<uint32_t> const &symbols);
 
     virtual void addRollingDice();
 
@@ -282,6 +299,7 @@ private:
     void initializeCommandBuffers();
     void updateDepthResources();
     std::shared_ptr<vulkan::Image> createTextureImage(uint32_t texWidth, uint32_t texHeight,
-                                                      std::vector<char> const &bitmap);
+                                                      std::unique_ptr<unsigned char[]> const &bitmap,
+                                                      size_t bitmapSize);
 };
 #endif

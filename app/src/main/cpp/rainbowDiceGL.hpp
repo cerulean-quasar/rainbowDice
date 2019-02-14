@@ -78,13 +78,14 @@ struct DiceGL {
     // and then uses the index to determine what the reroll value was.
     bool isBeingReRolled;
 
-    std::string rerollSymbol;
+    std::vector<uint32_t> rerollIndices;
 
-    DiceGL(std::vector<std::string> const &symbols, std::string const &inRerollSymbol, glm::vec3 &position)
+    DiceGL(std::vector<std::string> const &symbols, std::vector<uint32_t> const &inRerollIndices,
+           glm::vec3 &position, std::vector<float> const &color)
             : die(nullptr),
-              rerollSymbol{inRerollSymbol}
+              rerollIndices{inRerollIndices}
     {
-        initDice(symbols, position);
+        initDice(symbols, position, color);
     }
 
     void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
@@ -99,7 +100,19 @@ struct DiceGL {
             return false;
         }
 
-        return !isBeingReRolled && rerollSymbol == die->getResult();
+        if (isBeingReRolled) {
+            return false;
+        }
+
+        uint32_t result = die->getResult();
+
+        for (auto const & rerollIndex : rerollIndices) {
+            if (result == rerollIndex) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     ~DiceGL() {
@@ -108,23 +121,24 @@ struct DiceGL {
     }
 
 private:
-    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position) {
+    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position,
+                  std::vector<float> const &color) {
         isBeingReRolled = false;
         long nbrSides = symbols.size();
         if (nbrSides == 2) {
-            die.reset(new DiceModelCoin(symbols, position, true));
+            die.reset(new DiceModelCoin(symbols, position, color, true));
         } else if (nbrSides == 4) {
-            die.reset(new DiceModelTetrahedron(symbols, position, true));
+            die.reset(new DiceModelTetrahedron(symbols, position, color, true));
         } else if (nbrSides == 12) {
-            die.reset(new DiceModelDodecahedron(symbols, position, true));
+            die.reset(new DiceModelDodecahedron(symbols, position, color, true));
         } else if (nbrSides == 20) {
-            die.reset(new DiceModelIcosahedron(symbols, position, true));
+            die.reset(new DiceModelIcosahedron(symbols, position, color, true));
         } else if (nbrSides == 30) {
-            die.reset(new DiceModelRhombicTriacontahedron(symbols, position, true));
+            die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color, true));
         } else if (6 % nbrSides == 0) {
-            die.reset(new DiceModelCube(symbols, position, true));
+            die.reset(new DiceModelCube(symbols, position, color, true));
         } else {
-            die.reset(new DiceModelHedron(symbols, position, nbrSides, true));
+            die.reset(new DiceModelHedron(symbols, position, color, nbrSides, true));
         }
     }
 };
@@ -132,9 +146,12 @@ private:
 class RainbowDiceGL : public RainbowDice {
 public:
     RainbowDiceGL(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                  uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> &inBitmap)
+                  std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
+                  std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
+                  std::unique_ptr<unsigned char[]> const &inBitmap)
             : m_surface{window},
-              m_textureAtlas{new TextureAtlasGL{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace, inBitmap}}
+              m_textureAtlas{new TextureAtlasGL{symbols, inWidth, inHeightTexture, textureCoordsLeftRight,
+                                                textureCoordsTopBottom, inBitmap}}
     {
         init();
     }
@@ -151,11 +168,13 @@ public:
 
     virtual bool allStopped();
 
-    virtual std::vector<std::vector<std::string>> getDiceResults();
+    virtual std::vector<std::vector<uint32_t >> getDiceResults();
 
     virtual bool needsReroll();
 
-    virtual void loadObject(std::vector<std::string> const &symbols, std::string const &inRerollSymbol);
+    virtual void loadObject(std::vector<std::string> const &symbols,
+                            std::vector<uint32_t> const &inRerollIndices,
+                            std::vector<float> const &color);
 
     virtual void recreateModels();
 
@@ -167,7 +186,7 @@ public:
 
     virtual void resetPositions(std::set<int> &dice);
 
-    virtual void resetToStoppedPositions(std::vector<std::string> const &symbols);
+    virtual void resetToStoppedPositions(std::vector<uint32_t > const &inUpFaceIndices);
 
     virtual void addRollingDice();
 

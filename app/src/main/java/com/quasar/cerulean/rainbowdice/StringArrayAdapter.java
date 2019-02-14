@@ -30,32 +30,23 @@ import android.widget.TextView;
 import java.io.File;
 import java.util.ArrayList;
 
-public class FileAdapter extends BaseAdapter {
-    private ArrayList<String> filelist;
+public class StringArrayAdapter extends BaseAdapter {
+    private String[] strings;
     private Context ctx;
-    public FileAdapter(Context inctx, String[] excludeFiles) {
-        ctx = inctx;
-        filelist = new ArrayList<>();
-        File[] filearr = ctx.getFilesDir().listFiles();
-        for (File file : filearr) {
-            boolean found = false;
-            for (String filename : excludeFiles) {
-                if (file.getName().equals(filename)) {
-                    found = true;
-                    break;
-                }
-            }
+    private int layout;
+    private int textItem;
 
-            if (!found) {
-                filelist.add(file.getName());
-            }
-        }
+    public StringArrayAdapter(Context inctx, int arrayName, int inLayout, int inTextItem) {
+        ctx = inctx;
+        strings = ctx.getResources().getStringArray(arrayName);
+        layout = inLayout;
+        textItem = inTextItem;
     }
 
-    public int getPosition(String filename) {
+    public int getPosition(String selected) {
         int i = 0;
-        for (String file : filelist) {
-            if (filename.equals(file)) {
+        for (String string : strings) {
+            if (selected.equals(string)) {
                 return i;
             }
             i++;
@@ -65,27 +56,27 @@ public class FileAdapter extends BaseAdapter {
 
     @Override
     public int getCount() {
-        return filelist.size();
+        return strings.length;
     }
 
     @Override
     public String getItem(int position) {
-        return filelist.get(position);
+        return strings[position];
     }
 
     @Override
     public long getItemId(int position) {
-        return filelist.get(position).hashCode();
+        return strings[position].hashCode();
     }
 
     @Override
     public View getView(int position, View convertView, ViewGroup container) {
         if (convertView == null) {
             LayoutInflater inflater = (LayoutInflater) ctx.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-            convertView = inflater.inflate(R.layout.list_item_dice_configuration, container, false);
+            convertView = inflater.inflate(layout, container, false);
         }
 
-        TextView text = convertView.findViewById(R.id.list_item);
+        TextView text = convertView.findViewById(textItem);
         text.setText(getItem(position));
 
         return text;

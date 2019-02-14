@@ -23,6 +23,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.os.Parcelable;
@@ -30,7 +31,9 @@ import android.support.constraint.ConstraintLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.Layout;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -39,6 +42,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -46,6 +50,7 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.ScrollView;
 import android.widget.Spinner;
+import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 
 import org.json.JSONArray;
@@ -64,7 +69,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     private static final int DEFAULT_INCREMENT = 1;
     private static final int DEFAULT_NBR_DICE = 1;
     private static final int DEFAULT_NBR_SIDES = 6;
-    private static final int OTHER_BUTTON_INDEX = 11;
+    private static final int OTHER_BUTTON_INDEX = 10;
     private String saveFileName = null;
     private Dialog saveDialog = null;
 
@@ -121,7 +126,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             getWindow().setBackgroundDrawableResource(value.resourceId);
         }
 
-        diceSidesInfos = new DiceSidesInfo[12];
+        diceSidesInfos = new DiceSidesInfo[11];
         int i = 0;
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d1Button),
                 R.attr.constant_clicked, R.attr.constant_unclicked);
@@ -143,8 +148,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 R.attr.d20_clicked, R.attr.d20_unclicked);
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d30Button),
                 R.attr.d30_clicked, R.attr.d30_unclicked);
-        diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.d100Button),
-                R.attr.percentile_clicked, R.attr.percentile_unclicked);
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.otherButton),
                 R.attr.d10_clicked, R.attr.d10_unclicked);
 
@@ -166,7 +169,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             if (filename != null && !filename.isEmpty()) {
                 try {
                     FileInputStream inputStream = openFileInput(filename);
-                    configs = DieConfiguration.loadFromFile(inputStream);
+                    DiceGroup dice = DiceGroup.loadFromFile(inputStream);
+                    if (dice != null) {
+                        configs = dice.dieConfigurations();
+                    }
                     inputStream.close();
                     saveFileName = filename;
                 } catch (FileNotFoundException e) {
@@ -185,50 +191,50 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         if (configs == null) {
             // load the default configuration
             configs = new DieConfiguration[1];
-            configs[0] = new DieConfiguration(1, 6, 1, 1, -1, true);
+            configs[0] = new DieConfiguration(1, 6, 1, 1,
+                    null, true, null);
         }
 
         configsToView(configs);
-        DiceGuiConfig cfg = diceConfigs.get(0);
-        DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
-        ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
-        int length = diceConfigs.size();
-        for (int j = 1; j < length; j++) {
-            cfg = diceConfigs.get(j);
-            info = getInfoForDieSides(cfg.config.getNumberOfSides());
-            ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
-        }
+        loadEditPanel(diceConfigs.get(configBeingEdited).config.getNumberOfSides() == 1);
 
-        TextView text = findViewById(R.id.otherText);
-        text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+        final TextView text = findViewById(R.id.otherText);
+        text.addTextChangedListener(new TextWatcher() {
             @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if (!hasFocus && v.isEnabled()) {
-                    DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
 
-                    TextView text = (TextView) v;
-                    String string = text.getText().toString();
-                    int nbrSides;
-                    if (string.isEmpty()) {
-                        nbrSides = DEFAULT_NBR_SIDES;
-                    } else {
-                        nbrSides = Integer.decode(string);
-                    }
-
-                    if (string.isEmpty() || nbrSides == 0 || nbrSides == 1) {
-                        // set to the default!
-                        text.setText(String.format(Locale.getDefault(), "%d", DEFAULT_NBR_SIDES));
-                        cfg.setNumberOfSides(DEFAULT_NBR_SIDES);
-                    } else {
-                        cfg.setNumberOfSides(nbrSides);
-                    }
-
-                    repopulateCurrentListItemFromConfig();
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // only change the config if the user is making an edit.  If it is being set to a
+                // default value, then ignore the change.
+                if (!text.isEnabled()) {
+                    return;
                 }
+
+                DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
+
+                String string = s.toString();
+                int nbrSides;
+                if (DieSideConfiguration.isNumeric(string)) {
+                    nbrSides = Integer.decode(string);
+                } else {
+                    nbrSides = DEFAULT_NBR_SIDES;
+                }
+
+                if (nbrSides == 0) {
+                    nbrSides = DEFAULT_NBR_SIDES;
+                }
+
+                cfg.setNumberOfSides(nbrSides);
+                repopulateCurrentListItemFromConfig();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
             }
         });
 
-        loadEditPanel(diceConfigs.get(configBeingEdited).config.getNumberOfSides() == 1);
     }
 
     @Override
@@ -259,6 +265,22 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         return true;
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == Constants.DICE_SIDES_ACTIVITY && resultCode == RESULT_OK) {
+            String json = data.getStringExtra(Constants.DICE_SIDES_JSON);
+            try {
+                JSONArray arr = new JSONArray(json);
+                DieSideConfiguration[] sides = DieSideConfiguration.fromJsonArray(arr);
+                diceConfigs.get(configBeingEdited).config.setSides(sides);
+            } catch (JSONException e) {
+                // should not happen
+                return;
+            }
+            repopulateCurrentListItemFromConfig();
+        }
+    }
+
     private void repopulateCurrentListItemFromConfig() {
         DiceGuiConfig guiCfg = diceConfigs.get(configBeingEdited);
         DieConfiguration cfg = guiCfg.config;
@@ -272,25 +294,39 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         item.setBackground(getResources().getDrawable(info.drawableClicked, null));
 
         if (cfg.getNumberOfSides() == 1) {
-            dieConfigButton.setText(String.format(Locale.getDefault(),
-                    getString(R.string.constantConfigStringRepresentation),
-                    cfg.getStartAt()));
+            dieConfigButton.setText(cfg.getSide(0).toString());
         } else {
             String nbrsOnDiceString = String.format(Locale.getDefault(),
                     getString(R.string.diceNumbersString),
-                    cfg.getStartAt(), cfg.getStartAt() + cfg.getIncrement(),
-                    cfg.getStartAt() + cfg.getIncrement() * (cfg.getNumberOfSides() - 1));
+                    cfg.getSide(0).toShortString(), cfg.getSide(1).toShortString(),
+                    cfg.getSide(cfg.getNumberOfSides() - 1).toShortString());
 
             // Set the text that specifies the dice being rolled in the format: 1D6
             String diceRepresentation = String.format(Locale.getDefault(),
                     getString(R.string.diceConfigStringRepresentation),
                     cfg.getNumberOfDice(), cfg.getNumberOfSides());
 
+            ArrayList<String> rerollOn = new ArrayList<>();
+            for (int i = 0; i < cfg.getNumberOfSides(); i++) {
+                DieSideConfiguration side = cfg.getSide(i);
+                if (side.reRollOn()) {
+                    rerollOn.add(side.toShortString());
+                }
+            }
             String rerollString = "";
-            if (cfg.getReRollOn() > cfg.getStartAt()) {
+            if (rerollOn.size() > 0) {
                 // update the re-roll text
+                StringBuilder builder = new StringBuilder();
+                int length = rerollOn.size();
+                for (String symbol : rerollOn) {
+                    builder.append(symbol);
+                    if (length > 1) {
+                        builder.append(',');
+                    }
+                    length--;
+                }
                 rerollString = String.format(Locale.getDefault(), getString(R.string.rerollText),
-                        cfg.getReRollOn());
+                        builder.toString());
             }
 
             dieConfigButton.setText(rerollString + "\n" + nbrsOnDiceString + "\n" + diceRepresentation);
@@ -328,10 +364,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         LinearLayout layoutPanelConstant = findViewById(R.id.edit_panel_constant);
         if ((layoutPanelConstant != null && !newPanelIsConstant) ||
                 (layoutPanelConstant == null && layoutPanelDie == null && !newPanelIsConstant)) {
-            if (layoutPanelConstant != null) {
-                TextView text = layoutPanelConstant.findViewById(R.id.constant);
-                text.setOnFocusChangeListener(null);
-            }
 
             // we were editing a constant and now we are editing a die.  Set the panel to the die panel.
             layoutEditPanel.removeAllViews();
@@ -339,116 +371,39 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     R.layout.customization_die, layoutEditPanel, false);
             layoutEditPanel.addView(layoutEditPanelDie);
 
-            TextView text = findViewById(R.id.die_start);
-            text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            EditText text = findViewById(R.id.number_of_dice);
+            text.addTextChangedListener(new TextWatcher() {
                 @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (!hasFocus) {
-                        DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
 
-                        TextView text = (TextView) v;
-                        String string = text.getText().toString();
-                        boolean reroll = true;
-                        if (cfg.getStartAt() > cfg.getReRollOn()) {
-                            reroll = false;
-                        }
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
 
-                        if (string.isEmpty()) {
-                            // set to the default!
-                            text.setText(String.format(Locale.getDefault(), "%d", DEFAULT_START));
-                            cfg.setStartAt(DEFAULT_START);
-                        } else {
-                            cfg.setStartAt(Integer.decode(string));
-                        }
-
-                        if (!reroll) {
-                            cfg.setReRollOn(cfg.getStartAt() - 1);
-                        }
-
-                        repopulateCurrentListItemFromConfig();
+                    String string = s.toString();
+                    if (string.isEmpty() || Integer.decode(string) == 0) {
+                        // set to the default!
+                        cfg.setNumberOfDice(DEFAULT_NBR_DICE);
+                    } else {
+                        int nbrDice = Integer.decode(string);
+                        cfg.setNumberOfDice(nbrDice);
                     }
+
+                    repopulateCurrentListItemFromConfig();
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
                 }
             });
 
-            text = findViewById(R.id.die_next);
-            text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (!hasFocus) {
-                        DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
-
-                        TextView text = (TextView) v;
-                        String string = text.getText().toString();
-                        if (string.isEmpty()) {
-                            // set to the default!
-                            text.setText(String.format(Locale.getDefault(), "%d", cfg.getStartAt() + DEFAULT_INCREMENT));
-                            cfg.setIncrement(DEFAULT_INCREMENT);
-                        } else {
-                            cfg.setIncrement(Integer.decode(string) - cfg.getStartAt());
-                        }
-
-                        repopulateCurrentListItemFromConfig();
-                    }
-                }
-            });
-
-            text = findViewById(R.id.number_of_dice);
-            text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (!hasFocus) {
-                        DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
-
-                        TextView text = (TextView) v;
-                        String string = text.getText().toString();
-                        if (string.isEmpty() || Integer.decode(string) == 0) {
-                            // set to the default!
-                            text.setText(String.format(Locale.getDefault(), "%d", DEFAULT_NBR_DICE));
-                            cfg.setNumberOfDice(DEFAULT_NBR_DICE);
-                        } else {
-                            int nbrDice = Integer.decode(string);
-                            cfg.setNumberOfDice(nbrDice);
-                        }
-
-                        repopulateCurrentListItemFromConfig();
-                    }
-                }
-            });
-
-            text = findViewById(R.id.die_reroll);
-            text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (!hasFocus) {
-                        DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
-
-                        TextView text = (TextView) v;
-                        String string = text.getText().toString();
-                        if (string.isEmpty()) {
-                            // Empty means no re-roll.  Set the re-roll value to the start at value - 1
-                            // thus, no re-rolls will occur.
-                            cfg.setReRollOn(cfg.getStartAt() - 1);
-                        } else {
-                            cfg.setReRollOn(Integer.decode(string));
-                        }
-
-                        repopulateCurrentListItemFromConfig();
-                    }
-                }
-            });
-
+            Spinner colorSpinner = findViewById(R.id.die_color);
+            ColorArrayAdapter adapter = new ColorArrayAdapter(this,
+                    R.array.diceColor, R.layout.list_item_dice_configuration, R.id.list_item);
+            colorSpinner.setAdapter(adapter);
         } else if ((layoutPanelDie != null && newPanelIsConstant) ||
                 (layoutPanelConstant == null && layoutPanelDie == null && newPanelIsConstant)) {
-            if (layoutPanelDie != null) {
-                TextView text = layoutPanelDie.findViewById(R.id.die_start);
-                text.setOnFocusChangeListener(null);
-                text = layoutPanelDie.findViewById(R.id.die_next);
-                text.setOnFocusChangeListener(null);
-                text = layoutPanelDie.findViewById(R.id.number_of_dice);
-                text.setOnFocusChangeListener(null);
-                text = layoutPanelDie.findViewById(R.id.die_reroll);
-                text.setOnFocusChangeListener(null);
-            }
 
             // we were editing a die, now we are editing a constant.  Set the panel to the constant
             // edit panel.
@@ -457,31 +412,83 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     R.layout.customization_constant, layoutEditPanel, false);
             layoutEditPanel.addView(layoutEditPanelDie);
 
-            TextView text = findViewById(R.id.constant);
-            text.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            EditText text = findViewById(R.id.constant_symbol);
+            text.addTextChangedListener(new TextWatcher() {
                 @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (!hasFocus) {
-                        DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
 
-                        TextView text = (TextView) v;
-                        String string = text.getText().toString();
-                        if (string.isEmpty()) {
-                            // set to the default!
-                            text.setText(String.format(Locale.getDefault(), "%d", DEFAULT_START));
-                            cfg.setStartAt(DEFAULT_START);
-                        } else {
-                            cfg.setStartAt(Integer.decode(string));
-                        }
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
 
-                        repopulateCurrentListItemFromConfig();
+                    String string = s.toString();
+                    DieSideConfiguration side = cfg.getSide(0);
+                    if (string.equals(side.symbol())) {
+                        // this is called by the value's text getting changed because we changed
+                        // it with the code below.  i.e. this is a programatic code change, not
+                        // one initiated by the user.  We need this return here to avoid an
+                        // infinite loop.
+                        return;
                     }
+                    side.setSymbol(string);
+                    if (DieSideConfiguration.isNumeric(string)) {
+                        // is a number - adjust the value as well
+                        side.setValue(Integer.decode(string));
+                        EditText text1 = findViewById(R.id.constant_value);
+                        text1.setText(string);
+                    }
+
+                    repopulateCurrentListItemFromConfig();
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                }
+            });
+
+            text = findViewById(R.id.constant_value);
+            text.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
+                    DieSideConfiguration side0 = cfg.getSide(0);
+
+                    String string = s.toString();
+                    if (string.isEmpty()) {
+                        side0.setValue(null);
+                    } else if (DieSideConfiguration.isNumeric(string)) {
+                        Integer value = Integer.decode(string);
+                        if (value.equals(side0.value())) {
+                            // this is called by the symbol's text getting changed because we changed
+                            // it with the code below.  i.e. this is a programatic code change, not
+                            // one initiated by the user.  We need this return here to avoid an
+                            // infinite loop.
+                            return;
+                        }
+                        side0.setValue(value);
+                        EditText text1 = findViewById(R.id.constant_symbol);
+                        if (DieSideConfiguration.isNumeric(text1.getText().toString())) {
+                            // the symbol is a number - adjust the symbol to match the value
+                            side0.setSymbol(string);
+                            text1.setText(string);
+                        }
+                    }
+
+                    repopulateCurrentListItemFromConfig();
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
                 }
             });
 
         }
     }
-
 
     public void onDiceListItemClick(View view) {
         // first gather the data from the screen and update the config.  So that you get the config
@@ -570,8 +577,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         ConstraintLayout layoutNew = (ConstraintLayout) inflater.inflate(R.layout.dice_list_item, layoutDiceList, false);
 
         Button button = layoutNew.findViewById(R.id.die_config_button);
-        DieConfiguration config = new DieConfiguration(DEFAULT_NBR_DICE, DEFAULT_NBR_SIDES,
-                DEFAULT_START, DEFAULT_INCREMENT, DEFAULT_START - 1, true);
+        DieConfiguration config = new DieConfiguration(diceConfigs.get(diceConfigs.size() -1).config);
         diceConfigs.add(new DiceGuiConfig(config, button));
 
         // populate the detailed dice config page
@@ -592,6 +598,20 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             ScrollView scrollViewDice = findViewById(R.id.scrollViewDiceLandscape);
             scrollViewDice.fullScroll(View.FOCUS_DOWN);
         }
+    }
+
+    public void onDetailsClick(View view) {
+        Intent intent = new Intent(this, DiceSidesActivity.class);
+        try {
+            DieSideConfiguration[] sides = diceConfigs.get(configBeingEdited).config.getSides();
+            JSONArray arr = DieSideConfiguration.toJsonArray(sides);
+            intent.putExtra(Constants.DICE_SIDES_JSON, arr.toString());
+        } catch (JSONException e) {
+            // should not happen!
+            return;
+        }
+
+        startActivityForResult(intent, Constants.DICE_SIDES_ACTIVITY);
     }
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
@@ -639,13 +659,86 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             text.setText(saveFileName);
         }
 
-
         saveDialog = new AlertDialog.Builder(this).setTitle(R.string.save).setView(saveDialogView).show();
     }
 
     public void onCancelDiceCustomization(MenuItem item) {
         setResult(RESULT_CANCELED, null);
         finish();
+    }
+
+    public void onRecipesDiceCustomization(MenuItem item) {
+        LinearLayout layout = findViewById(R.id.dice_list);
+        LayoutInflater inflater = getLayoutInflater();
+
+        LinearLayout recipesView = (LinearLayout) inflater.inflate(
+                R.layout.customization_recipes_dialog, layout, false);
+
+        final Spinner spinner = recipesView.findViewById(R.id.spinnerRecipes);
+        final StringArrayAdapter adapter = new StringArrayAdapter(this, R.array.recipes,
+                R.layout.list_item_dice_configuration, R.id.list_item);
+        spinner.setAdapter(adapter);
+        final Dialog recipesDialog = new AlertDialog.Builder(this).setTitle(R.string.recipes).setView(recipesView).show();
+        Button cancel = recipesView.findViewById(R.id.cancelRecipes);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                recipesDialog.dismiss();
+            }
+        });
+        Button add = recipesView.findViewById(R.id.addRecipes);
+        add.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String selected = spinner.getSelectedItem().toString();
+                DieConfiguration[] newDice;
+                Resources resources = getResources();
+                if (selected.equals(resources.getString(R.string.fudge))) {
+                    newDice = DieConfiguration.createFudge();
+                } else if (selected.equals(resources.getString(R.string.percentile))) {
+                    newDice = DieConfiguration.createPercentile();
+                } else {
+                    // should not get here... forgot to add new item in config?
+                    recipesDialog.dismiss();
+                    return;
+                }
+
+                DieConfiguration[] allDice = new DieConfiguration[diceConfigs.size() + newDice.length];
+                int i = 0;
+                for (DiceGuiConfig config : diceConfigs) {
+                    allDice[i] = config.config;
+                    i++;
+                }
+                for (DieConfiguration config : newDice) {
+                    allDice[i] = config;
+                    i++;
+                }
+
+                configsToView(allDice);
+                recipesDialog.dismiss();
+            }
+        });
+
+        Button replace = recipesView.findViewById(R.id.replaceRecipes);
+        replace.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String selected = spinner.getSelectedItem().toString();
+                DieConfiguration[] newDice;
+                Resources resources = getResources();
+                if (selected.equals(resources.getString(R.string.fudge))) {
+                    newDice = DieConfiguration.createFudge();
+                } else if (selected.equals(resources.getString(R.string.percentile))) {
+                    newDice = DieConfiguration.createPercentile();
+                } else {
+                    // should not get here... forgot to add new item in config?
+                    recipesDialog.dismiss();
+                    return;
+                }
+                configsToView(newDice);
+                recipesDialog.dismiss();
+            }
+        });
     }
 
     public void onCancel(View view) {
@@ -668,71 +761,56 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             configs[i] = diceConfigs.get(i).config;
         }
 
+        String errorMessage = null;
+        DiceGroup dice = new DiceGroup(configs);
         try {
             FileOutputStream outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-            DieConfiguration.saveToFile(outputStream, configs);
+            dice.saveToFile(outputStream);
             outputStream.close();
-        } catch (IOException e) {
-            System.out.println("Exception on writing to file: " + filename + " message: " + e.getMessage());
-            return;
+        } catch (Exception e) {
+            errorMessage = e.getMessage();
+            System.out.println("Exception on writing to file: " + filename + " message: " + errorMessage);
         }
 
-        saveDialog.dismiss();
-        saveDialog = null;
+        if (errorMessage != null) {
+            // failed to save the file.  Pop up a dialog box with error message and do not dismiss
+            // the save dialog.
+            LinearLayout layout = findViewById(R.id.dice_list);
+            LinearLayout errorLayout = (LinearLayout) getLayoutInflater().inflate(
+                    R.layout.message_dialog, layout, false);
 
-        setResult(RESULT_OK, null);
-        finish();
+            TextView error = errorLayout.findViewById(R.id.message);
+            error.setText(errorMessage);
+
+            final Dialog errorDialog = new AlertDialog.Builder(this)
+                    .setTitle(R.string.error).setView(errorLayout).show();
+
+            Button ok = errorLayout.findViewById(R.id.okButton);
+            ok.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    errorDialog.dismiss();
+                }
+            });
+        } else {
+            saveDialog.dismiss();
+            saveDialog = null;
+
+            setResult(RESULT_OK, null);
+            finish();
+        }
     }
 
     private void updateConfigFromScreen() {
-        // Repopulate the dice config from the screen in case the user changed something
-        // there and the field has not lost focus yet.
+        // Repopulate the dice config from the screen in case the user changed the die color.
         if (configBeingEdited >= 0) {
             DieConfiguration config = diceConfigs.get(configBeingEdited).config;
 
-            if (config.getNumberOfSides() == 1) {
-                EditText constant = findViewById(R.id.constant);
-                String stringConstant = constant.getText().toString();
-                if (!stringConstant.isEmpty()) {
-                    config.setStartAt(Integer.valueOf(stringConstant));
-                }
-            } else {
-                EditText diceField = findViewById(R.id.number_of_dice);
-                String stringDiceField = diceField.getText().toString();
-                if (!stringDiceField.isEmpty()) {
-                    config.setNumberOfDice(Integer.valueOf(stringDiceField));
-                }
-
-                diceField = findViewById(R.id.die_start);
-                stringDiceField = diceField.getText().toString();
-                int start = config.getStartAt();
-                if (!stringDiceField.isEmpty()) {
-                    start = Integer.valueOf(stringDiceField);
-                    config.setStartAt(start);
-                }
-
-                diceField = findViewById(R.id.die_next);
-                stringDiceField = diceField.getText().toString();
-                if (!stringDiceField.isEmpty()) {
-                    int increment = Integer.valueOf(stringDiceField) - start;
-                    config.setIncrement(increment);
-                }
-
-                diceField = findViewById(R.id.die_reroll);
-                stringDiceField = diceField.getText().toString();
-                if (!stringDiceField.isEmpty()) {
-                    config.setReRollOn(Integer.valueOf(stringDiceField));
-                } else {
-                    config.setReRollOn(start-1);
-                }
-
-                diceField = findViewById(R.id.otherText);
-                if (diceField.isEnabled()) {
-                    stringDiceField = diceField.getText().toString();
-                    if (!stringDiceField.isEmpty()) {
-                        config.setNumberOfSides(Integer.valueOf(stringDiceField));
-                    }
-                }
+            if (config.getNumberOfSides() != 1) {
+                Spinner colorSpinner = findViewById(R.id.die_color);
+                ColorArrayAdapter colorAdapter = (ColorArrayAdapter)colorSpinner.getAdapter();
+                String selected = colorSpinner.getSelectedItem().toString();
+                config.setColor(colorAdapter.getColor(selected));
             }
         }
     }
@@ -785,7 +863,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             i++;
         }
 
-        editConfig(0, getInfoForDieSides(diceConfigs.get(0).config.getNumberOfSides()) == diceSidesInfos[OTHER_BUTTON_INDEX]);
+        editConfig(0, getInfoForDieSides(diceConfigs.get(0).config.getNumberOfSides()) ==
+                diceSidesInfos[OTHER_BUTTON_INDEX]);
     }
 
     private void editConfig(int i, boolean isOtherButton) {
@@ -813,39 +892,21 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         info.button.setBackground(getResources().getDrawable(info.drawableClicked,null));
 
         if (newPanelIsConstant) {
-            EditText edit = findViewById(R.id.constant);
-            edit.setText(String.format(Locale.getDefault(),
-                    getString(R.string.constantConfigStringRepresentation), config.getStartAt()));
+            DieSideConfiguration side = config.getSide(0);
+            EditText edit = findViewById(R.id.constant_symbol);
+            edit.setText(side.symbol());
+
+            edit = findViewById(R.id.constant_value);
+            edit.setText(String.format(Locale.getDefault(),"%d", side.value()));
         } else {
             EditText edit = findViewById(R.id.number_of_dice);
             edit.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfDice()));
-            edit = findViewById(R.id.die_start);
-            edit.setText(String.format(Locale.getDefault(), "%d", config.getStartAt()));
-            edit = findViewById(R.id.die_next);
-            edit.setText(String.format(Locale.getDefault(), "%d", config.getIncrement() + config.getStartAt()));
-            edit = findViewById(R.id.die_reroll);
-            TextView textView = findViewById(R.id.die_reroll_label);
-            if (config.getNumberDiceInRepresentation() > 1) {
-                // reroll does not make sense for percentile dice
-                edit.setEnabled(false);
-                textView.setTextColor(Color.GRAY);
-                edit.setText("");
-            } else {
-                edit.setEnabled(true);
-                TypedArray themeArray = getTheme().obtainStyledAttributes(new int[] {android.R.attr.textColor});
-                try {
-                    int textColor = themeArray.getColor(0, 0);
-                    textView.setTextColor(textColor);
-                } finally {
-                    // Free up resources.
-                    themeArray.recycle();
-                }
-                if (config.getReRollOn() >= config.getStartAt()) {
-                    edit.setText(String.format(Locale.getDefault(), "%d", config.getReRollOn()));
-                } else {
-                    edit.setText("");
-                }
-            }
+
+            Spinner colorSpinner = findViewById(R.id.die_color);
+            ColorArrayAdapter adapter = (ColorArrayAdapter) colorSpinner.getAdapter();
+            float[] color = config.getColor();
+            int pos = adapter.getPositionForColor(color);
+            colorSpinner.setSelection(pos);
         }
     }
 
@@ -882,8 +943,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 return 20;
             case 9:
                 return 30;
-            case 10:
-                return 100;
             default:
                 TextView other = findViewById(R.id.otherText);
                 String otherTextString = other.getText().toString();
@@ -894,6 +953,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 return Integer.decode(otherTextString);
         }
     }
+
     private DiceSidesInfo getInfoForDieSides(int nbrSides) {
         switch (nbrSides) {
             case 1:
@@ -916,10 +976,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 return diceSidesInfos[8];
             case 30:
                 return diceSidesInfos[9];
-            case 100:
-                return diceSidesInfos[10];
             default:
-                return diceSidesInfos[11];
+                return diceSidesInfos[10];
         }
     }
 }

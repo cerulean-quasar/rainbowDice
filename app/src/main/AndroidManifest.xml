@@ -29,6 +29,7 @@
         <activity android:name=".DiceCustomizationActivity" />
         <activity android:name=".ActivityThemeSelector" />
         <activity android:name=".DiceLogActivity" />
+        <activity android:name=".DiceSidesActivity"></activity>
     </application>
 
 </manifest>

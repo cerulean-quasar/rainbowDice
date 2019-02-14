@@ -56,7 +56,7 @@ std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
     /* color */
     attributeDescriptions[1].binding = 0; /* binding description to use */
     attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     attributeDescriptions[1].offset = offsetof(Vertex, color);
 
     /* texture coordinate */
@@ -280,7 +280,7 @@ void RainbowDiceVulkan::recreateModels() {
 }
 
 std::shared_ptr<vulkan::Buffer> RainbowDiceVulkan::createVertexBuffer(Dice *die) {
-    VkDeviceSize bufferSize = sizeof(die->die->vertices[0]) * die->die->vertices.size();
+    VkDeviceSize bufferSize = sizeof(die->die->getVertices()[0]) * die->die->getVertices().size();
 
     /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
      * memory.  Then use a copy command to copy the data into fast graphics card only memory.
@@ -288,7 +288,7 @@ std::shared_ptr<vulkan::Buffer> RainbowDiceVulkan::createVertexBuffer(Dice *die)
     vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    stagingBuffer.copyRawTo(die->die->vertices.data(), static_cast<size_t>(bufferSize));
+    stagingBuffer.copyRawTo(die->die->getVertices().data(), static_cast<size_t>(bufferSize));
 
     std::shared_ptr<vulkan::Buffer> vertexBuffer{new vulkan::Buffer{m_device, bufferSize,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -304,12 +304,13 @@ std::shared_ptr<vulkan::Buffer> RainbowDiceVulkan::createVertexBuffer(Dice *die)
  * Only one index buffer per pipeline is allowed.  Put all dice in the same index buffer.
  */
 std::shared_ptr<vulkan::Buffer>  RainbowDiceVulkan::createIndexBuffer(Dice *die) {
-    VkDeviceSize bufferSize = sizeof(die->die->indices[0]) * die->die->indices.size();
+    VkDeviceSize bufferSize = sizeof(die->die->getIndices()[0]) * die->die->getIndices().size();
 
     vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    stagingBuffer.copyRawTo(die->die->indices.data(), sizeof(die->die->indices[0]) * die->die->indices.size());
+    stagingBuffer.copyRawTo(die->die->getIndices().data(), sizeof(die->die->getIndices()[0]) *
+                                                           die->die->getIndices().size());
 
     std::shared_ptr<vulkan::Buffer> indexBuffer{new vulkan::Buffer{m_device, bufferSize,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
@@ -412,7 +413,7 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
              * parameter 5 - offset to add to the indices in the index buffer
              * parameter 6 - offset for instance rendering
              */
-            vkCmdDrawIndexed(commandBuffer, die->die->indices.size(), 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, die->die->getIndices().size(), 1, 0, 0, 0);
         }
 
         vkCmdEndRenderPass(commandBuffer);
@@ -524,9 +525,9 @@ void RainbowDiceVulkan::updateDepthResources() {
 }
 
 std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t texWidth, uint32_t texHeight,
-        std::vector<char> const &bitmap) {
-    char const *buffer = bitmap.data();
-    VkDeviceSize imageSize = bitmap.size();
+        std::unique_ptr<unsigned char[]> const &bitmap, size_t bitmapSize) {
+    unsigned char const *buffer = bitmap.get();
+    VkDeviceSize imageSize = bitmapSize;
 
     /* copy the image to CPU accessable memory in the graphics card.  Make sure that it has the
      * VK_BUFFER_USAGE_TRANSFER_SRC_BIT set so that we can copy from it to an image later
@@ -537,7 +538,7 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t te
 
     stagingBuffer.copyRawTo(buffer, static_cast<size_t>(imageSize));
 
-    VkFormat format = VK_FORMAT_R8_UNORM;
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     std::shared_ptr<vulkan::Image> textureImage{new vulkan::Image{m_device, texWidth, texHeight, format,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
@@ -559,9 +560,11 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t te
     return textureImage;
 }
 
-void RainbowDiceVulkan::loadObject(std::vector<std::string> const &symbols, std::string const &rerollSymbol) {
+void RainbowDiceVulkan::loadObject(std::vector<std::string> const &symbols,
+                                   std::vector<uint32_t> const &rerollIndices,
+                                   std::vector<float> const &color) {
     glm::vec3 position(0.0f, 0.0f, -1.0f);
-    std::shared_ptr<Dice> o(new Dice(m_device, symbols, rerollSymbol, position));
+    std::shared_ptr<Dice> o(new Dice(m_device, symbols, rerollIndices, position, color));
     dice.push_back(o);
 }
 
@@ -624,18 +627,27 @@ void RainbowDiceVulkan::resetPositions(std::set<int> &diceIndices) {
 void RainbowDiceVulkan::addRollingDice() {
     for (DiceList::iterator diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
         // Skip dice already being rerolled or does not get rerolled.
-        if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollSymbol.size() == 0) {
+        if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollIndices.size() == 0) {
             continue;
         }
 
-        std::string result = diceIt->get()->die->getResult();
-        if (result != diceIt->get()->rerollSymbol) {
+        uint32_t result = diceIt->get()->die->getResult() % diceIt->get()->die->getNumberOfSymbols();
+        bool shouldReroll = false;
+        for (auto const &rerollIndex : diceIt->get()->rerollIndices) {
+            if (result == rerollIndex) {
+                shouldReroll = true;
+                break;
+            }
+        }
+
+        if (!shouldReroll) {
             continue;
         }
 
         glm::vec3 position(0.0f, 0.0f, -1.0f);
-        std::shared_ptr<Dice> die(new Dice(m_device, diceIt->get()->die->symbols,
-                                           diceIt->get()->rerollSymbol, position));
+        std::shared_ptr<Dice> die(new Dice(m_device, diceIt->get()->die->getSymbols(),
+                                           diceIt->get()->rerollIndices, position,
+                                           diceIt->get()->die->dieColor()));
         diceIt->get()->isBeingReRolled = true;
 
         die->loadModel(m_swapChain->extent().width, m_swapChain->extent().height, m_textureAtlas);
@@ -680,14 +692,14 @@ bool RainbowDiceVulkan::allStopped() {
     return true;
 }
 
-std::vector<std::vector<std::string>> RainbowDiceVulkan::getDiceResults() {
-    std::vector<std::vector<std::string>> results;
+std::vector<std::vector<uint32_t >> RainbowDiceVulkan::getDiceResults() {
+    std::vector<std::vector<uint32_t>> results;
     for (DiceList::iterator dieIt = dice.begin(); dieIt != dice.end(); dieIt++) {
         if (!dieIt->get()->die->isStopped()) {
             // Should not happen
             throw std::runtime_error("Not all die are stopped!");
         }
-        std::vector<std::string> dieResults;
+        std::vector<uint32_t > dieResults;
         while (dieIt->get()->isBeingReRolled) {
             dieResults.push_back(dieIt->get()->die->getResult());
             dieIt++;
@@ -709,7 +721,7 @@ bool RainbowDiceVulkan::needsReroll() {
     return false;
 }
 
-void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::string> const &symbols) {
+void RainbowDiceVulkan::resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) {
     uint32_t i = 0;
     for (auto &&die : dice) {
         uint32_t nbrX = static_cast<uint32_t>(screenWidth/(2*DicePhysicsModel::stoppedRadius));
@@ -718,7 +730,7 @@ void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::string> const &
         float x = -screenWidth/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
         float y = screenHeight/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
 
-        die->die->positionDice(symbols[i++], x, y);
+        die->die->positionDice(upFaceIndices[i++], x, y);
         die->updateUniformBuffer();
     }
 }

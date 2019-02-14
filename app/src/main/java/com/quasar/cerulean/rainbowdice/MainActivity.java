@@ -129,6 +129,9 @@ public class MainActivity extends AppCompatActivity {
                     joinDrawer();
                     String diceFileName = b.getText().toString();
                     DieConfiguration[] diceConfig = loadFromFile(diceFileName);
+                    if (diceConfig == null) {
+                        return;
+                    }
                     rollTheDice(diceConfig, diceFileName);
                 }
             });
@@ -227,23 +230,43 @@ public class MainActivity extends AppCompatActivity {
     public void drawStoppedDice(DieConfiguration[] diceConfig, DiceResult diceResult) {
         ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
         int len = 0;
+        int i = 0;
         for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
+            if (diceConfig[i].getNumberOfSides() == 1) {
+                // skip drawing constants...
+                i+=dieResults.size();
+                continue;
+            }
+            i += dieResults.size();
             len += dieResults.size();
         }
 
-        String[] symbols = new String[len];
+        int[] indices = new int[len];
 
-        int i = 0;
+        i = 0;
+        int j = 0;
         for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
+            if (diceConfig[i].getNumberOfSides() == 1) {
+                // skip drawing constants...
+                i+=dieResults.size();
+                continue;
+            }
             for (DiceResult.DieResult dieResult : dieResults) {
-                symbols[i++] = Integer.toString(dieResult.result, 10);
+                Integer index = dieResult.index();
+                // old dice result...
+                if (index == null) {
+                    index = diceConfig[i].getIndexForSymbol(dieResult.symbol());
+                }
+                indices[j] = index;
+                j++;
+                i++;
             }
         }
 
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        Draw draw = new Draw(null, drawSurfaceHolder, diceConfig, assetManager, null);
-        String err = draw.startDrawingStoppedDice(symbols);
+        Draw draw = new Draw(null, drawSurfaceHolder, diceConfig, assetManager);
+        String err = draw.startDrawingStoppedDice(indices);
         if (err != null && err.length() > 0) {
             TextView text = findViewById(R.id.rollResult);
             text.setText(err);
@@ -280,23 +303,7 @@ public class MainActivity extends AppCompatActivity {
         for (int j = 0; j < diceResultList.size(); j++) {
             ArrayList<DiceResult.DieResult> dieResults = diceResultList.get(j);
             for (int i=0; i < dieResults.size(); i++) {
-                DiceResult.DieResult dieResult = dieResults.get(i);
-                if (configs[l].isRepresentableByTwoTenSided()) {
-                    if (configs[l].getStartAt() == 0) {
-                        result.diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
-                                configs[l].getReRollOn(), configs[l].isAddOperation());
-                        result.diceConfig[k++] = new DieConfiguration(1, 10, 0, 1,
-                                configs[l].getReRollOn(), configs[l].isAddOperation());
-                    } else {
-                        result.diceConfig[k++] = new DieConfiguration(1, 10, 0, 10,
-                                configs[l].getReRollOn(), configs[l].isAddOperation());
-                        result.diceConfig[k++] = new DieConfiguration(1, 10, 1, 1,
-                                configs[l].getReRollOn(), configs[l].isAddOperation());
-                    }
-                    j++;
-                } else {
-                    result.diceConfig[k++] = new DieConfiguration(configs[l], 1);
-                }
+                result.diceConfig[k++] = new DieConfiguration(configs[l], 1);
             }
             if (m == configs[l].getNumberOfDice()-1) {
                 l++;
@@ -306,37 +313,29 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        text.setText(result.diceResult.generateResultsString(getString(R.string.diceMessageResult),
+        text.setText(result.diceResult.generateResultsString(configs,
+                getString(R.string.diceMessageResult),
+                getString(R.string.diceMessageResult2),
                 getString(R.string.addition), getString(R.string.subtraction)));
         return result;
     }
 
     private DieConfiguration[] loadFromFile(String filename) {
-        StringBuilder json = new StringBuilder();
-
         try {
-            byte[] bytes = new byte[1024];
-            int len;
             FileInputStream inputStream = openFileInput(filename);
-            while ((len = inputStream.read(bytes)) >= 0) {
-                if (len > 0) {
-                    json.append(new String(bytes, 0, len, "UTF-8"));
-                }
-            }
+            DiceGroup diceGroup = DiceGroup.loadFromFile(inputStream);
             inputStream.close();
+
+            if (diceGroup == null) {
+                return null;
+            }
+
+            return diceGroup.dieConfigurations();
         } catch (FileNotFoundException e) {
             System.out.println("Could not find file on opening: " + filename + " message: " + e.getMessage());
             return null;
         } catch (IOException e) {
             System.out.println("Exception on reading from file: " + filename + " message: " + e.getMessage());
-            return null;
-        }
-
-        try {
-            JSONArray jsonArray = new JSONArray(json.toString());
-            return DieConfiguration.fromJsonArray(jsonArray);
-        } catch (JSONException e) {
-            System.out.println("Exception on reading JSON from file: " + filename + " message: " + e.getMessage());
             return null;
         }
     }
@@ -349,37 +348,52 @@ public class MainActivity extends AppCompatActivity {
             String filename;
             // There are no favorites or dice configuration defaults.  Add a few example dice
             // configurations.
+            DiceGroup diceGroup;
             DieConfiguration[] dice = new DieConfiguration[1];
-            dice[0] = new DieConfiguration(1, 6, 1, 1, 0, true);
+            dice[0] = new DieConfiguration(1, 6, 1, 1,
+                    null, true, null);
+            diceGroup = new DiceGroup(dice);
             filename = "1D6";
-            configurationFile.addDice(filename, dice);
+            configurationFile.addDice(filename, diceGroup);
 
-
-            dice[0] = new DieConfiguration(2, 6, 1, 1, 0, true);
+            dice[0] = new DieConfiguration(2, 6, 1, 1,
+                    null, true, null);
+            diceGroup = new DiceGroup(dice);
             filename = "2D6";
-            configurationFile.addDice(filename, dice);
+            configurationFile.addDice(filename, diceGroup);
 
-            dice[0] = new DieConfiguration(1, 20, 1, 1, 0, true);
+            dice[0] = new DieConfiguration(1, 20, 1, 1,
+                    null, true, null);
+            diceGroup = new DiceGroup(dice);
             filename = "1D20";
-            configurationFile.addDice(filename, dice);
+            configurationFile.addDice(filename, diceGroup);
 
-            dice[0] = new DieConfiguration(1, 100, 0, 1, -1, true);
-            filename = "Percentile";
-            configurationFile.addDice(filename, dice);
-
-            dice[0] = new DieConfiguration(4, 3, -1, 1, -2, true);
+            dice = DieConfiguration.createFudge();
+            diceGroup = new DiceGroup(dice);
             filename = "Fudge Dice";
-            configurationFile.addDice(filename, dice);
+            configurationFile.addDice(filename, diceGroup);
 
-            dice[0] = new DieConfiguration(12, 6, 1, 1, 0, true);
+            dice = new DieConfiguration[1];
+            dice[0] = new DieConfiguration(12, 6, 1, 1,
+                    null, true, null);
             filename = "12D6";
-            configurationFile.addDice(filename, dice);
+            configurationFile.addDice(filename, diceGroup);
+
+            dice = DieConfiguration.createPercentile();
+            diceGroup = new DiceGroup(dice);
+            filename = "Percentile";
+            configurationFile.addDice(filename, diceGroup);
 
             dice = new DieConfiguration[2];
-            dice[0] = new DieConfiguration(1, 6, 1, 1, 6, true);
-            dice[1] = new DieConfiguration(1, 6, 1, 1, 6, false);
+            int[] rerollOn = new int[1];
+            rerollOn[0] = 6;
+            dice[0] = new DieConfiguration(1, 6, 1, 1, rerollOn,
+                    true, null);
+            dice[1] = new DieConfiguration(1, 6, 1, 1, rerollOn,
+                    false, null);
+            diceGroup = new DiceGroup(dice);
             filename = "d6-d6(reroll 6's)";
-            configurationFile.addDice(filename, dice);
+            configurationFile.addDice(filename, diceGroup);
             configurationFile.save();
         }
     }
@@ -395,7 +409,7 @@ public class MainActivity extends AppCompatActivity {
         joinDrawer();
         TextView resultView = findViewById(R.id.rollResult);
         Handler notify = new Handler(new ResultHandler(resultView, diceConfig, diceFileName));
-        drawer = new Thread(new Draw(notify, drawSurfaceHolder, diceConfig, assetManager, null));
+        drawer = new Thread(new Draw(notify, drawSurfaceHolder, diceConfig, assetManager));
         drawer.start();
     }
 
@@ -447,7 +461,9 @@ public class MainActivity extends AppCompatActivity {
             // no dice need reroll, just update the results text view with the results.
             logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
             drawingStarted = false;
-            text.setText(diceResult.generateResultsString(getString(R.string.diceMessageResult),
+            text.setText(diceResult.generateResultsString(diceConfig,
+                    getString(R.string.diceMessageResult),
+                    getString(R.string.diceMessageResult2),
                     getString(R.string.addition), getString(R.string.subtraction)));
             return true;
         }

@@ -25,7 +25,7 @@ uniform mat4 proj;
 uniform mat4 normalMatrix;
 
 attribute vec3 inPosition;
-attribute vec3 inColor;
+attribute vec4 inColor;
 attribute vec2 inTexCoord;
 attribute vec3 inNormal;
 attribute vec3 inCornerNormal;
@@ -36,7 +36,7 @@ attribute vec3 inCorner4;
 attribute vec3 inCorner5;
 attribute float inMode;
 
-varying vec3 fragColor;
+varying vec4 fragColor;
 varying vec2 fragTexCoord;
 varying vec3 fragNormal;
 varying vec3 fragPosition;

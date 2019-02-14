@@ -24,7 +24,10 @@
 #include <vector>
 
 struct TextureImage {
-    uint32_t imageIndex;
+    float left;
+    float right;
+    float top;
+    float bottom;
 };
 
 /* texture image */
@@ -32,39 +35,41 @@ typedef std::map<std::string, TextureImage>::iterator texture_iterator;
 
 class TextureAtlas {
 protected:
-    uint32_t heightImage;
-    uint32_t heightBlankSpace;
     uint32_t width;
-    uint32_t heightTexture;
+    uint32_t height;
     std::map<std::string, TextureImage> textureImages;
 
 public:
-    uint32_t getImageHeight() { return heightImage; }
     uint32_t getImageWidth() { return width; }
-    uint32_t getTextureHeight() {return heightTexture; }
-    uint32_t getPaddingHeight() {return heightBlankSpace; }
-    uint32_t getImageIndex(std::string &symbol) {
+    uint32_t getImageHeight() {return height; }
+    uint32_t getNbrImages() {
+        return (uint32_t)textureImages.size();
+    }
+
+    virtual TextureImage getTextureCoordinates(std::string const &symbol) {
         std::map<std::string, TextureImage>::iterator it = textureImages.find(symbol);
         if (it == textureImages.end()) {
             // shouldn't happen
             throw std::runtime_error(std::string("Texture not found for symbol: ") + symbol);
         }
 
-        return it->second.imageIndex;
-    }
-    uint32_t getNbrImages() {
-        return (uint32_t)textureImages.size();
+        return it->second;
     }
 
-    TextureAtlas(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                 uint32_t inHeightImage, uint32_t inHeightBlankSpace)
-        :heightImage(inHeightImage), heightBlankSpace(inHeightBlankSpace), width(inWidth),
-         heightTexture(inHeightTexture), textureImages()
+    TextureAtlas(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                 std::vector<std::pair<float, float>> const &inLeftRightTextureCoordinate,
+                 std::vector<std::pair<float, float>> const &inTopBottomTextureCoordinate)
+        :width(inWidth), height(inHeightTexture), textureImages()
     {
         for (uint32_t i=0; i < symbols.size(); i++) {
-            TextureImage tex = { i };
+            TextureImage tex = { inLeftRightTextureCoordinate[i].first,
+                                 inLeftRightTextureCoordinate[i].second,
+                                 inTopBottomTextureCoordinate[i].first,
+                                 inTopBottomTextureCoordinate[i].second };
             textureImages.insert(std::make_pair(symbols[i], tex));
         }
     }
+
+    virtual ~TextureAtlas() {}
 };
 #endif

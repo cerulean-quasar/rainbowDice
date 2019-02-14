@@ -26,10 +26,11 @@
 
 class TextureAtlasGL : public TextureAtlas {
 public:
-    TextureAtlasGL(std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                   uint32_t inHeightImage, uint32_t inHeightBlankSpace, std::vector<char> const &inBitmap)
-        : TextureAtlas{symbols, inWidth, inHeightTexture, inHeightImage, inHeightBlankSpace},
-          m_bitmap{inBitmap}
+    TextureAtlasGL(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                   std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
+                   std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
+                   std::unique_ptr<unsigned char[]> const &inBitmap)
+        : TextureAtlas{symbols, inWidth, inHeightTexture, textureCoordsLeftRight, textureCoordsTopBottom}
     {
         // load the textures
         glGenTextures(1, &m_texture);
@@ -44,24 +45,30 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, /*GL_LINEAR_MIPMAP_LINEAR*/GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, /*GL_LINEAR*/ GL_NEAREST);
 
-        std::vector<char> &texture = m_bitmap;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width,
-                     heightTexture, 0, GL_ALPHA, GL_UNSIGNED_BYTE, m_bitmap.data());
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width,
+                     height, 0, GL_RGBA, GL_UNSIGNED_BYTE, inBitmap.get());
 
         glGenerateMipmap(GL_TEXTURE_2D);
 
+    }
+
+    TextureImage getTextureCoordinates(std::string const &symbol) {
+        TextureImage coords = TextureAtlas::getTextureCoordinates(symbol);
+        float temp = coords.left;
+        coords.left = coords.right;
+        coords.right = temp;
+
+        return coords;
     }
 
     ~TextureAtlasGL() {
         glDeleteTextures(1, &m_texture);
     }
 
-    std::vector<char> &image() { return m_bitmap; }
     inline GLuint texture() { return m_texture; }
 
 private:
     GLuint m_texture;
-    std::vector<char> m_bitmap;
 };
 
 #endif /* RAINBOWDICE_TEXTUREATLASGL_HPP */

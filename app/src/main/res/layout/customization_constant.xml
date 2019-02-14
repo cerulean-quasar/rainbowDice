@@ -2,18 +2,40 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/edit_panel_constant"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
-    <TextView
-        android:labelFor="@id/constant"
+    <LinearLayout
+        android:orientation="horizontal"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/diceConfigConstant"/>
-    <EditText
-        android:id="@+id/constant"
+        android:layout_height="wrap_content">
+        <TextView
+            android:labelFor="@id/constant_symbol"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/diceConfigSymbol"/>
+        <EditText
+            android:id="@+id/constant_symbol"
+            android:maxLength="20"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="18" />
+    </LinearLayout>
+    <LinearLayout
+        android:orientation="horizontal"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:inputType="numberSigned"
-        android:text="18" />
+        android:layout_height="wrap_content">
+        <TextView
+            android:labelFor="@id/constant_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/diceConfigValue"/>
+        <EditText
+            android:id="@+id/constant_value"
+            android:maxLength="9"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="numberSigned"
+            android:text="18" />
+    </LinearLayout>
 </LinearLayout>

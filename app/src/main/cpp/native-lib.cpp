@@ -142,15 +142,17 @@ std::shared_ptr<RainbowDice> initDice(
         jobjectArray jSymbols,
         jint width,
         jint height,
-        jint imageHeight,
-        jint heightBlankSpace,
+        jfloatArray jArrayTextureCoordsLeft,
+        jfloatArray jArrayTextureCoordsRight,
+        jfloatArray jArrayTextureCoordsTop,
+        jfloatArray jArrayTextureCoordsBottom,
         jbyteArray jbitmap) {
 
     // get the texture data
     jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
     size_t bitmapSize = static_cast<size_t>(env->GetArrayLength(jbitmap));
-    std::vector<char> bitmap(static_cast<size_t>(bitmapSize));
-    memcpy(bitmap.data(), bytes, bitmap.size());
+    auto bitmap = std::make_unique<unsigned char[]>(bitmapSize);
+    memcpy(bitmap.get(), bytes, bitmapSize);
     env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
 
     std::vector<std::string> symbols;
@@ -162,6 +164,24 @@ std::shared_ptr<RainbowDice> initDice(
         env->ReleaseStringUTFChars(obj, csymbol);
         symbols.push_back(symbol);
     }
+
+    std::vector<std::pair<float, float>> textureCoordsTopBottom;
+    jfloat *jTextureCoordsBottom = env->GetFloatArrayElements(jArrayTextureCoordsBottom, nullptr);
+    jfloat *jTextureCoordsTop = env->GetFloatArrayElements(jArrayTextureCoordsTop, nullptr);
+    for (int i = 0; i < nbrSymbols; i++) {
+        textureCoordsTopBottom.push_back(std::make_pair(jTextureCoordsTop[i], jTextureCoordsBottom[i]));
+    }
+    env->ReleaseFloatArrayElements(jArrayTextureCoordsTop, jTextureCoordsTop, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jArrayTextureCoordsBottom, jTextureCoordsBottom, JNI_ABORT);
+
+    std::vector<std::pair<float, float>> textureCoordsLeftRight;
+    jfloat *jTextureCoordsLeft = env->GetFloatArrayElements(jArrayTextureCoordsLeft, nullptr);
+    jfloat *jTextureCoordsRight = env->GetFloatArrayElements(jArrayTextureCoordsRight, nullptr);
+    for (int i = 0; i < nbrSymbols; i++) {
+        textureCoordsLeftRight.push_back(std::make_pair(jTextureCoordsLeft[i], jTextureCoordsRight[i]));
+    }
+    env->ReleaseFloatArrayElements(jArrayTextureCoordsLeft, jTextureCoordsLeft, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jArrayTextureCoordsRight, jTextureCoordsRight, JNI_ABORT);
 
     ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
     if (window == nullptr) {
@@ -175,8 +195,8 @@ std::shared_ptr<RainbowDice> initDice(
 #ifdef CQ_ENABLE_VULKAN
     try {
         diceGraphics.reset(new RainbowDiceVulkan(window, symbols, static_cast<uint32_t>(width),
-                                                 static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
-                                                 static_cast<uint32_t>(heightBlankSpace), bitmap));
+                                                 static_cast<uint32_t>(height), textureCoordsLeftRight,
+                                                 textureCoordsTopBottom, bitmap, bitmapSize));
     } catch (std::runtime_error &e) {
         useGl = true;
     }
@@ -187,8 +207,8 @@ std::shared_ptr<RainbowDice> initDice(
     if (useGl) {
         try {
             diceGraphics.reset(new RainbowDiceGL(window, symbols, static_cast<uint32_t>(width),
-                                                 static_cast<uint32_t>(height), static_cast<uint32_t>(imageHeight),
-                                                 static_cast<uint32_t>(heightBlankSpace), bitmap));
+                                                 static_cast<uint32_t>(height), textureCoordsLeftRight,
+                                                 textureCoordsTopBottom, bitmap));
         } catch (std::runtime_error &e) {
             ANativeWindow_release(window);
             throw;
@@ -201,7 +221,7 @@ std::shared_ptr<RainbowDice> initDice(
         jobject obj = env->GetObjectArrayElement(jDiceConfigs, i);
         jclass diceConfigClass = env->GetObjectClass(obj);
 
-        jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberOfSidesInt", "()I");
+        jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberOfSides", "()I");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
@@ -211,53 +231,83 @@ std::shared_ptr<RainbowDice> initDice(
             continue;
         }
 
-        mid = env->GetMethodID(diceConfigClass, "getNumberDiceInRepresentation", "()I");
-        if (mid == 0) {
-            throw std::runtime_error("Could not load dice models");
-        }
-        jint nbrDiceInRepresentation = env->CallIntMethod(obj, mid);
-
-        std::vector<std::vector<std::string>> symbolsDiceVector;
+        std::vector<std::string> symbolsDiceVector;
         mid = env->GetMethodID(diceConfigClass, "getSymbolsString", "(I)Ljava/lang/String;");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
-        for (int j = 0; j < nbrDiceInRepresentation; j++) {
+
+        for (int j = 0; j < nbrSides; j++) {
             jstring jSymbolsDice = (jstring) env->CallObjectMethod(obj, mid, j);
             char const *cSymbolsDice = env->GetStringUTFChars(jSymbolsDice, 0);
             std::string symbolsDice(cSymbolsDice);
             env->ReleaseStringUTFChars(jSymbolsDice, cSymbolsDice);
 
-            std::size_t epos = symbolsDice.find("\n");
-            std::size_t bpos = 0;
-            std::vector<std::string> symbolsDieVector;
-            while (epos != std::string::npos) {
-                std::string symbolDice = symbolsDice.substr(bpos, epos-bpos);
-                symbolsDieVector.push_back(symbolDice);
-                bpos = epos+1;
-                epos = symbolsDice.find("\n", bpos);
-            }
-            symbolsDiceVector.push_back(symbolsDieVector);
+            symbolsDiceVector.push_back(symbolsDice);
         }
 
-        mid = env->GetMethodID(diceConfigClass, "getNumberOfDiceInt", "()I");
+        mid = env->GetMethodID(diceConfigClass, "getNumberOfDice", "()I");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
         jint nbrDice = env->CallIntMethod(obj, mid);
 
-        mid = env->GetMethodID(diceConfigClass, "getReRollOnInt", "()I");
+        mid = env->GetMethodID(diceConfigClass, "getNbrIndicesReRollOn", "()I");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
-        jint reroll = env->CallIntMethod(obj, mid);
+        jint nbrIndicesRerollOn = env->CallIntMethod(obj, mid);
 
-        std::string rerollSymbol{std::to_string(reroll)};
+        std::vector<uint32_t> indicesRerollOn;
+
+        if (nbrIndicesRerollOn > 0) {
+            jintArray jarrayindicesRerollOn = env->NewIntArray(nbrIndicesRerollOn);
+
+            mid = env->GetMethodID(diceConfigClass, "getReRollOn", "([I)V");
+            if (mid == 0) {
+                throw std::runtime_error("Could not load dice models");
+            }
+            env->CallVoidMethod(obj, mid, jarrayindicesRerollOn);
+
+            jint *jindicesRerollOn = env->GetIntArrayElements(jarrayindicesRerollOn, NULL);
+            for (int i = 0; i < nbrIndicesRerollOn; i++) {
+                indicesRerollOn.push_back(jindicesRerollOn[i]);
+            }
+
+            // we don't want to copy back changes to the array so use JNI_ABORT mode.
+            env->ReleaseIntArrayElements(jarrayindicesRerollOn, jindicesRerollOn, JNI_ABORT);
+        }
+
+        mid = env->GetMethodID(diceConfigClass, "isRainbow", "()Z");
+        if (mid == 0) {
+            throw std::runtime_error("Could not load dice models");
+        }
+        jboolean rainbow = env->CallBooleanMethod(obj, mid);
+
+        std::vector<float> color;
+        if (!rainbow) {
+            mid = env->GetMethodID(diceConfigClass, "getColor", "([F)Z");
+            if (mid == 0) {
+                throw std::runtime_error("Could not load dice models");
+            }
+
+            // the color is always 4 floats long
+            jfloatArray jarrayColor = env->NewFloatArray(4);
+
+            jboolean result = env->CallBooleanMethod(obj, mid, jarrayColor);
+            if (result) {
+                jfloat *jcolor = env->GetFloatArrayElements(jarrayColor, NULL);
+                for (int i = 0; i < 4; i++) {
+                    color.push_back(jcolor[i]);
+                }
+
+                // we don't want to copy back changes to the array so use JNI_ABORT mode.
+                env->ReleaseFloatArrayElements(jarrayColor, jcolor, JNI_ABORT);
+            }
+        }
 
         for (int j = 0; j < nbrDice; j++) {
-            for (auto const &diceSymbols : symbolsDiceVector) {
-                diceGraphics->loadObject(diceSymbols, rerollSymbol);
-            }
+            diceGraphics->loadObject(symbolsDiceVector, indicesRerollOn, color);
         }
     }
 
@@ -288,11 +338,11 @@ std::string drawRollingDice(std::shared_ptr<RainbowDice> const &diceGraphics)
                 diceGraphics->addRollingDice();
                 continue;
             }
-            std::vector<std::vector<std::string>> results = diceGraphics->getDiceResults();
+            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
             std::string totalResult;
-            for (auto result : results) {
-                for (auto dieResult : result) {
-                    totalResult += dieResult + "\t";
+            for (auto const &result : results) {
+                for (auto const &dieResult : result) {
+                    totalResult += std::to_string(dieResult) + "\t";
                 }
                 totalResult[totalResult.length() - 1] = '\n';
             }
@@ -314,15 +364,18 @@ Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
         jobjectArray jSymbols,
         jint width,
         jint height,
-        jint imageHeight,
-        jint heightBlankSpace,
+        jfloatArray textureCoordLeft,
+        jfloatArray textureCoordRight,
+        jfloatArray textureCoordTop,
+        jfloatArray textureCoordBottom,
         jbyteArray jbitmap) {
 
     stopDrawing.store(false);
 
     try {
         std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
-                jSymbols, width, height, imageHeight, heightBlankSpace, jbitmap);
+                jSymbols, width, height, textureCoordLeft, textureCoordRight,
+                textureCoordTop, textureCoordBottom, jbitmap);
         diceGraphics->resetPositions();
         std::string results = drawRollingDice(diceGraphics);
         return env->NewStringUTF(results.c_str());
@@ -346,31 +399,33 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         JNIEnv *env,
         jobject jthis,
-        jobjectArray jSymbolsUp,
+        jintArray jFaceIndicesUpArray,
         jobject surface,
         jobject manager,
         jobjectArray jDiceConfigs,
         jobjectArray jSymbols,
         jint width,
         jint height,
-        jint imageHeight,
-        jint heightBlankSpace,
+        jfloatArray textureCoordLeft,
+        jfloatArray textureCoordRight,
+        jfloatArray textureCoordTop,
+        jfloatArray textureCoordBottom,
         jbyteArray jbitmap)
 {
-    int count = env->GetArrayLength(jSymbolsUp);
-    std::vector<std::string> symbols;
+    int count = env->GetArrayLength(jFaceIndicesUpArray);
+    std::vector<uint32_t > faceIndicesUp;
+    jint* jFaceIndicesUp = env->GetIntArrayElements(jFaceIndicesUpArray, nullptr);
     for (int i = 0; i < count; i++) {
-        jstring jsymbol = (jstring) env->GetObjectArrayElement(jSymbolsUp, i);
-        char const *csymbol = env->GetStringUTFChars(jsymbol, nullptr);
-        symbols.push_back(csymbol);
-        env->ReleaseStringUTFChars(jsymbol, csymbol);
+        faceIndicesUp.push_back(static_cast<uint32_t >(jFaceIndicesUp[i]));
     }
+    env->ReleaseIntArrayElements(jFaceIndicesUpArray, jFaceIndicesUp, JNI_ABORT);
 
     try {
         std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
-                                                             jSymbols, width, height, imageHeight,
-                                                             heightBlankSpace, jbitmap);
-        diceGraphics->resetToStoppedPositions(symbols);
+                                                             jSymbols, width, height, textureCoordLeft,
+                                                             textureCoordRight, textureCoordTop,
+                                                             textureCoordBottom, jbitmap);
+        diceGraphics->resetToStoppedPositions(faceIndicesUp);
         diceGraphics->drawFrame();
         return env->NewStringUTF("");
     } catch (std::runtime_error &e) {

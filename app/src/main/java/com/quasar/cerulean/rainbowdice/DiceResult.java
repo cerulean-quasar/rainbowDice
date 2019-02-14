@@ -24,56 +24,80 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class DiceResult {
     public class DieResult {
         private static final String result_name = "die_result";
-        private static final String needsReRoll_name = "die_needs_reroll";
+        private static final String result_symbol_name = "die_symbol_result";
+        private static final String result_value_name = "die_value_result";
+        private static final String diceIndex_name = "dice_index_result";
         private static final String isAddOperation_name = "is_add_operation";
         private static final String isConstant_name = "is_constant";
 
-        // What the die rolled
-        public int result;
+        private Integer m_diceIndex;
+        private Integer m_value;
 
-        // Does it need to be rerolled?
-        public boolean needsReRoll;
+        // What the die rolled
+        private String m_symbol;
 
         // Does this die get added or subtracted?
-        public boolean isAddOperation;
+        private boolean m_isAddOperation;
 
         // is the result from a constant (D1 dice)?
-        public boolean isConstant;
+        private boolean m_isConstant;
 
-        DieResult (int inResult, boolean inNeedsReRoll, boolean inIsAddOperation, boolean inIsConstant) {
-            result = inResult;
-            needsReRoll = inNeedsReRoll;
-            isAddOperation = inIsAddOperation;
-            isConstant = inIsConstant;
+        DieResult (String inSymbol, Integer inValue, Integer inDiceIndex, boolean inIsAddOperation, boolean inIsConstant) {
+            m_symbol = inSymbol;
+            m_value = inValue;
+            m_diceIndex = inDiceIndex;
+            m_isAddOperation = inIsAddOperation;
+            m_isConstant = inIsConstant;
         }
 
         public JSONObject toJSON() throws JSONException {
             JSONObject obj = new JSONObject();
-            obj.put(result_name, result);
-            obj.put(needsReRoll_name, needsReRoll);
-            obj.put(isAddOperation_name, isAddOperation);
-            obj.put(isConstant_name, isConstant);
+            if (m_value != null) {
+                obj.put(result_value_name, m_value);
+            }
+            if (!m_isConstant && m_diceIndex != null) {
+                obj.put(diceIndex_name, m_diceIndex);
+            }
+            obj.put(result_symbol_name, m_symbol);
+            obj.put(isAddOperation_name, m_isAddOperation);
+            obj.put(isConstant_name, m_isConstant);
 
             return obj;
         }
 
         public DieResult(JSONObject obj) throws JSONException {
-            result = obj.getInt(result_name);
-            needsReRoll = obj.getBoolean(needsReRoll_name);
-            isAddOperation = obj.getBoolean(isAddOperation_name);
-            isConstant = obj.getBoolean(isConstant_name);
+            m_isAddOperation = obj.getBoolean(isAddOperation_name);
+            m_isConstant = obj.getBoolean(isConstant_name);
+            if (obj.has(result_name)) {
+                // an old result.  the symbol and value are the same and both are numbers only
+                m_value = obj.getInt(result_name);
+                m_symbol = String.format(Locale.getDefault(), "%d", m_value);
+                m_diceIndex = null;
+            } else {
+                m_symbol = obj.getString(result_symbol_name);
+                if (obj.has(result_value_name)) {
+                    m_value = obj.getInt(result_value_name);
+                }
+                m_diceIndex = null;
+                if (!m_isConstant && obj.has(diceIndex_name)) {
+                    m_diceIndex = obj.getInt(diceIndex_name);
+                }
+            }
         }
+
+        Integer value() { return m_value; }
+        String symbol() { return m_symbol; }
+        Integer index() { return m_diceIndex; }
     }
 
     private ArrayList<ArrayList<DieResult>> diceResults;
-
-    private DiceResult() {
-        diceResults = null;
-    }
 
     public DiceResult(String result, DieConfiguration[] diceConfigurations) {
         diceResults = new ArrayList<>();
@@ -82,22 +106,16 @@ public class DiceResult {
         for (DieConfiguration die: diceConfigurations) {
             int numberOfDice = die.getNumberOfDice();
             boolean isAddOperation = die.isAddOperation();
-            int reRollOn = die.getReRollOn();
             for (int j = 0; j < numberOfDice; j++) {
-                boolean needsReRoll = false;
-                if (die.isRepresentableByTwoTenSided()) {
-                    ArrayList<DieResult> dieResults = getResultForString(values[i++], isAddOperation);
-                    ArrayList<DieResult> dieResults2 = getResultForString(values[i], isAddOperation);
-                    diceResults.add(dieResults);
-                    diceResults.add(dieResults2);
-                    i++;
-                } else if (die.getNumberOfSides() == 1) {
-                    DieResult dieResult = new DieResult(die.getStartAt(), false, isAddOperation, true);
+                if (die.getNumberOfSides() == 1) {
+                    DieSideConfiguration side = die.getSide(0);
+                    DieResult dieResult = new DieResult(side.symbol(), side.value(), null,
+                            isAddOperation, true);
                     ArrayList<DieResult> dieResults = new ArrayList<>();
                     dieResults.add(dieResult);
                     diceResults.add(dieResults);
                 } else {
-                    ArrayList<DieResult> dieResults = getResultForString(values[i], isAddOperation);
+                    ArrayList<DieResult> dieResults = getResultForString(die, values[i], isAddOperation);
                     diceResults.add(dieResults);
                     i++;
                 }
@@ -105,12 +123,20 @@ public class DiceResult {
         }
     }
 
-    private ArrayList<DieResult> getResultForString(String dieResultsString, boolean isAddOperation) {
+    private ArrayList<DieResult> getResultForString(DieConfiguration die, String dieResultsString, boolean isAddOperation) {
         ArrayList<DieResult> dieResults = new ArrayList<>();
         String[] values = dieResultsString.split("\t");
         for (String value: values) {
-            int valueInt = Integer.valueOf(value);
-            DieResult dieResult = new DieResult(valueInt, false, isAddOperation, false);
+            int index = Integer.valueOf(value);
+            // Take %die.getNumberOfSides() because C++ returns the dice face index, not the index
+            // into the dice sides array.  This is critical for some dice like the 3 sided die, where
+            // the actual virtual die has six sides, but the configuration only has three sides.
+            // C++ needs to return the face index so that it can be passed back into the function
+            // to restore dice from a log entry.  If the face index is not passed but rather the
+            // symbol index, then for the three sided die, the face could shift colors for
+            // rainbow colored dice.
+            DieSideConfiguration side = die.getSide(index%die.getNumberOfSides());
+            DieResult dieResult = new DieResult(side.symbol(), side.value(), index, isAddOperation, false);
             dieResults.add(dieResult);
         }
         return dieResults;
@@ -144,101 +170,117 @@ public class DiceResult {
         }
     }
 
-    public void updateWithReRolls(String result) {
-        String[] values = result.split("\n");
-        int i = 0;
-        for (ArrayList<DieResult> prevResult : diceResults) {
-            DieResult prev = prevResult.get(prevResult.size()-1);
-            if (prev.needsReRoll) {
-                boolean needsReRoll = false;
-                int value = Integer.valueOf(values[i]);
-                if (prev.result == value) {
-                    needsReRoll = true;
-                }
-
-                DieResult dieResult = new DieResult(value, needsReRoll, prev.isAddOperation, false);
-                prevResult.add(dieResult);
-            }
-            if (!prev.isConstant) {
-                i++;
-            }
-        }
-    }
-
-    public int[] reRollRequiredOnIndices() {
-        ArrayList<Integer> indicesNeedReRoll = new ArrayList<>();
-        int i=0;
-        for (ArrayList<DieResult> dieResults : diceResults) {
-            if (dieResults.get(dieResults.size()-1).needsReRoll) {
-                indicesNeedReRoll.add(i);
-            }
-            if (!dieResults.get(dieResults.size()-1).isConstant) {
-                i++;
-            }
-        }
-
-        if (indicesNeedReRoll.isEmpty()) {
-            return null;
-        }
-
-        int[] indices = new int[indicesNeedReRoll.size()];
-        i = 0;
-        for (Integer index : indicesNeedReRoll) {
-            indices[i++] = index;
-        }
-
-        return indices;
-    }
-
-    public String generateResultsString(String resultFormat, String addition, String subtraction) {
+    public String generateResultsString(DieConfiguration[] configs, String resultFormat,
+                                        String resultFormat2,
+                                        String addition, String subtraction) {
         boolean isBegin = true;
-        int total = 0;
+        int i = 0;
+        int j = 1;
+        TreeMap<String, Integer> totalMap = new TreeMap<>();
+        String number = "__cerulean_quasar_numeric_value__";
         StringBuilder resultString = new StringBuilder();
         for (ArrayList<DieResult> dieResults : diceResults) {
             for (DieResult dieResult : dieResults) {
-                int value = dieResult.result;
+                String symbol = dieResult.m_symbol;
+                Integer value = dieResult.m_value;
+                boolean isAddOperation = dieResult.m_isAddOperation;
+                if (DieSideConfiguration.valueEqualsSymbol(symbol, value) && value < 0) {
+                    value = -value;
+                    symbol = String.format(Locale.getDefault(), "%d", value);
+                    isAddOperation = !isAddOperation;
+                }
                 if (isBegin) {
                     isBegin = false;
-                    if (dieResult.isAddOperation) {
-                        total += value;
-                    } else {
-                        total -= value;
-                        value = -1*value;
+                    if (!isAddOperation) {
+                        resultString.append(subtraction);
                     }
                 } else {
-                    if (dieResult.isAddOperation) {
-                        total += value;
+                    if (isAddOperation) {
                         resultString.append(addition);
                     } else {
-                        total-= value;
                         resultString.append(subtraction);
                     }
                 }
-                resultString.append(value);
+
+                resultString.append(DieSideConfiguration.toString(symbol, value));
+
+                symbol = dieResult.m_symbol;
+                value = dieResult.m_value;
+                if (value == null) {
+                    value = 1;
+                } else {
+                    symbol = number;
+                }
+
+                if (!configs[i].isAddOperation()) {
+                    value = -value;
+                }
+
+                Integer nbrTimesOccurred = totalMap.remove(symbol);
+                if (nbrTimesOccurred != null) {
+                    nbrTimesOccurred += value;
+                    totalMap.put(symbol, nbrTimesOccurred);
+                } else {
+                    totalMap.put(symbol, value);
+                }
+            }
+            if (j < configs[i].getNumberOfDice()) {
+                j++;
+            } else {
+                i++;
+                j = 1;
             }
         }
-        return String.format(resultFormat, resultString.toString(), total);
+
+        StringBuilder totalString = new StringBuilder();
+        isBegin = true;
+        for (Map.Entry<String, Integer> entry : totalMap.entrySet()) {
+            Integer value = entry.getValue();
+            boolean isAddOperation = true;
+            if (value == 0) {
+                continue;
+            }
+            if (value < 0) {
+                value = -value;
+                isAddOperation = false;
+            }
+            if (isBegin) {
+                isBegin = false;
+                if (!isAddOperation) {
+                    totalString.append(subtraction);
+                }
+            } else {
+                if (isAddOperation) {
+                    totalString.append(addition);
+                } else {
+                    totalString.append(subtraction);
+                }
+            }
+            if (entry.getKey().equals(number)) {
+                totalString.append(value);
+            } else {
+                if (value == 1) {
+                    totalString.append(entry.getKey());
+                } else {
+                    totalString.append(String.format(Locale.getDefault(), "%d*%s",
+                            value, entry.getKey()));
+                }
+            }
+        }
+
+        String resultBeforeAdd = resultString.toString();
+        String resultAfterAdd = totalString.toString();
+        if (resultAfterAdd.isEmpty()) {
+            resultAfterAdd = "0";
+        }
+        if (resultBeforeAdd.equals(resultAfterAdd)) {
+            return String.format(Locale.getDefault(), resultFormat2, resultBeforeAdd);
+        } else {
+            return String.format(Locale.getDefault(), resultFormat, resultBeforeAdd, resultAfterAdd);
+        }
     }
 
     ArrayList<ArrayList<DieResult>> getDiceResults() {
         return diceResults;
-    }
-
-    String[] getResultSymbolList() {
-        int len = 0;
-        for (ArrayList<DieResult> dieResults : diceResults) {
-            len += dieResults.size();
-        }
-
-        String[] symbols = new String[len];
-
-        int i = 0;
-        for (ArrayList<DieResult> dieResults : diceResults) {
-            for (DieResult dieResult : dieResults) {
-                symbols[i++] = Integer.toString(dieResult.result, 10);
-            }
-        }
-
-        return symbols;
     }
 }

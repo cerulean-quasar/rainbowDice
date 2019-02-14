@@ -35,25 +35,48 @@ import java.util.Collection;
 import java.util.TreeSet;
 
 import static android.graphics.Bitmap.Config.ALPHA_8;
+import static android.graphics.Bitmap.Config.ARGB_4444;
+import static android.graphics.Bitmap.Config.ARGB_8888;
 
 public class Draw implements Runnable {
-    private static final int TEXWIDTH = 64;
-    private static final int TEXHEIGHT = 64;
-    private static final int TEX_BLANK_HEIGHT = 56;
+    private static final int MAX_TEXTURE_DIMENSION = 10000;
+    private static final int TEXWIDTH = 128;
+    private static final int TEX_PADDING = 30;
+    private static final int TEX_BLANK_HEIGHT = 128;
+
+    private class DiceTexture {
+        public int width;
+        public int height;
+        public float[] textureCoordLeft;
+        public float[] textureCoordRight;
+        public float[] textureCoordTop;
+        public float[] textureCoordBottom;
+        public byte[] bytes;
+        public DiceTexture(int inWidth, int inTextureHeight,
+                           float[] inTextureCoordLeft, float[] inTextureCoordRight,
+                           float[] inTextureCoordTop, float[] inTextureCoordBottom,
+                           byte[] inBytes) {
+            width = inWidth;
+            height = inTextureHeight;
+            textureCoordLeft = inTextureCoordLeft;
+            textureCoordRight = inTextureCoordRight;
+            textureCoordTop = inTextureCoordTop;
+            textureCoordBottom = inTextureCoordBottom;
+            bytes = inBytes;
+        }
+    }
 
     private Handler m_notify;
     private SurfaceHolder m_surfaceHolder;
     private DieConfiguration[] m_diceConfig;
     private AssetManager m_assetManager;
-    private int[] m_indicesNeedsReroll;
 
     public Draw(Handler inNotify, SurfaceHolder inSurfaceHolder, DieConfiguration[] inDiceConfig,
-                AssetManager inAssetManager, int[] inIndicesNeedsReroll) {
+                AssetManager inAssetManager) {
         m_notify = inNotify;
         m_surfaceHolder = inSurfaceHolder;
         m_diceConfig = inDiceConfig;
         m_assetManager = inAssetManager;
-        m_indicesNeedsReroll = inIndicesNeedsReroll;
     }
 
     public void run() {
@@ -80,16 +103,16 @@ public class Draw implements Runnable {
 
         Collection<String> symbolSet = getSymbols();
 
-        byte[] texture = createTexture(symbolSet);
+        DiceTexture texture = createTexture(symbolSet, changeAspectRatio());
         if (texture == null) {
-            return "Could not create texture.";
+            return "error: Could not create texture.";
         }
 
         Surface drawSurface = m_surfaceHolder.getSurface();
         String err = rollDice(drawSurface, m_assetManager, m_diceConfig,
                 symbolSet.toArray(new String[symbolSet.size()]),
-                TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
-                TEX_BLANK_HEIGHT, texture);
+                texture.width, texture.height, texture.textureCoordLeft, texture.textureCoordRight,
+                texture.textureCoordTop, texture.textureCoordBottom, texture.bytes);
         if (err != null && err.length() != 0) {
             return err;
         }
@@ -97,7 +120,20 @@ public class Draw implements Runnable {
         return null;
     }
 
-    public String startDrawingStoppedDice(String[] symbolsUp) {
+    private boolean changeAspectRatio() {
+        boolean change = true;
+        for (DieConfiguration dieConfig : m_diceConfig) {
+            int nbrSides = dieConfig.getNumberOfSides();
+            if (nbrSides == 12 || nbrSides == 6 || nbrSides ==  3 || nbrSides == 2) {
+                change = false;
+                break;
+            }
+        }
+
+        return change;
+    }
+
+    public String startDrawingStoppedDice(int[] faceIndicesUp) {
         if (m_diceConfig == null || m_diceConfig.length == 0) {
             // somehow someone managed to crash the code by having dice config null.  I don't know
             // how they did this, but returning here avoids the crash.
@@ -106,16 +142,17 @@ public class Draw implements Runnable {
 
         Collection<String> symbolSet = getSymbols();
 
-        byte[] texture = createTexture(symbolSet);
+        DiceTexture texture = createTexture(symbolSet, changeAspectRatio());
         if (texture == null) {
-            return "Could not create texture.";
+            return "error: Could not create texture.";
         }
 
         Surface drawSurface = m_surfaceHolder.getSurface();
-        String err = drawStoppedDice(symbolsUp, drawSurface, m_assetManager, m_diceConfig,
+        String err = drawStoppedDice(faceIndicesUp, drawSurface, m_assetManager, m_diceConfig,
                 symbolSet.toArray(new String[symbolSet.size()]),
-                TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT)*symbolSet.size(), TEXHEIGHT,
-                TEX_BLANK_HEIGHT, texture);
+                texture.width, texture.height,
+                texture.textureCoordLeft, texture.textureCoordRight, texture.textureCoordTop,
+                texture.textureCoordBottom, texture.bytes);
         if (err != null && err.length() != 0) {
             return err;
         }
@@ -129,36 +166,184 @@ public class Draw implements Runnable {
         // First we need to load all the textures in the texture Atlas (in cpp), then
         // we can load the models.  Since the model depends on the size of the textures.
         for (DieConfiguration dieConfig : m_diceConfig) {
-            for (int i=0; i < dieConfig.getNumberDiceInRepresentation(); i++) {
-                String[] symbols = dieConfig.getSymbols(i);
-                symbolSet.addAll(Arrays.asList(symbols));
+            for (int i = 0; i < dieConfig.getNumberOfSides(); i++) {
+                symbolSet.add(dieConfig.getSide(i).symbol());
             }
         }
 
         return symbolSet;
     }
 
-    private byte[] createTexture(Collection<String> symbolSet) {
+    private DiceTexture createTexture(Collection<String> symbolSet, boolean changeAspectRatio) {
+        int totalNbrImages = symbolSet.size();
+        int textureHeight = 0;
+        int textureWidth = 0;
+        int totalTextureHeight = 0;
+        Paint paint = new Paint(/*Paint.ANTI_ALIAS_FLAG*/);
+        paint.setTextAlign(Paint.Align.CENTER);
+        int i = 0;
+        float[] textSizes = new float[symbolSet.size()];
+        int maxHeight = 0;
+        int maxWidth = 0;
+        int[] textureCoordTop = new int[symbolSet.size()];
+        int[] textureCoordBottom = new int[symbolSet.size()];
+        int[] textureCoordLeft = new int[symbolSet.size()];
+        int[] textureCoordRight = new int[symbolSet.size()];
+        int[] textNumberOfLines = new int[symbolSet.size()];
+        int totalNbrTexturesDown = (int)Math.ceil(Math.sqrt(totalNbrImages));
+        int nbrTexturesDown = 0;
+        for (String symbol : symbolSet) {
+            // find the longest line of text in a sequence of lines
+            int length = symbol.length();
+            int nbrLines = 0;
+            int start = 0;
+            int end = symbol.indexOf("\n", 0);
+            if (end == -1) {
+                end = length;
+            }
+            int longestLineStart = 0;
+            int longestLineEnd = end;
+
+            float maxLineWidth = 0;
+            do {
+                nbrLines++;
+                float width = paint.measureText(symbol, start, end);
+                if (width > maxLineWidth) {
+                    maxLineWidth = width;
+                    longestLineStart = start;
+                    longestLineEnd = end;
+                }
+
+                if (end == length) {
+                    break;
+                }
+
+                start = end+1;
+                end = symbol.indexOf("\n", end + 1);
+                if (end == -1) {
+                    end = length;
+                }
+            } while (true);
+            textNumberOfLines[i] = nbrLines;
+
+            // find the max size for the text.
+            float maxTextSize = TEXWIDTH;
+            float minTextSize = 5.0f;
+            float textSize = (maxTextSize + minTextSize)/2;
+            paint.setTextSize(textSize);
+            do {
+                paint.setTextSize(textSize);
+                if (paint.measureText(symbol, longestLineStart, longestLineEnd) >= TEXWIDTH) {
+                    maxTextSize = textSize;
+                } else {
+                    minTextSize = textSize;
+                }
+                textSize = (maxTextSize + minTextSize)/2;
+            } while (maxTextSize - minTextSize > 0.5f);
+            textSizes[i] = minTextSize - 0.5f;
+
+            paint.setTextSize(textSizes[i]);
+            int height = (int) Math.ceil((paint.descent() - paint.ascent())*nbrLines + TEX_PADDING);
+            int width = TEXWIDTH + TEX_PADDING;
+            if (!changeAspectRatio) {
+                if (height < width) {
+                    height = width;
+                } else {
+                    width = height;
+                }
+            }
+
+            if (maxWidth < width) {
+                maxWidth = width;
+            }
+
+            if (textureHeight + height + TEX_BLANK_HEIGHT > MAX_TEXTURE_DIMENSION ||
+                    nbrTexturesDown >= totalNbrTexturesDown) {
+                if (totalTextureHeight < textureHeight) {
+                    totalTextureHeight = textureHeight;
+                }
+                nbrTexturesDown = 0;
+                textureHeight = 0;
+                textureWidth += maxWidth + TEX_BLANK_HEIGHT;
+                maxWidth = width;
+
+                if (textureWidth > MAX_TEXTURE_DIMENSION) {
+                    return null;
+                }
+            }
+
+            if (textureHeight > 0) {
+                textureHeight += TEX_BLANK_HEIGHT;
+            }
+
+            textureCoordTop[i] = textureHeight;
+            textureHeight += height;
+            textureCoordBottom[i] = textureHeight;
+            textureCoordLeft[i] = textureWidth;
+            textureCoordRight[i] = textureWidth + width;
+            if (height > maxHeight) {
+                maxHeight = height;
+            }
+
+            i++;
+            nbrTexturesDown++;
+        }
+
+        if (totalTextureHeight < textureHeight) {
+            totalTextureHeight = textureHeight;
+        }
+        textureWidth += maxWidth;
+
         Bitmap bitmap;
         try {
-            bitmap = Bitmap.createBitmap(TEXWIDTH, (TEXHEIGHT+TEX_BLANK_HEIGHT) * symbolSet.size(), ALPHA_8);
+            bitmap = Bitmap.createBitmap(textureWidth, totalTextureHeight, ARGB_8888);
         } catch (Exception e) {
             return null;
         }
         Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setUnderlineText(true);
-        paint.setFakeBoldText(true);
-        paint.setTextAlign(Paint.Align.CENTER);
+
+        // fill the image with blank including a zero alpha.  The shader uses this to tell if we
+        // are in text or open space.
         canvas.drawARGB(0,0,0,0);
-        int i = 0;
+
+        float textureCoordTopNorm[] = new float[totalNbrImages];
+        float textureCoordBottomNorm[] = new float[totalNbrImages];
+        float textureCoordLeftNorm[] = new float[totalNbrImages];
+        float textureCoordRightNorm[] = new float[totalNbrImages];
+        i = 0;
         for (String symbol : symbolSet) {
-            if (symbol.length() < 3) {
-                paint.setTextSize(48.0f);
-            } else {
-                paint.setTextSize(25.0f);
+            paint.setTextSize(textSizes[i]);
+            int length = symbol.length();
+            int nbrLines = 0;
+            int start = 0;
+            int end = symbol.indexOf("\n", 0);
+            if (end == -1) {
+                end = length;
             }
-            canvas.drawText(symbol, 28, i*(TEXHEIGHT+TEX_BLANK_HEIGHT) + 47, paint);
+            int middle = (textureCoordBottom[i] - textureCoordTop[i] -
+                    (int)Math.ceil((paint.descent() - paint.ascent())*textNumberOfLines[i]))/2;
+            do {
+                nbrLines++;
+                canvas.drawText(symbol,
+                        start,
+                        end,
+                        (textureCoordRight[i] + textureCoordLeft[i])/2,
+                        textureCoordTop[i] - paint.ascent()*nbrLines + middle,
+                        paint);
+                if (end == length) {
+                    break;
+                }
+
+                start = end+1;
+                end = symbol.indexOf("\n", end + 1);
+                if (end == -1) {
+                    end = length;
+                }
+            } while (true);
+            textureCoordTopNorm[i] = textureCoordTop[i]/(float)totalTextureHeight;
+            textureCoordBottomNorm[i] = textureCoordBottom[i]/(float)totalTextureHeight;
+            textureCoordLeftNorm[i] = textureCoordLeft[i]/(float)textureWidth;
+            textureCoordRightNorm[i] = textureCoordRight[i]/(float)textureWidth;
             i++;
         }
         int bitmapSize = bitmap.getAllocationByteCount();
@@ -172,13 +357,18 @@ public class Draw implements Runnable {
             return null;
         }
 
-        return bytes;
+        return new DiceTexture(textureWidth, totalTextureHeight,
+                textureCoordLeftNorm, textureCoordRightNorm,
+                textureCoordTopNorm, textureCoordBottomNorm, bytes);
     }
 
     private native String rollDice(Surface surface, AssetManager manager, DieConfiguration[] diceConfig,
-                                   String[] symbols, int width, int height, int heightImage,
-                                   int heightBlankSpace,  byte[] bitmap);
-    private native String drawStoppedDice(String[] symbolsUp, Surface surface, AssetManager manager, DieConfiguration[] diceConfig,
-                                          String[] symbolsTexture, int width, int height, int heightImage,
-                                          int heightBlankSpace,  byte[] bitmap);
+                                   String[] symbols, int width, int height,
+                                   float[] textureCoordLeft, float[] textureCoordRight,
+                                   float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
+    private native String drawStoppedDice(int[] symbolIndicesUp, Surface surface, AssetManager manager,
+                                          DieConfiguration[] diceConfig, String[] symbolsTexture,
+                                          int width, int height,
+                                          float[] textureCoordLeft, float[] textureCoordRight,
+                                          float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
 }

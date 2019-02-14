@@ -50,10 +50,10 @@ public class DiceConfigurationManager {
         }
     }
 
-    public void addDice(String name, DieConfiguration[] configs) {
+    public void addDice(String name, DiceGroup configs) {
         try {
             FileOutputStream outputStream = ctx.openFileOutput(name, Context.MODE_PRIVATE);
-            DieConfiguration.saveToFile(outputStream, configs);
+            configs.saveToFile(outputStream);
             outputStream.close();
         } catch (IOException e) {
             System.out.println("Exception on writing to file: " + name + " message: " + e.getMessage());

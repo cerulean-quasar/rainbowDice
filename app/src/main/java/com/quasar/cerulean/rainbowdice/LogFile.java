@@ -95,22 +95,26 @@ public class LogFile {
 
     private class LogItemV1 extends LogItem {
         private static final String diceList_name = "diceConfigurationList";
+        private static final String diceGroup_name = "diceGroup";
         private static final String diceResult_name = "diceResults";
-        private DieConfiguration[] dice;
+        private DiceGroup dice;
         private DiceResult result;
 
         public LogItemV1(String inLogTime, String inDiceName, DieConfiguration[] inDice, DiceResult inResult) {
             logTime = inLogTime;
             diceName = inDiceName;
-            dice = inDice;
+            dice = new DiceGroup(inDice);
             result = inResult;
         }
 
         public LogItemV1(JSONObject obj) throws JSONException {
             logTime = obj.getString(jsonTime);
             diceName = obj.getString(jsonDiceName);
-            JSONArray arr = obj.getJSONArray(diceList_name);
-            dice = DieConfiguration.fromJsonArray(arr);
+            if (obj.has(diceList_name)) {
+                dice = DiceGroup.fromDiceConfigurationV0JsonArray(obj.getJSONArray(diceList_name));
+            } else if (obj.has(diceGroup_name)) {
+                dice = DiceGroup.fromJson(obj.getJSONObject(diceGroup_name));
+            }
             JSONArray arr2 = obj.getJSONArray(diceResult_name);
             result = new DiceResult(arr2);
         }
@@ -120,8 +124,8 @@ public class LogFile {
             obj.put(version_name, 1);
             obj.put(jsonTime, logTime);
             obj.put(jsonDiceName, diceName);
-            JSONArray diceArr = DieConfiguration.toJSON(dice);
-            obj.put(diceList_name, diceArr);
+            JSONObject diceObj = dice.toJson();
+            obj.put(diceGroup_name, diceObj);
             JSONArray resultArr = result.toJSON();
             obj.put(diceResult_name, resultArr);
             return obj;
@@ -129,19 +133,21 @@ public class LogFile {
 
         @Override
         public String getDiceRepresentation() {
-            return DieConfiguration.arrayToString(dice);
+            return DieConfiguration.arrayToString(dice.dieConfigurations());
         }
 
         @Override
         public String getRollResultsString() {
             Resources res = ctx.getResources();
-            return result.generateResultsString(res.getString(R.string.diceMessageResult),
+            return result.generateResultsString(dice.dieConfigurations(),
+                    res.getString(R.string.diceMessageResult),
+                    res.getString(R.string.diceMessageResult2),
                     res.getString(R.string.addition), res.getString(R.string.subtraction));
         }
 
         @Override
         public DieConfiguration[] getDiceConfiguration() {
-            return dice;
+            return dice.dieConfigurations();
         }
 
         @Override
@@ -184,12 +190,9 @@ public class LogFile {
             JSONArray arr = new JSONArray(json.toString());
             for (int i=0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
-                int version;
-                try {
+                int version = 0;
+                if (obj.has(version_name)) {
                     version = obj.getInt(version_name);
-                } catch (JSONException e) {
-                    // if there is no version, then we are using version 0.
-                    version = 0;
                 }
                 LogItem item;
                 if (version == 0) {
