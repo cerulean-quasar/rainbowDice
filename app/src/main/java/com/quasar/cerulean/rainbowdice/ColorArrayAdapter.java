@@ -23,12 +23,14 @@ public class ColorArrayAdapter extends BaseAdapter {
     private Context ctx;
     private int layout;
     private int textItem;
+    private int[] fgBgColors;
 
     public ColorArrayAdapter(Context inctx, int arrayName, int inLayout, int inTextItem) {
         ctx = inctx;
         strings = ctx.getResources().getStringArray(arrayName);
         layout = inLayout;
         textItem = inTextItem;
+        fgBgColors = null;
     }
 
     public int getPosition(String selected) {
@@ -160,14 +162,30 @@ public class ColorArrayAdapter extends BaseAdapter {
 
     @Override
     public View getView(int position, View convertView, ViewGroup container) {
+        // Set the background color to the color being selected except if it is rainbow being selected.
+        // For rainbow, do not set the color if the TextView is being created.  If it is being reused,
+        // set it to the default text color and for the background, use the color opposite of the
+        // text color.
+        String item = getItem(position);
+        int[] colors = getFgBgColors(item);
+
+        TextView text;
         if (convertView == null) {
             LayoutInflater inflater = (LayoutInflater) ctx.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
             convertView = inflater.inflate(layout, container, false);
+            text = convertView.findViewById(textItem);
+            if (fgBgColors == null) {
+                fgBgColors = new int[2];
+                fgBgColors[0] = text.getTextColors().getDefaultColor();
+                fgBgColors[1] = ~fgBgColors[0] | 0xFF000000;
+            }
+        } else {
+            text = convertView.findViewById(textItem);
+            if (colors == null) {
+                colors = fgBgColors;
+            }
         }
 
-        TextView text = convertView.findViewById(textItem);
-        String item = getItem(position);
-        int[] colors = getFgBgColors(item);
         if (colors != null) {
             text.setBackgroundColor(colors[1]);
             text.setTextColor(colors[0]);

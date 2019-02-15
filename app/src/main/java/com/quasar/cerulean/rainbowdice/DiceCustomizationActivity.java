@@ -151,6 +151,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         diceSidesInfos[i++] = new DiceSidesInfo((Button)findViewById(R.id.otherButton),
                 R.attr.d10_clicked, R.attr.d10_unclicked);
 
+        configBeingEdited = 0;
         DieConfiguration[] configs = null;
         Parcelable[] parcelableConfigs = null;
         if (savedInstanceState != null) {
@@ -163,6 +164,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 configs[i++] = (DieConfiguration) parcelableConfig;
             }
             saveFileName = savedInstanceState.getString(Constants.DICE_FILENAME);
+            configBeingEdited = savedInstanceState.getInt(Constants.DICE_BEING_EDITED);
         } else {
             Intent intent = getIntent();
             String filename = intent.getStringExtra(Constants.DICE_FILENAME);
@@ -184,7 +186,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     configs = null;
                     saveFileName = null;
                 }
-
             }
         }
 
@@ -195,8 +196,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     null, true, null);
         }
 
-        configsToView(configs);
-        loadEditPanel(diceConfigs.get(configBeingEdited).config.getNumberOfSides() == 1);
+        configsToView(configs, configBeingEdited);
+        //loadEditPanel(diceConfigs.get(configBeingEdited).config.getNumberOfSides() == 1);
 
         final TextView text = findViewById(R.id.otherText);
         text.addTextChangedListener(new TextWatcher() {
@@ -256,6 +257,8 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         if (saveFileName != null) {
             instanceState.putString(Constants.DICE_FILENAME, saveFileName);
         }
+
+        instanceState.putInt(Constants.DICE_BEING_EDITED, configBeingEdited);
     }
 
     @Override
@@ -714,7 +717,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     i++;
                 }
 
-                configsToView(allDice);
+                configsToView(allDice, 0);
                 recipesDialog.dismiss();
             }
         });
@@ -735,7 +738,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     recipesDialog.dismiss();
                     return;
                 }
-                configsToView(newDice);
+                configsToView(newDice, 0);
                 recipesDialog.dismiss();
             }
         });
@@ -815,7 +818,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         }
     }
 
-    private void configsToView(DieConfiguration[] configs) {
+    private void configsToView(DieConfiguration[] configs, int configToEdit) {
         if (configs == null) {
             // shouldn't happen
             return;
@@ -863,14 +866,14 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             i++;
         }
 
-        editConfig(0, getInfoForDieSides(diceConfigs.get(0).config.getNumberOfSides()) ==
+        editConfig(configToEdit, getInfoForDieSides(diceConfigs.get(0).config.getNumberOfSides()) ==
                 diceSidesInfos[OTHER_BUTTON_INDEX]);
 
         // now switch the active dice set.
         i = 0;
         for (DiceGuiConfig cfg : diceConfigs) {
             DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
-            if (i == 0) {
+            if (i == configToEdit) {
                 ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
             } else {
                 ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));

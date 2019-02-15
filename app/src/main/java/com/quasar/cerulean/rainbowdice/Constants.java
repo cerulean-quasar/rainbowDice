@@ -25,6 +25,7 @@ public class Constants {
     public static final int DICE_CUSTOMIZATION_ACTIVITY = 2;
     public static final String DICE_FILENAME = "DiceFileName";
     public static final String DICE_CONFIGURATION = "DiceConfiguration";
+    public static final String DICE_BEING_EDITED = "DiceBeingEdited";
 
     public static final int DICE_THEME_SELECTION_ACTIVITY = 3;
     public static final String themeNameConfigValue = "ThemeName";
