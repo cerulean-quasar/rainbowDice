@@ -273,11 +273,15 @@ public class DiceResult {
         if (resultAfterAdd.isEmpty()) {
             resultAfterAdd = "0";
         }
+
+        String finalResult;
         if (resultBeforeAdd.equals(resultAfterAdd)) {
-            return String.format(Locale.getDefault(), resultFormat2, resultBeforeAdd);
+            finalResult = String.format(Locale.getDefault(), resultFormat2, resultBeforeAdd);
         } else {
-            return String.format(Locale.getDefault(), resultFormat, resultBeforeAdd, resultAfterAdd);
+            finalResult = String.format(Locale.getDefault(), resultFormat, resultBeforeAdd, resultAfterAdd);
         }
+
+        return finalResult.replace('\n', ' ');
     }
 
     ArrayList<ArrayList<DieResult>> getDiceResults() {

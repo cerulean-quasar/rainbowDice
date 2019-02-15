@@ -865,6 +865,19 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
 
         editConfig(0, getInfoForDieSides(diceConfigs.get(0).config.getNumberOfSides()) ==
                 diceSidesInfos[OTHER_BUTTON_INDEX]);
+
+        // now switch the active dice set.
+        i = 0;
+        for (DiceGuiConfig cfg : diceConfigs) {
+            DiceSidesInfo info = getInfoForDieSides(cfg.config.getNumberOfSides());
+            if (i == 0) {
+                ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableClicked,null));
+            } else {
+                ((View)cfg.button.getParent()).setBackground(getResources().getDrawable(info.drawableUnclicked,null));
+            }
+            i++;
+        }
+
     }
 
     private void editConfig(int i, boolean isOtherButton) {

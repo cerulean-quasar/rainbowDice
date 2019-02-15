@@ -49,7 +49,7 @@ public class DiceLogActivity extends AppCompatActivity {
             text.setText(item.getDiceName());
 
             text = layoutItem.findViewById(R.id.dice_log_representation);
-            text.setText(item.getDiceRepresentation());
+            text.setText(item.getDiceRepresentation().replace('\n', ' '));
 
             text = layoutItem.findViewById(R.id.dice_log_result);
             text.setText(item.getRollResultsString());
