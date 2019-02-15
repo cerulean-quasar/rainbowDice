@@ -897,7 +897,12 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
             edit.setText(side.symbol());
 
             edit = findViewById(R.id.constant_value);
-            edit.setText(String.format(Locale.getDefault(),"%d", side.value()));
+            Integer value = side.value();
+            if (value != null) {
+                edit.setText(String.format(Locale.getDefault(), "%d", value));
+            } else {
+                edit.setText("");
+            }
         } else {
             EditText edit = findViewById(R.id.number_of_dice);
             edit.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfDice()));
