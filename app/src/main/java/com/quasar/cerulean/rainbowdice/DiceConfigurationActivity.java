@@ -49,6 +49,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -237,6 +238,26 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                             public void onClick(View view) {
                                 String newName = edit.getText().toString();
                                 if (newName.length() > 0) {
+                                    if (newName.contains("/")) {
+                                        LinearLayout errorLayout = (LinearLayout) getLayoutInflater().inflate(
+                                                R.layout.message_dialog, editDeleteLayout, false);
+
+                                        TextView error = errorLayout.findViewById(R.id.message);
+                                        error.setText(R.string.errorDirectorySeparator);
+
+                                        final Dialog errorDialog = new AlertDialog.Builder(ctx)
+                                                .setTitle(R.string.error).setView(errorLayout).show();
+
+                                        Button ok = errorLayout.findViewById(R.id.okButton);
+                                        ok.setOnClickListener(new View.OnClickListener() {
+                                            @Override
+                                            public void onClick(View v) {
+                                                errorDialog.dismiss();
+                                            }
+                                        });
+                                        
+                                        return;
+                                    }
                                     diceConfigManager.renameDice(diceName, newName);
 
                                     editDeleteLayout.removeViewAt(4);
