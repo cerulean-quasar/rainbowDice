@@ -238,12 +238,22 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                             public void onClick(View view) {
                                 String newName = edit.getText().toString();
                                 if (newName.length() > 0) {
-                                    if (newName.contains("/")) {
+                                    String errorMessage = null;
+                                    boolean renameResult = false;
+                                    try {
+                                        renameResult = diceConfigManager.renameDice(diceName, newName);
+                                    } catch (Exception e) {
+                                        errorMessage = e.getMessage();
+                                    }
+                                    if (!renameResult) {
                                         LinearLayout errorLayout = (LinearLayout) getLayoutInflater().inflate(
                                                 R.layout.message_dialog, editDeleteLayout, false);
 
+                                        if (errorMessage == null) {
+                                            errorMessage = getString(R.string.errorRenameFailed);
+                                        }
                                         TextView error = errorLayout.findViewById(R.id.message);
-                                        error.setText(R.string.errorDirectorySeparator);
+                                        error.setText(errorMessage);
 
                                         final Dialog errorDialog = new AlertDialog.Builder(ctx)
                                                 .setTitle(R.string.error).setView(errorLayout).show();
@@ -255,10 +265,9 @@ public class DiceConfigurationActivity extends AppCompatActivity {
                                                 errorDialog.dismiss();
                                             }
                                         });
-                                        
+
                                         return;
                                     }
-                                    diceConfigManager.renameDice(diceName, newName);
 
                                     editDeleteLayout.removeViewAt(4);
                                     editDeleteLayout.removeViewAt(3);

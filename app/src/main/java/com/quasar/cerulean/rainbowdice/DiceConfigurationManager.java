@@ -67,12 +67,16 @@ public class DiceConfigurationManager {
         ctx.deleteFile(name);
     }
 
-    public void renameDice(String oldName, String newName) {
-        config.rename(oldName, newName);
+    public boolean renameDice(String oldName, String newName) {
         File oldFile = new File(ctx.getFilesDir().getPath().concat("/").concat(oldName));
         File newFile = new File(ctx.getFilesDir().getPath().concat("/").concat(newName));
 
-        oldFile.renameTo(newFile);
+        boolean result = oldFile.renameTo(newFile);
+        if (result) {
+            config.rename(oldName, newName);
+        }
+
+        return result;
     }
 
     public void moveDice(String item, int to) {

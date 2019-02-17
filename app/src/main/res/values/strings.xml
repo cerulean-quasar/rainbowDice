@@ -19,7 +19,7 @@
     <string name="new_dice">New Dice</string>
     <string name="favorites">Favorites:</string>
     <string name="configureDice">Reorder Dice</string>
-    <string name="diceMessageRolling">Rolling...</string>
+    <string name="diceMessageRolling">Rolling&#8230;</string>
     <string name="diceMessageResult">result: %s = %s</string>
     <string name="diceMessageResult2">result: %s</string>
     <string name="diceMessageToStartRolling">Shake while rolling</string>
@@ -32,7 +32,7 @@
     <string name="diceSides">Dice Sides</string>
     <string name="diceMessageStartup">Click on a dice name above to roll, or add new dice by selecting "New Dice" from the menu.</string>
     <string name="errorNoDiceDefinitions">There are dice listed.  Create some with "Choose Dice->New".</string>
-    <string name="errorDirectorySeparator">New file name contains a directory separator, but it should not.</string>
+    <string name="errorRenameFailed">Rename failed: new dice name cannot be too long or contain directory separators.</string>
     <string name="confirm">Delete dice configuration: %s?</string>
     <string name="D1">Bonus</string>
     <string name="D2">Coin</string>
