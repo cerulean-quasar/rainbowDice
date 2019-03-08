@@ -30,44 +30,14 @@ public:
     explicit TextureGL(std::shared_ptr<TextureAtlas> inTextureAtlas) :
         m_textureAtlas{std::move(inTextureAtlas)}
     {
-        init();
+        initGLResources();
     }
 
-    TextureGL(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                   std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
-                   std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
-                   std::unique_ptr<unsigned char[]> &&inBitmap, uint32_t inBitmapSize)
-        : m_textureAtlas{std::make_shared<TextureAtlas>(symbols, inWidth, inHeightTexture,
-                                                       textureCoordsLeftRight, textureCoordsTopBottom,
-                                                       std::move(inBitmap), inBitmapSize)} {
-        init();
-    }
-
-    // TODO: reverse texture coordinates in atlas...
-    /*
-    TextureImage getTextureCoordinates(std::string const &symbol) {
-        TextureImage coords = TextureAtlas::getTextureCoordinates(symbol);
-        float temp = coords.left;
-        coords.left = coords.right;
-        coords.right = temp;
-
-        return coords;
-    }
-    */
-
-    ~TextureGL() {
+    void destroyGLResources() {
         glDeleteTextures(1, &m_texture);
     }
 
-    inline GLuint texture() { return m_texture; }
-
-    inline std::shared_ptr<TextureAtlas> const &textureAtlas() { return m_textureAtlas; }
-
-private:
-    std::shared_ptr<TextureAtlas> m_textureAtlas;
-    GLuint m_texture;
-
-    void init() {
+    void initGLResources() {
         // load the textures
         glGenTextures(1, &m_texture);
         glActiveTexture(GL_TEXTURE0);
@@ -86,8 +56,19 @@ private:
                      m_textureAtlas->bitmap().get());
 
         glGenerateMipmap(GL_TEXTURE_2D);
-
     }
+
+    ~TextureGL() {
+        destroyGLResources();
+    }
+
+    inline GLuint texture() { return m_texture; }
+
+    inline std::shared_ptr<TextureAtlas> const &textureAtlas() { return m_textureAtlas; }
+
+private:
+    std::shared_ptr<TextureAtlas> m_textureAtlas;
+    GLuint m_texture;
 };
 
 #endif /* RAINBOWDICE_TEXTUREATLASGL_HPP */

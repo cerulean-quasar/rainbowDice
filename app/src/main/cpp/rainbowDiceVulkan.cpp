@@ -141,8 +141,17 @@ void DiceDescriptorSetLayout::createDescriptorSetLayout() {
     viewPointLayoutBinding.descriptorCount = 1;
     viewPointLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     viewPointLayoutBinding.pImmutableSamplers = nullptr; // Optional
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings =
-            {uboLayoutBinding, samplerLayoutBinding, viewPointLayoutBinding};
+
+    /* Per object fragment shader data */
+    VkDescriptorSetLayoutBinding perObjectFragLayoutBinding = {};
+    perObjectFragLayoutBinding.binding = 3;
+    perObjectFragLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    perObjectFragLayoutBinding.descriptorCount = 1;
+    perObjectFragLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    perObjectFragLayoutBinding.pImmutableSamplers = nullptr; // Optional
+
+    std::array<VkDescriptorSetLayoutBinding, 4> bindings =
+            {uboLayoutBinding, samplerLayoutBinding, viewPointLayoutBinding, perObjectFragLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -165,6 +174,7 @@ void DiceDescriptorSetLayout::createDescriptorSetLayout() {
 /* descriptor set for the MVP matrix and texture samplers */
 void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
                                                   std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
+                                                  std::shared_ptr<vulkan::Buffer> const &perObjFragVars,
                                             std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet,
                                                   std::vector<VkDescriptorImageInfo> const &imageInfos) {
     VkDescriptorBufferInfo bufferInfo = {};
@@ -172,7 +182,7 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     bufferInfo.offset = 0;
     bufferInfo.range = sizeof(UniformBufferObject);
 
-    std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
+    std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrites[0].dstSet = descriptorSet->descriptorSet().get();
 
@@ -217,6 +227,22 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     descriptorWrites[2].pBufferInfo = &bufferInfoViewPoint;
     descriptorWrites[2].pImageInfo = nullptr; // Optional
     descriptorWrites[2].pTexelBufferView = nullptr; // Optional
+
+    VkDescriptorBufferInfo bufferInfoPerObjFragVars = {};
+    bufferInfoPerObjFragVars.buffer = perObjFragVars->buffer().get();
+    bufferInfoPerObjFragVars.offset = 0;
+    bufferInfoPerObjFragVars.range = sizeof(PerObjectFragmentVariables);
+
+    descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[3].dstSet = descriptorSet->descriptorSet().get();
+    descriptorWrites[3].dstBinding = 3;
+    descriptorWrites[3].dstArrayElement = 0;
+    descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[3].descriptorCount = 1;
+    descriptorWrites[3].pBufferInfo = &bufferInfoPerObjFragVars;
+    descriptorWrites[3].pImageInfo = nullptr; // Optional
+    descriptorWrites[3].pTexelBufferView = nullptr; // Optional
+
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
@@ -227,10 +253,12 @@ void RainbowDiceVulkan::initModels() {
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device,
             sizeof (UniformBufferObject))};
+        std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
+            m_device, sizeof (PerObjectFragmentVariables))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet,
-                                                   m_texture->getImageInfosForDescriptorSet());
-        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
+            uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
+        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
     }
     updateDepthResources();
 
@@ -331,11 +359,14 @@ void RainbowDiceVulkan::recreateModels() {
         die->loadModel(m_texture->textureAtlas());
         std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (UniformBufferObject))};
+        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device,
+                sizeof (UniformBufferObject))};
+        std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
+                m_device, sizeof (PerObjectFragmentVariables))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet,
-                                                   m_texture->getImageInfosForDescriptorSet());
-        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
+                uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
+        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
     }
 
     initializeCommandBuffers();
@@ -720,12 +751,16 @@ void RainbowDiceVulkan::addRollingDice() {
         die->loadModel(m_texture->textureAtlas());
         std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
         std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (UniformBufferObject))};
+        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(
+                m_device, sizeof (UniformBufferObject))};
+        std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
+                m_device, sizeof (PerObjectFragmentVariables))};
         std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer, descriptorSet,
-                                                   m_texture->getImageInfosForDescriptorSet());
-        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer);
+        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
+                uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
+        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
         die->die->resetPosition(width, height);
+        die->updateUniformBuffer(m_proj, m_view);
 
         diceIt++;
         dice.insert(diceIt, die);
@@ -801,4 +836,86 @@ void RainbowDiceVulkan::resetToStoppedPositions(std::vector<uint32_t> const &upF
         die->die->positionDice(upFaceIndices[i++], x, y);
         die->updateUniformBuffer(m_proj, m_view);
     }
+}
+
+/*
+bool RainbowDiceVulkan::tapDice(float x, float y) {
+    bool needsRedraw = false;
+    auto const ext = m_swapChain->extent();
+    float swidth = screenWidth(m_width, m_height);
+    float sheight = screenHeight(m_width, m_height);
+    float xnorm = x/(float)m_width * swidth - swidth / 2.0f;
+    float ynorm = y/(float)m_height * sheight - sheight / 2.0f;
+    float z1 = -1.0f;
+    float z2 = 1.0f;
+
+    glm::vec4 v1{xnorm, ynorm, z1, 1.0f};
+    glm::vec4 v2{xnorm, ynorm, z2, 1.0f};
+
+    glm::vec4 v1t = glm::inverse(m_view) * glm::inverse(m_proj) * v1;
+    glm::vec4 v2t = glm::inverse(m_view) * glm::inverse(m_proj) * v2;
+
+    glm::vec3 v1t3{v1t.x, v1t.y, v1t.z};
+    v1t3 /= v1t.w;
+    glm::vec3 v2t3{v2t.x, v2t.y, v2t.z};
+    v2t3 /= v2t.w;
+
+    float theta = (1.0f - v1t3.z)/(v2t3.z-v1t3.z);
+    glm::vec3 pos = v1t3*(1-theta) + v2t3*theta;
+
+    glm::vec3 position(0.0f, 0.0f, -1.0f);
+    auto const &firstDie = dice.begin();
+    std::shared_ptr<Dice> die(new Dice(m_device, firstDie->get()->die->getSymbols(),
+                                       firstDie->get()->rerollIndices, position,
+                                       firstDie->get()->die->dieColor()));
+
+    die->loadModel(m_texture->textureAtlas());
+    std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
+    std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
+    std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(
+            m_device, sizeof (UniformBufferObject))};
+    std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
+            m_device, sizeof (PerObjectFragmentVariables))};
+    std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
+    m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
+                                               uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
+    die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
+    die->die->positionDice(0, pos.x, pos.y);
+    die->updateUniformBufferFragmentVariables();
+    die->updateUniformBuffer(m_proj, m_view);
+
+    dice.push_back(die);
+    initializeCommandBuffers();
+    return true;
+}
+*/
+
+// returns true if it needs a redraw
+bool RainbowDiceVulkan::tapDice(float x, float y) {
+    bool needsRedraw = false;
+    auto const ext = m_swapChain->extent();
+    float swidth = screenWidth(ext.width, ext.height);
+    float sheight = screenHeight(ext.width, ext.height);
+    float xnorm = x/m_width * swidth - swidth / 2.0f;
+    float ynorm = y/m_height * sheight - sheight / 2.0f;
+    glm::vec4 point1{xnorm, ynorm, 1.0f, 1.0f};
+    glm::vec4 point2{xnorm, ynorm, -1.0f, 1.0f};
+
+    glm::vec4 transformedP1 = glm::inverse(m_view) * glm::inverse(m_projWithoutPreTransform) * point1;
+    glm::vec4 transformedP2 = glm::inverse(m_view) * glm::inverse(m_projWithoutPreTransform) * point2;
+
+    glm::vec3 start = glm::vec3{transformedP1.x, transformedP1.y, transformedP1.z}/transformedP1.w;
+    glm::vec3 line =  glm::vec3{transformedP2.x, transformedP2.y, transformedP2.z}/transformedP2.w - start;
+
+    line = glm::normalize(line);
+    for (auto const &die : dice) {
+        float distanceToLine = glm::length(glm::cross(line, die->die->position() - start));
+        if (distanceToLine < DicePhysicsModel::stoppedRadius) {
+            die->toggleSelected();
+            needsRedraw = true;
+            break;
+        }
+    }
+
+    return needsRedraw;
 }

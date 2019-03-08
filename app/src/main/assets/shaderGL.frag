@@ -1,7 +1,7 @@
 #version 100
 precision highp float;
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -34,6 +34,7 @@ varying float fragMode;
 
 uniform sampler2D texSampler;
 uniform vec3 viewPosition;
+uniform int isSelected;
 
 float proximity(vec3 position, vec3 sideNormal, float factor, vec3 sideAvg) {
     if (length(sideNormal) == 0.0) {
@@ -87,6 +88,7 @@ void main() {
 
     vec3 value = vec3(0.0,0.0,0.0);
 
+    bool nearEdges = false;
     if (fragMode <= 0.0) {
         // consider the distance from the edges of the shape. fragCorner1-fragCorner4 are the
         // vectors to the corners of the shape making up a face of the die.
@@ -113,14 +115,19 @@ void main() {
 
         if (proximity(fragPosition, sideNormal1, factor, f1) <= 0.0) {
             specNormal = normalize(fragCornerNormal);
+            nearEdges = true;
         } else if (proximity(fragPosition, sideNormal2, factor, f2) <= 0.0) {
             specNormal = normalize(fragCornerNormal);
+            nearEdges = true;
         } else if (proximity(fragPosition, sideNormal3, factor, f3) <= 0.0) {
             specNormal = normalize(fragCornerNormal);
+            nearEdges = true;
         } else if (proximity(fragPosition, sideNormal4, factor, f4) <= 0.0) {
             specNormal = normalize(fragCornerNormal);
+            nearEdges = true;
         } else if (proximity(fragPosition, sideNormal5, factor, f5) <= 0.0) {
             specNormal = normalize(fragCornerNormal);
+            nearEdges = true;
         } else {
             specNormal = fragNormal;
             shininess = 16.0;
@@ -130,17 +137,26 @@ void main() {
         // of the die.  fragCorner2 is a vector to one of the outer points in the triangle.
         if (length(fragCorner2 - fragCorner1) - length(fragPosition - fragCorner1) - factor <= 0.0) {
             specNormal = normalize(fragCornerNormal);
+            nearEdges = true;
         } else {
             specNormal = normalize(fragNormal);
             shininess = 16.0;
         }
      }
 
-    float spec = pow(max(dot(specNormal, halfWayDirection), 0.0), shininess);
-    vec3 specular = lightColor * spec;
-    float diff = max(dot(specNormal, lightDirection), 0.0);
-    vec3 diffuse = diff * color;
+    if (isSelected > 0 && nearEdges) {
+        gl_FragColor = vec4(1.0 - fragColor.r, 1.0 - fragColor.g, 1.0 - fragColor.b, alpha);
+    } else {
+        float spec = pow(max(dot(specNormal, halfWayDirection), 0.0), shininess);
+        vec3 specular = lightColor * spec;
+        float diff = max(dot(specNormal, lightDirection), 0.0);
+        vec3 diffuse = diff * color;
 
-    vec3 ambient = 0.3 * color;
-    gl_FragColor = vec4(ambient + diffuse + specular, alpha);
+        float ambientFactor = 0.3;
+        if (isSelected > 0) {
+            ambientFactor = 1.0f;
+        }
+        vec3 ambient = ambientFactor * color;
+        gl_FragColor = vec4(ambient + diffuse + specular, alpha);
+    }
 }

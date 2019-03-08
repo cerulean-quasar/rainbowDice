@@ -18,7 +18,8 @@
         android:theme="@style/Space.Launcher">
         <activity
             android:name=".MainActivity"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:configChanges="screenSize|orientation|smallestScreenSize|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -29,7 +30,7 @@
         <activity android:name=".DiceCustomizationActivity" />
         <activity android:name=".ActivityThemeSelector" />
         <activity android:name=".DiceLogActivity" />
-        <activity android:name=".DiceSidesActivity"></activity>
+        <activity android:name=".DiceSidesActivity" />
     </application>
 
 </manifest>

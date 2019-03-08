@@ -146,15 +146,6 @@ namespace graphicsGL {
         }
     }
 
-    void Surface::reloadSurfaceDimensions() {
-        if (!eglQuerySurface(m_display, m_surface, EGL_WIDTH, &m_width) ||
-            !eglQuerySurface(m_display, m_surface, EGL_HEIGHT, &m_height)) {
-            destroySurface();
-            throw std::runtime_error("Could not get width and height of surface");
-        }
-
-        glViewport(0, 0, m_width, m_height);
-    }
 } /* namespace graphicsGL */
 
 std::string const SHADER_VERT_FILE("shaderGL.vert");
@@ -222,6 +213,10 @@ void RainbowDiceGL::drawFrame() {
         matrix = glm::transpose(glm::inverse(model));
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
+        // whether the die is selected
+        GLint var = glGetUniformLocation(programID, "isSelected");
+        glUniform1i(var, die->isSelected()?1:0);
+
         // 1st attribute buffer : colors
         GLint colorID = glGetAttribLocation(programID, "inColor");
         glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer);
@@ -260,7 +255,7 @@ void RainbowDiceGL::drawFrame() {
         );
         glEnableVertexAttribArray(texCoordID);
 
-        // attribute buffer : vertices for die
+        // attribute buffer : normal vector to the face
         GLint normalID = glGetAttribLocation(programID, "inNormal");
         glVertexAttribPointer(
                 normalID,                        // The position of the attribute in the shader.
@@ -272,7 +267,7 @@ void RainbowDiceGL::drawFrame() {
         );
         glEnableVertexAttribArray(normalID);
 
-        // attribute buffer : vertices for die
+        // attribute buffer : normal vector to the corner
         GLint cornerNormalID = glGetAttribLocation(programID, "inCornerNormal");
         glVertexAttribPointer(
                 cornerNormalID,                        // The position of the attribute in the shader.
@@ -344,7 +339,7 @@ void RainbowDiceGL::drawFrame() {
         );
         glEnableVertexAttribArray(corner5ID);
 
-        // attribute buffer : vertices for die
+        // attribute buffer : mode for the way the nearness to edges is detected.
         GLint modeID = glGetAttribLocation(programID, "inMode");
         glVertexAttribPointer(
                 modeID,                          // The position of the attribute in the shader.
@@ -372,7 +367,7 @@ void RainbowDiceGL::drawFrame() {
         glDisableVertexAttribArray(corner5ID);
         glDisableVertexAttribArray(modeID);
     }
-    eglSwapBuffers(m_surface.display(), m_surface.surface());
+    eglSwapBuffers(m_surface->display(), m_surface->surface());
 }
 
 GLuint RainbowDiceGL::loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile) {
@@ -473,8 +468,8 @@ bool RainbowDiceGL::updateUniformBuffer() {
 
     bool needsRedraw = false;
     uint32_t i = 0;
-    float width = screenWidth(m_surface.width(), m_surface.height());
-    float height = screenHeight(m_surface.width(), m_surface.height());
+    float width = screenWidth(m_surface->width(), m_surface->height());
+    float height = screenHeight(m_surface->width(), m_surface->height());
     for (auto &&die : dice) {
         if (die->die->updateModelMatrix()) {
             needsRedraw = true;
@@ -541,23 +536,40 @@ void RainbowDiceGL::loadObject(std::vector<std::string> const &symbols,
 
 void RainbowDiceGL::recreateModels() {
     for (auto die : dice) {
-        // create 1 buffer for the vertices (includes color and texture coordinates and which texture to use too).
+        // the vertex buffer
         glGenBuffers(1, &die->vertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof (Vertex) * die->die->getVertices().size(),
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * die->die->getVertices().size(),
                      die->die->getVertices().data(), GL_STATIC_DRAW);
 
-        // create 1 buffer for the indices
+        // the index buffer
         glGenBuffers(1, &die->indexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof (Vertex) * die->die->getIndices().size(),
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * die->die->getIndices().size(),
                      die->die->getIndices().data(), GL_STATIC_DRAW);
     }
 }
 
+void RainbowDiceGL::destroyModelGLResources() {
+    for (auto die : dice) {
+        die->destroyGLResources();
+    }
+}
+
 void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
-    m_surface.reloadSurfaceDimensions();
-    updatePerspectiveMatrix(m_surface.width(), m_surface.height());
+    // destroy all GL resources
+    destroyModelGLResources();
+    m_texture->destroyGLResources();
+    destroyGLResources();
+    auto window = m_surface->window();
+    m_surface.reset();
+
+    // recreate everything from scratch and update the perspective matrix
+    m_surface = std::make_shared<graphicsGL::Surface>(window);
+    init();
+    recreateModels();
+    m_texture->initGLResources();
+    updatePerspectiveMatrix(m_surface->width(), m_surface->height());
 }
 
 void RainbowDiceGL::updateAcceleration(float x, float y, float z) {
@@ -567,8 +579,8 @@ void RainbowDiceGL::updateAcceleration(float x, float y, float z) {
 }
 
 void RainbowDiceGL::resetPositions() {
-    float width = screenWidth(m_surface.width(), m_surface.height());
-    float height = screenHeight(m_surface.width(), m_surface.height());
+    float width = screenWidth(m_surface->width(), m_surface->height());
+    float height = screenHeight(m_surface->width(), m_surface->height());
     for (auto && die: dice) {
         die->die->resetPosition(width, height);
     }
@@ -576,8 +588,8 @@ void RainbowDiceGL::resetPositions() {
 
 void RainbowDiceGL::resetPositions(std::set<int> &diceIndices) {
     int i = 0;
-    float width = screenWidth(m_surface.width(), m_surface.height());
-    float height = screenHeight(m_surface.width(), m_surface.height());
+    float width = screenWidth(m_surface->width(), m_surface->height());
+    float height = screenHeight(m_surface->width(), m_surface->height());
     for (auto &&die : dice) {
         if (diceIndices.find(i) != diceIndices.end()) {
             die->die->resetPosition(width, height);
@@ -586,8 +598,8 @@ void RainbowDiceGL::resetPositions(std::set<int> &diceIndices) {
     }
 }
 void RainbowDiceGL::addRollingDice() {
-    float width = screenWidth(m_surface.width(), m_surface.height());
-    float height = screenHeight(m_surface.width(), m_surface.height());
+    float width = screenWidth(m_surface->width(), m_surface->height());
+    float height = screenHeight(m_surface->width(), m_surface->height());
     for (DiceList::iterator diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
         // Skip dice already being rerolled or does not get rerolled.
         if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollIndices.size() == 0) {
@@ -612,8 +624,8 @@ void RainbowDiceGL::addRollingDice() {
         std::shared_ptr<DiceGL> die(new DiceGL(currentDie->die->getSymbols(), currentDie->rerollIndices,
                                                position, currentDie->die->dieColor()));
         diceIt->get()->isBeingReRolled = true;
-        int32_t w = m_surface.width();
-        int32_t h = m_surface.height();
+        int32_t w = m_surface->width();
+        int32_t h = m_surface->height();
         die->loadModel(m_texture->textureAtlas());
 
         // the vertex buffer
@@ -650,8 +662,8 @@ void RainbowDiceGL::addRollingDice() {
 
 void RainbowDiceGL::resetToStoppedPositions(std::vector<uint32_t> const &inUpFaceIndices) {
     uint32_t i = 0;
-    float width = screenWidth(m_surface.width(), m_surface.height());
-    float height = screenHeight(m_surface.width(), m_surface.height());
+    float width = screenWidth(m_surface->width(), m_surface->height());
+    float height = screenHeight(m_surface->width(), m_surface->height());
     for (auto &&die : dice) {
         uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
         uint32_t stoppedX = i%nbrX;
@@ -661,4 +673,33 @@ void RainbowDiceGL::resetToStoppedPositions(std::vector<uint32_t> const &inUpFac
 
         die->die->positionDice(inUpFaceIndices[i++], x, y);
     }
+}
+
+// returns true if it needs a redraw
+bool RainbowDiceGL::tapDice(float x, float y) {
+    bool needsRedraw = false;
+    float swidth = screenWidth(m_surface->width(), m_surface->height());
+    float sheight = screenHeight(m_surface->width(), m_surface->height());
+    float xnorm = x/m_surface->width() * swidth - swidth / 2.0f;
+    float ynorm = -y/m_surface->height() * sheight + sheight / 2.0f;
+    glm::vec4 point1{xnorm, ynorm, 1.0f, 1.0f};
+    glm::vec4 point2{xnorm, ynorm, -1.0f, 1.0f};
+
+    glm::vec4 transformedP1 = glm::inverse(m_view) * glm::inverse(m_proj) * point1;
+    glm::vec4 transformedP2 = glm::inverse(m_view) * glm::inverse(m_proj) * point2;
+
+    glm::vec3 start = glm::vec3{transformedP1.x, transformedP1.y, transformedP1.z}/transformedP1.w;
+    glm::vec3 line =  glm::vec3{transformedP2.x, transformedP2.y, transformedP2.z}/transformedP2.w - start;
+
+    line = glm::normalize(line);
+    for (auto const &die : dice) {
+        float distanceToLine = glm::length(glm::cross(line, die->die->position() - start));
+        if (distanceToLine < DicePhysicsModel::stoppedRadius) {
+            die->toggleSelected();
+            needsRedraw = true;
+            break;
+        }
+    }
+
+    return needsRedraw;
 }

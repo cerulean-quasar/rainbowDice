@@ -22,6 +22,7 @@ public class RainbowDiceSurfaceView extends SurfaceView {
 
         @Override
         public boolean onSingleTapConfirmed(MotionEvent ev) {
+            Draw.tapDice(ev.getAxisValue(MotionEvent.AXIS_X), ev.getAxisValue(MotionEvent.AXIS_Y));
             return RainbowDiceSurfaceView.this.performClick();
         }
     }

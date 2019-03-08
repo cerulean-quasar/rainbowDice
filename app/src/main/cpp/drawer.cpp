@@ -196,6 +196,10 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                         if ((*event)(m_diceGraphics)) {
                             nbrRequireRedraw++;
                         }
+                        break;
+                    case DrawEvent::tapDice:
+                        // ignore these events while drawing
+                        break;
                 }
             } else {
                 break;

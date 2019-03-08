@@ -365,6 +365,16 @@ Java_com_quasar_cerulean_rainbowdice_Draw_scale(
     diceChannel().sendEvent(event);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_tapDice(
+        JNIEnv *env,
+        jclass jclass1,
+        jfloat x,
+        jfloat y) {
+    auto event = std::make_shared<TapDiceEvent>(x, y);
+    diceChannel().sendEvent(event);
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         JNIEnv *env,

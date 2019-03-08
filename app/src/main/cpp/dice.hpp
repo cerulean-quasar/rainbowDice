@@ -255,7 +255,7 @@ private:
     /* position */
     glm::vec3 acceleration;
     glm::vec3 velocity;
-    glm::vec3 position;
+    glm::vec3 m_position;
     glm::vec3 prevPosition;
 
     bool goingToStop;
@@ -281,7 +281,7 @@ public:
         : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
-          velocity(0.0f,0.0f,0.0f), position(0.0f, 0.0f, 0.0f),
+          velocity(0.0f,0.0f,0.0f), m_position(0.0f, 0.0f, 0.0f),
           prevPosition(10.0f, 0.0f, 0.0f), goingToStop(false), stoppedRotateTime(0.0f),
           stopped(false), animationDone(false), doneX(0.0f), doneY(0.0f), animationTime(0.0f),
           m_color(inColor)
@@ -294,7 +294,7 @@ public:
         : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
-          velocity(0.0f,0.0f,0.0f), position(inPosition),
+          velocity(0.0f,0.0f,0.0f), m_position(inPosition),
           prevPosition(10.0f, 0.0f, 0.0f), goingToStop(false), stoppedRotateTime(0.0f),
           stopped(false), animationDone(false), doneX(0.0f), doneY(0.0f), animationTime(0.0f),
           m_color(inColor)
@@ -307,6 +307,10 @@ public:
 
     glm::mat4 model() {
         return m_model;
+    }
+
+    glm::vec3 position() {
+        return m_position;
     }
 
     void updateAcceleration(float x, float y, float z);

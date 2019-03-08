@@ -346,4 +346,6 @@ public class Draw {
     public static native void scroll(float distanceX, float distanceY);
 
     public static native void scale(float scaleFactor);
+
+    public static native void tapDice(float x, float y);
 }

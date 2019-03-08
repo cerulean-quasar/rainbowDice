@@ -93,6 +93,8 @@ public:
 
     virtual void newSurface(std::shared_ptr<WindowType> surface) = 0;
 
+    virtual bool tapDice(float x, float y) = 0;
+
     virtual void scale(float scaleFactor) {
         m_viewPoint.z /= scaleFactor;
 
@@ -138,23 +140,23 @@ public:
     inline float screenWidth(uint32_t width, uint32_t height) {
         //float avg = (width + height)/2.0f;
         //return width/avg*2.0f;
-        //if (height > width) {
+
+        //if (width < height) {
         //    return 2.0f;
         //} else {
-        //    return width/ (float) height *2.0f;
+        //    return width / (float) height * 2.0f;
         //}
-
         return 2.0f;
     }
 
     inline float screenHeight(uint32_t width, uint32_t height) {
+        //if (height < width) {
+        //    return 2.0f;
+        //} else {
+        //    return height / (float) width * 2.0f;
+        //}
         //float avg = (width + height)/2.0f;
         //return height/avg*2.0f;
-        //if (height > width) {
-        //    return height/(float) width;
-        //} else {
-        //    return 2.0f;
-        //}
 
         return 2.0f;
     }

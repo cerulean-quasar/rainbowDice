@@ -39,7 +39,8 @@ public:
         diceChange,
         drawStoppedDice,
         scrollSurface,
-        scaleSurface
+        scaleSurface,
+        tapDice
     };
 
     // returns true if the surface needs redrawing after this event.
@@ -121,6 +122,25 @@ public:
     ~ScaleEvent() override = default;
 };
 
+class TapDiceEvent : public DrawEvent {
+private:
+    float m_x;
+    float m_y;
+public:
+    TapDiceEvent(float inX, float inY)
+            : m_x{inX},
+              m_y{inY} {
+    }
+
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+        return diceGraphics->tapDice(m_x, m_y);
+    }
+
+    evtype type() override { return tapDice; }
+
+    ~TapDiceEvent() override = default;
+};
+
 class DrawStoppedDiceEvent : public DrawEvent {
     std::vector<std::shared_ptr<DiceDescription>> m_dice;
     std::shared_ptr<TextureAtlas> m_texture;
@@ -171,6 +191,7 @@ public:
         diceGraphics->setDice(m_diceName, m_dice);
         diceGraphics->initModels();
         diceGraphics->resetPositions();
+        diceGraphics->updateUniformBuffer();
         return true;
     }
 

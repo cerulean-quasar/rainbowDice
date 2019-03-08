@@ -37,6 +37,10 @@ layout(set = 0, binding = 2) uniform UniformBufferObject {
     vec3 pos;
 } viewPoint;
 
+layout(set = 0, binding = 3) uniform UniformBufferObjectObj {
+    int isSelected;
+} fragPerObjUbo;
+
 layout(location = 0) out vec4 outColor;
 
 float proximity(vec3 position, vec3 sideNormal, float factor, vec3 sideAvg) {
@@ -89,6 +93,7 @@ void main() {
     vec3 f4 = vec3(0.0, 0.0, 0.0);
     vec3 f5 = vec3(0.0, 0.0, 0.0);
 
+    bool nearEdges = false;
     if (fragMode == 0) {
         // consider the distance from the edges of the shape. fragCorner1-fragCorner4 are the
         // vectors to the corners of the shape making up a face of the die.
@@ -114,14 +119,19 @@ void main() {
         }
 
         if (proximity(fragPosition, sideNormal1, factor, f1) <= 0.0) {
+            nearEdges = true;
             specNormal = normalize(fragCornerNormal);
         } else if (proximity(fragPosition, sideNormal2, factor, f2) <= 0.0) {
+            nearEdges = true;
             specNormal = normalize(fragCornerNormal);
         } else if (proximity(fragPosition, sideNormal3, factor, f3) <= 0.0) {
+            nearEdges = true;
             specNormal = normalize(fragCornerNormal);
         } else if (proximity(fragPosition, sideNormal4, factor, f4) <= 0.0) {
+            nearEdges = true;
             specNormal = normalize(fragCornerNormal);
         } else if (proximity(fragPosition, sideNormal5, factor, f5) <= 0.0) {
+            nearEdges = true;
             specNormal = normalize(fragCornerNormal);
         } else {
             specNormal = fragNormal;
@@ -131,6 +141,7 @@ void main() {
         // consider distance from center.  fragCorner1 is a vector to the center of the face
         // of the die.  fragCorner2 is a vector to one of the outer points in the triangle.
         if (length(fragCorner2-fragCorner1) - length(fragPosition - fragCorner1) - factor <= 0.0) {
+            nearEdges = true;
             specNormal = normalize(fragCornerNormal);
         } else {
             specNormal = normalize(fragNormal);
@@ -138,12 +149,20 @@ void main() {
         }
     }
 
-    float spec = pow(max(dot(normalize(specNormal), halfWayDirection), 0.0), shininess);
-    vec3 specular = lightColor * spec;
+    if (fragPerObjUbo.isSelected > 0 && nearEdges) {
+        outColor = vec4(1.0 - color.r, 1.0 - color.g, 1.0 - color.b, alpha);
+    } else {
+        float spec = pow(max(dot(normalize(specNormal), halfWayDirection), 0.0), shininess);
+        vec3 specular = lightColor * spec;
 
-    float diff = max(dot(specNormal, lightDirection), 0.0);
-    vec3 diffuse = diff * color;
+        float diff = max(dot(specNormal, lightDirection), 0.0);
+        vec3 diffuse = diff * color;
 
-    vec3 ambient = 0.3 * color;
-    outColor = vec4(ambient + diffuse + specular, alpha);
+        float ambientFactor = 0.3;
+        if (fragPerObjUbo.isSelected > 0) {
+            ambientFactor = 1.0;
+        }
+        vec3 ambient = ambientFactor * color;
+        outColor = vec4(ambient + diffuse + specular, alpha);
+    }
 }

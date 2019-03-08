@@ -48,6 +48,10 @@
 #include "graphicsVulkan.hpp"
 #include "TextureAtlasVulkan.h"
 
+struct PerObjectFragmentVariables {
+    int isSelected;
+};
+
 VkVertexInputBindingDescription getBindingDescription();
 std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
 
@@ -75,6 +79,7 @@ public:
 
     void updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
                              std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
+                             std::shared_ptr<vulkan::Buffer> const &perObjFragVars,
                              std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet,
                              std::vector<VkDescriptorImageInfo> const &imageInfos);
 
@@ -111,6 +116,7 @@ struct Dice {
     /* for passing data other than the vertex data to the vertex shader */
     std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
     std::shared_ptr<vulkan::Buffer> uniformBuffer;
+    std::shared_ptr<vulkan::Buffer> uniformBufferFrag;
 
     bool isBeingReRolled;
     std::vector<uint32_t> rerollIndices;
@@ -120,7 +126,8 @@ struct Dice {
          glm::vec3 &position, std::vector<float> const &color)
             : m_device{inDevice},
               die(nullptr),
-              rerollIndices{inRerollIndices}
+              rerollIndices{inRerollIndices},
+              m_isSelected{false}
     {
         initDice(symbols, position, color);
     }
@@ -132,11 +139,14 @@ struct Dice {
     void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet,
               std::shared_ptr<vulkan::Buffer> inIndexBuffer,
               std::shared_ptr<vulkan::Buffer> inVertexBuffer,
-              std::shared_ptr<vulkan::Buffer> inUniformBuffer) {
-        uniformBuffer = inUniformBuffer;
-        indexBuffer = inIndexBuffer;
-        vertexBuffer = inVertexBuffer;
-        descriptorSet = inDescriptorSet;
+              std::shared_ptr<vulkan::Buffer> inUniformBuffer,
+              std::shared_ptr<vulkan::Buffer> inPerObjFragVars) {
+        uniformBuffer = std::move(inUniformBuffer);
+        uniformBufferFrag = std::move(inPerObjFragVars);
+        indexBuffer = std::move(inIndexBuffer);
+        vertexBuffer = std::move(inVertexBuffer);
+        descriptorSet = std::move(inDescriptorSet);
+        updateUniformBufferFragmentVariables();
     }
 
     void destroyVulkanMemory() {
@@ -152,7 +162,13 @@ struct Dice {
         ubo.proj = die->alterPerspective(proj);
         ubo.view = view;
         ubo.model = die->model();
-        uniformBuffer->copyRawTo(&ubo, sizeof (ubo));
+        uniformBuffer->copyRawTo(&ubo, sizeof(ubo));
+    }
+
+    void updateUniformBufferFragmentVariables() {
+        PerObjectFragmentVariables fragmentVariables;
+        fragmentVariables.isSelected = m_isSelected ? 1 : 0;
+        uniformBufferFrag->copyRawTo(&fragmentVariables, sizeof (fragmentVariables));
     }
 
     bool needsReroll() {
@@ -176,7 +192,15 @@ struct Dice {
         return false;
     }
 
+    inline bool isSelected() { return m_isSelected; }
+
+    void toggleSelected() {
+        m_isSelected = !m_isSelected;
+        updateUniformBufferFragmentVariables();
+    }
 private:
+    bool m_isSelected;
+
     void initDice(std::vector<std::string> const &symbols, glm::vec3 &position, std::vector<float> const &color) {
         isBeingReRolled = false;
         die = std::move(createDice(symbols, color));
@@ -202,8 +226,7 @@ public:
               m_depthImageView{new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
                                                      m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT}},
               m_swapChainCommands{new vulkan::SwapChainCommands{m_swapChain, m_commandPool,
-                                                                m_renderPass, m_depthImageView}},
-              m_preTransform{1.0f}
+                                                                m_renderPass, m_depthImageView}}
     {
         setView();
         updatePerspectiveMatrix(m_swapChain->extent().width, m_swapChain->extent().height);
@@ -211,37 +234,6 @@ public:
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-
-
-        switch (m_swapChain->preTransform()) {
-            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
-                m_preTransform = glm::rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-                break;
-            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
-                m_preTransform = glm::rotate(glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-                break;
-            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
-                m_preTransform = glm::rotate(glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-                break;
-            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR:
-                m_preTransform[0][0] = -1.0f;
-                break;
-            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR:
-                m_preTransform[0][0] = -1.0f;
-                m_preTransform = glm::rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * m_preTransform;
-                break;
-            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR:
-                m_preTransform[0][0] = -1.0f;
-                m_preTransform = glm::rotate(glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * m_preTransform;
-                break;
-            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR:
-                m_preTransform[0][0] = -1.0f;
-                m_preTransform = glm::rotate(glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * m_preTransform;
-                break;
-            case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
-            default:
-                break;
-        }
     }
 
     void initModels() override;
@@ -280,6 +272,8 @@ public:
 
     void newSurface(std::shared_ptr<WindowType> surface) override;
 
+    bool tapDice(float x, float y) override;
+
     void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) override {
         RainbowDice::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
 
@@ -288,10 +282,15 @@ public:
          */
         m_proj[1][1] *= -1;
 
+        m_projWithoutPreTransform = m_proj;
+
         /* some hardware have their screen rotated in different directions.  We need to apply the
          * preTransform that we promised the window manager/hardware that we would do.
          */
-        m_proj = m_preTransform * m_proj;
+        m_proj = preTransform() * m_proj;
+
+        m_width = surfaceWidth;
+        m_height = surfaceHeight;
     }
 
     void scale(float scaleFactor) override {
@@ -371,14 +370,51 @@ private:
 
     std::shared_ptr<TextureVulkan> m_texture;
 
-    /* the preTransform matrix.  Perform this transform after all other matrices have been applied.
-     * It matches what we would promise the hardware we would do.
-     */
-    glm::mat4 m_preTransform;
+    glm::mat4 m_projWithoutPreTransform;
+    uint32_t m_width;
+    uint32_t m_height;
 
     std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
     std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
 
+    /* return the preTransform matrix.  Perform this transform after all other matrices have been applied.
+     * It matches what we would promise the hardware we would do.
+     */
+    glm::mat4 preTransform() {
+        glm::mat4 preTransformRet{1.0f};
+
+        switch (m_swapChain->preTransform()) {
+            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+                preTransformRet = glm::rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                break;
+            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+                preTransformRet = glm::rotate(glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                break;
+            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+                preTransformRet = glm::rotate(glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR:
+                preTransformRet[0][0] = -1.0f;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR:
+                preTransformRet[0][0] = -1.0f;
+                preTransformRet = glm::rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * preTransformRet;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR:
+                preTransformRet[0][0] = -1.0f;
+                preTransformRet = glm::rotate(glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * preTransformRet;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR:
+                preTransformRet[0][0] = -1.0f;
+                preTransformRet = glm::rotate(glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * preTransformRet;
+                break;
+            case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
+            default:
+                break;
+        }
+
+        return preTransformRet;
+    }
     void cleanupSwapChain();
     void initializeCommandBuffers();
     void updateDepthResources();

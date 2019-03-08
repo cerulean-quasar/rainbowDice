@@ -48,8 +48,7 @@ namespace graphicsGL {
         inline int height() { return m_height; }
         inline EGLSurface surface() { return m_surface; }
         inline EGLDisplay display() { return m_display; }
-
-        void reloadSurfaceDimensions();
+        inline std::shared_ptr<WindowType> window() { return m_window; }
 
         ~Surface() {
             destroySurface();
@@ -88,7 +87,8 @@ struct DiceGL {
               indexBuffer{0},
               die{},
               isBeingReRolled{false},
-              rerollIndices{std::move(inRerollIndices)}
+              rerollIndices{std::move(inRerollIndices)},
+              m_isSelected{false}
     {
         initDice(symbols, position, color);
     }
@@ -118,12 +118,21 @@ struct DiceGL {
         return false;
     }
 
-    ~DiceGL() {
+    void destroyGLResources() {
         glDeleteBuffers(1, &vertexBuffer);
         glDeleteBuffers(1, &indexBuffer);
     }
 
+    ~DiceGL() {
+        destroyGLResources();
+    }
+
+    inline bool isSelected() { return m_isSelected; }
+    inline void toggleSelected() { m_isSelected = !m_isSelected; }
+
 private:
+    bool m_isSelected;
+
     void initDice(std::vector<std::string> const &symbols, glm::vec3 &position,
                   std::vector<float> const &color) {
         isBeingReRolled = false;
@@ -135,19 +144,19 @@ class RainbowDiceGL : public RainbowDice {
 public:
     explicit RainbowDiceGL(std::shared_ptr<WindowType> window)
             : RainbowDice{},
-              m_surface{std::move(window)},
+              m_surface{std::make_shared<graphicsGL::Surface>(std::move(window))},
               programID{0}
     {
         init();
         setView();
-        updatePerspectiveMatrix(m_surface.width(), m_surface.height());
+        updatePerspectiveMatrix(m_surface->width(), m_surface->height());
     }
 
     void initModels() override;
 
-    void initThread() override { m_surface.initThread(); }
+    void initThread() override { m_surface->initThread(); }
 
-    void cleanupThread() override { m_surface.cleanupThread(); }
+    void cleanupThread() override { m_surface->cleanupThread(); }
 
     void drawFrame() override;
 
@@ -177,12 +186,14 @@ public:
 
     void addRollingDice() override;
 
+    bool tapDice(float x, float y) override;
+
     void newSurface(std::shared_ptr<WindowType> surface) override {
         // TODO: do something here
     }
 
     void scroll(float distanceX, float distanceY) override {
-        RainbowDice::scroll(distanceX, distanceY, m_surface.width(), m_surface.height());
+        RainbowDice::scroll(distanceX, distanceY, m_surface->width(), m_surface->height());
     }
 
     void setTexture(std::shared_ptr<TextureAtlas> inTexture) override {
@@ -203,9 +214,17 @@ public:
 
     }
 
-    ~RainbowDiceGL() override = default;
+    void destroyModelGLResources();
+
+    void destroyGLResources() {
+        glDeleteProgram(programID);
+    }
+
+    ~RainbowDiceGL() {
+        destroyGLResources();
+    }
 private:
-    graphicsGL::Surface m_surface;
+    std::shared_ptr<graphicsGL::Surface> m_surface;
     GLuint programID;
     std::shared_ptr<TextureGL> m_texture;
 
