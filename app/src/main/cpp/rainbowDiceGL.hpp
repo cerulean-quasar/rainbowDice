@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -29,8 +29,8 @@
 namespace graphicsGL {
     class Surface {
     public:
-        Surface(WindowType *window)
-                : m_window{window},
+        explicit Surface(std::shared_ptr<WindowType> window)
+                : m_window{std::move(window)},
                   m_context{EGL_NO_CONTEXT},
                   m_config{},
                   m_surface{EGL_NO_SURFACE},
@@ -49,12 +49,14 @@ namespace graphicsGL {
         inline EGLSurface surface() { return m_surface; }
         inline EGLDisplay display() { return m_display; }
 
+        void reloadSurfaceDimensions();
+
         ~Surface() {
             destroySurface();
         }
 
     private:
-        WindowType *m_window;
+        std::shared_ptr<WindowType> m_window;
         EGLContext m_context;
         EGLConfig m_config;
         EGLSurface m_surface;
@@ -80,18 +82,19 @@ struct DiceGL {
 
     std::vector<uint32_t> rerollIndices;
 
-    DiceGL(std::vector<std::string> const &symbols, std::vector<uint32_t> const &inRerollIndices,
+    DiceGL(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
            glm::vec3 &position, std::vector<float> const &color)
-            : die(nullptr),
-              rerollIndices{inRerollIndices}
+            : vertexBuffer{0},
+              indexBuffer{0},
+              die{},
+              isBeingReRolled{false},
+              rerollIndices{std::move(inRerollIndices)}
     {
         initDice(symbols, position, color);
     }
 
-    void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
         die->loadModel(texAtlas);
-        die->setView();
-        die->updatePerspectiveMatrix(width, height);
     }
 
     bool needsReroll() {
@@ -124,78 +127,87 @@ private:
     void initDice(std::vector<std::string> const &symbols, glm::vec3 &position,
                   std::vector<float> const &color) {
         isBeingReRolled = false;
-        long nbrSides = symbols.size();
-        if (nbrSides == 2) {
-            die.reset(new DiceModelCoin(symbols, position, color, true));
-        } else if (nbrSides == 4) {
-            die.reset(new DiceModelTetrahedron(symbols, position, color, true));
-        } else if (nbrSides == 12) {
-            die.reset(new DiceModelDodecahedron(symbols, position, color, true));
-        } else if (nbrSides == 20) {
-            die.reset(new DiceModelIcosahedron(symbols, position, color, true));
-        } else if (nbrSides == 30) {
-            die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color, true));
-        } else if (6 % nbrSides == 0) {
-            die.reset(new DiceModelCube(symbols, position, color, true));
-        } else {
-            die.reset(new DiceModelHedron(symbols, position, color, nbrSides, true));
-        }
+        die = std::move(createDice(symbols, color, true));
     }
 };
 
 class RainbowDiceGL : public RainbowDice {
 public:
-    RainbowDiceGL(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                  std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
-                  std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
-                  std::unique_ptr<unsigned char[]> const &inBitmap)
-            : m_surface{window},
-              m_textureAtlas{new TextureAtlasGL{symbols, inWidth, inHeightTexture, textureCoordsLeftRight,
-                                                textureCoordsTopBottom, inBitmap}}
+    explicit RainbowDiceGL(std::shared_ptr<WindowType> window)
+            : RainbowDice{},
+              m_surface{std::move(window)},
+              programID{0}
     {
         init();
+        setView();
+        updatePerspectiveMatrix(m_surface.width(), m_surface.height());
     }
 
-    virtual void initModels();
+    void initModels() override;
 
-    virtual void initThread() { m_surface.initThread(); }
+    void initThread() override { m_surface.initThread(); }
 
-    virtual void cleanupThread() { m_surface.cleanupThread(); }
+    void cleanupThread() override { m_surface.cleanupThread(); }
 
-    virtual void drawFrame();
+    void drawFrame() override;
 
-    virtual bool updateUniformBuffer();
+    bool updateUniformBuffer() override;
 
-    virtual bool allStopped();
+    bool allStopped() override;
 
-    virtual std::vector<std::vector<uint32_t >> getDiceResults();
+    std::vector<std::vector<uint32_t >> getDiceResults() override;
 
-    virtual bool needsReroll();
+    bool needsReroll() override;
 
-    virtual void loadObject(std::vector<std::string> const &symbols,
+    void loadObject(std::vector<std::string> const &symbols,
                             std::vector<uint32_t> const &inRerollIndices,
-                            std::vector<float> const &color);
+                            std::vector<float> const &color) override;
 
-    virtual void recreateModels();
+    void recreateModels() override;
 
-    virtual void recreateSwapChain();
+    void recreateSwapChain(uint32_t width, uint32_t height) override;
 
-    virtual void updateAcceleration(float x, float y, float z);
+    void updateAcceleration(float x, float y, float z) override;
 
-    virtual void resetPositions();
+    void resetPositions() override;
 
-    virtual void resetPositions(std::set<int> &dice);
+    void resetPositions(std::set<int> &dice) override;
 
-    virtual void resetToStoppedPositions(std::vector<uint32_t > const &inUpFaceIndices);
+    void resetToStoppedPositions(std::vector<uint32_t > const &inUpFaceIndices) override;
 
-    virtual void addRollingDice();
+    void addRollingDice() override;
 
-    virtual ~RainbowDiceGL() {
+    void newSurface(std::shared_ptr<WindowType> surface) override {
+        // TODO: do something here
     }
+
+    void scroll(float distanceX, float distanceY) override {
+        RainbowDice::scroll(distanceX, distanceY, m_surface.width(), m_surface.height());
+    }
+
+    void setTexture(std::shared_ptr<TextureAtlas> inTexture) override {
+        m_texture = std::make_shared<TextureGL>(std::move(inTexture));
+    }
+
+    void setDice(std::string const &inDiceName,
+            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescription) override {
+        RainbowDice::setDice(inDiceName, inDiceDescription);
+
+        dice.clear();
+        for (auto const &diceDescription : m_diceDescriptions) {
+            for (int i = 0; i < diceDescription->m_nbrDice; i++) {
+                loadObject(diceDescription->m_symbols, diceDescription->m_rerollOnIndices,
+                           diceDescription->m_color);
+            }
+        }
+
+    }
+
+    ~RainbowDiceGL() override = default;
 private:
     graphicsGL::Surface m_surface;
     GLuint programID;
-    std::shared_ptr<TextureAtlasGL> m_textureAtlas;
+    std::shared_ptr<TextureGL> m_texture;
 
     typedef std::list<std::shared_ptr<DiceGL> > DiceList;
     DiceList dice;

@@ -30,7 +30,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/diceMessageToStartRolling"/>
         </LinearLayout>
-        <SurfaceView
+        <com.quasar.cerulean.rainbowdice.RainbowDiceSurfaceView
             android:id="@+id/drawingSurface"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />

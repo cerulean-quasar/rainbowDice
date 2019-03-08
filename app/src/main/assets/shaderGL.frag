@@ -64,7 +64,7 @@ void main() {
 
     float shininess = 8.0;
     vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    vec3 lightpos = vec3(0.0, 5.0, 5.0);
+    vec3 lightpos = vec3(0.0, -5.0, 5.0);
     vec3 lightDirection = normalize(lightpos - fragPosition);
     vec3 viewDirection = normalize(viewPosition - fragPosition);
     vec3 halfWayDirection = normalize(lightDirection + viewDirection);

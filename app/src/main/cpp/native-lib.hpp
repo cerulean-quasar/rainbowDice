@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -17,7 +17,27 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include <memory>
-#include "rainbowDiceGlobal.hpp"
-#include "text.hpp"
+#ifndef RAINBOWDICE_NATIVELIB_HPP
+#define RAINBOWDICE_NATIVELIB_HPP
 
+#include <cstdint>
+#include <vector>
+#include <string>
+#include <jni.h>
+#include "diceDescription.hpp"
+
+class Notify {
+private:
+    JNIEnv *m_env;
+    jobject m_notify;
+public:
+    Notify(JNIEnv *inEnv, jobject inNotify)
+        : m_env{inEnv},
+          m_notify{inNotify} {}
+    void sendResult(
+            std::string const &diceName,
+            std::vector<std::vector<uint32_t>> const &results,
+            std::vector<std::shared_ptr<DiceDescription>> const &dice);
+    void sendError(std::string const &error);
+};
+#endif // RAINBOWDICE_NATIVELIB_HPP

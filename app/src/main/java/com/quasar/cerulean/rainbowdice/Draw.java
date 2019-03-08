@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -19,18 +19,12 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.TreeSet;
 
@@ -38,13 +32,13 @@ import static android.graphics.Bitmap.Config.ALPHA_8;
 import static android.graphics.Bitmap.Config.ARGB_4444;
 import static android.graphics.Bitmap.Config.ARGB_8888;
 
-public class Draw implements Runnable {
+public class Draw {
     private static final int MAX_TEXTURE_DIMENSION = 10000;
     private static final int TEXWIDTH = 128;
     private static final int TEX_PADDING = 30;
     private static final int TEX_BLANK_HEIGHT = 128;
 
-    private class DiceTexture {
+    static final private class DiceTexture {
         public int width;
         public int height;
         public float[] textureCoordLeft;
@@ -66,50 +60,24 @@ public class Draw implements Runnable {
         }
     }
 
-    private Handler m_notify;
-    private SurfaceHolder m_surfaceHolder;
-    private DieConfiguration[] m_diceConfig;
-    private AssetManager m_assetManager;
-
-    public Draw(Handler inNotify, SurfaceHolder inSurfaceHolder, DieConfiguration[] inDiceConfig,
-                AssetManager inAssetManager) {
-        m_notify = inNotify;
-        m_surfaceHolder = inSurfaceHolder;
-        m_diceConfig = inDiceConfig;
-        m_assetManager = inAssetManager;
+    public Draw() {
     }
 
-    public void run() {
-        String result;
-        result = startDrawingRoll();
-        if (result == null || result.length() == 0) {
-            // no result and we exited, something must be wrong.  Just return, we are done.
-            return;
-        }
-        // tell the main thread, a result has occurred.
-        Bundle bundle = new Bundle();
-        bundle.putString("results", result);
-        Message msg = Message.obtain();
-        msg.setData(bundle);
-        m_notify.sendMessage(msg);
-    }
-
-    private String startDrawingRoll() {
-        if (m_diceConfig == null || m_diceConfig.length == 0) {
+    public static String startDrawingRoll(DieConfiguration[] diceConfig, String diceName) {
+        if (diceConfig == null || diceConfig.length == 0) {
             // somehow someone managed to crash the code by having dice config null.  I don't know
             // how they did this, but returning here avoids the crash.
             return "No dice configurations exist, please choose dice.";
         }
 
-        Collection<String> symbolSet = getSymbols();
+        Collection<String> symbolSet = getSymbols(diceConfig);
 
-        DiceTexture texture = createTexture(symbolSet, changeAspectRatio());
+        DiceTexture texture = createTexture(symbolSet, changeAspectRatio(diceConfig));
         if (texture == null) {
             return "error: Could not create texture.";
         }
 
-        Surface drawSurface = m_surfaceHolder.getSurface();
-        String err = rollDice(drawSurface, m_assetManager, m_diceConfig,
+        String err = rollDice(diceName, diceConfig,
                 symbolSet.toArray(new String[symbolSet.size()]),
                 texture.width, texture.height, texture.textureCoordLeft, texture.textureCoordRight,
                 texture.textureCoordTop, texture.textureCoordBottom, texture.bytes);
@@ -120,9 +88,9 @@ public class Draw implements Runnable {
         return null;
     }
 
-    private boolean changeAspectRatio() {
+    private static boolean changeAspectRatio(DieConfiguration[] diceConfig) {
         boolean change = true;
-        for (DieConfiguration dieConfig : m_diceConfig) {
+        for (DieConfiguration dieConfig : diceConfig) {
             int nbrSides = dieConfig.getNumberOfSides();
             if (nbrSides == 12 || nbrSides == 6 || nbrSides ==  3 || nbrSides == 2) {
                 change = false;
@@ -133,22 +101,21 @@ public class Draw implements Runnable {
         return change;
     }
 
-    public String startDrawingStoppedDice(int[] faceIndicesUp) {
-        if (m_diceConfig == null || m_diceConfig.length == 0) {
+    public static String startDrawingStoppedDice(DieConfiguration[] diceConfig, int[] faceIndicesUp) {
+        if (diceConfig == null || diceConfig.length == 0) {
             // somehow someone managed to crash the code by having dice config null.  I don't know
             // how they did this, but returning here avoids the crash.
             return "No dice configurations exist, please choose dice.";
         }
 
-        Collection<String> symbolSet = getSymbols();
+        Collection<String> symbolSet = getSymbols(diceConfig);
 
-        DiceTexture texture = createTexture(symbolSet, changeAspectRatio());
+        DiceTexture texture = createTexture(symbolSet, changeAspectRatio(diceConfig));
         if (texture == null) {
             return "error: Could not create texture.";
         }
 
-        Surface drawSurface = m_surfaceHolder.getSurface();
-        String err = drawStoppedDice(faceIndicesUp, drawSurface, m_assetManager, m_diceConfig,
+        String err = drawStoppedDice(faceIndicesUp, diceConfig,
                 symbolSet.toArray(new String[symbolSet.size()]),
                 texture.width, texture.height,
                 texture.textureCoordLeft, texture.textureCoordRight, texture.textureCoordTop,
@@ -160,12 +127,12 @@ public class Draw implements Runnable {
         return null;
     }
 
-    private Collection<String> getSymbols() {
+    private static Collection<String> getSymbols(DieConfiguration[] diceConfig) {
         TreeSet<String> symbolSet = new TreeSet<>();
 
         // First we need to load all the textures in the texture Atlas (in cpp), then
         // we can load the models.  Since the model depends on the size of the textures.
-        for (DieConfiguration dieConfig : m_diceConfig) {
+        for (DieConfiguration dieConfig : diceConfig) {
             for (int i = 0; i < dieConfig.getNumberOfSides(); i++) {
                 symbolSet.add(dieConfig.getSide(i).symbol());
             }
@@ -174,7 +141,7 @@ public class Draw implements Runnable {
         return symbolSet;
     }
 
-    private DiceTexture createTexture(Collection<String> symbolSet, boolean changeAspectRatio) {
+    private static DiceTexture createTexture(Collection<String> symbolSet, boolean changeAspectRatio) {
         int totalNbrImages = symbolSet.size();
         int textureHeight = 0;
         int textureWidth = 0;
@@ -362,13 +329,21 @@ public class Draw implements Runnable {
                 textureCoordTopNorm, textureCoordBottomNorm, bytes);
     }
 
-    private native String rollDice(Surface surface, AssetManager manager, DieConfiguration[] diceConfig,
+    private static native String rollDice(String diceName, DieConfiguration[] diceConfig,
                                    String[] symbols, int width, int height,
                                    float[] textureCoordLeft, float[] textureCoordRight,
                                    float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
-    private native String drawStoppedDice(int[] symbolIndicesUp, Surface surface, AssetManager manager,
-                                          DieConfiguration[] diceConfig, String[] symbolsTexture,
-                                          int width, int height,
+    private static native String drawStoppedDice(int[] symbolIndicesUp, DieConfiguration[] diceConfig,
+                                          String[] symbolsTexture, int width, int height,
                                           float[] textureCoordLeft, float[] textureCoordRight,
                                           float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
+    public static native void tellDrawerStop();
+
+    public static native String tellDrawerSurfaceDirty(Surface jsurface);
+
+    public static native String tellDrawerSurfaceChanged(int width, int height);
+
+    public static native void scroll(float distanceX, float distanceY);
+
+    public static native void scale(float scaleFactor);
 }

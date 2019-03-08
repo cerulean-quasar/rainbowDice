@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -125,10 +125,8 @@ struct Dice {
         initDice(symbols, position, color);
     }
 
-    void loadModel(int width, int height, std::shared_ptr<TextureAtlas> const &texAtlas) {
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
         die->loadModel(texAtlas);
-        die->setView();
-        die->updatePerspectiveMatrix(width, height);
     }
 
     void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet,
@@ -141,8 +139,20 @@ struct Dice {
         descriptorSet = inDescriptorSet;
     }
 
-    void updateUniformBuffer() {
-        uniformBuffer->copyRawTo(&die->ubo, sizeof(die->ubo));
+    void destroyVulkanMemory() {
+        uniformBuffer.reset();
+        indexBuffer.reset();
+        vertexBuffer.reset();
+        descriptorSet.reset();
+        m_device.reset();
+    }
+
+    void updateUniformBuffer(glm::mat4 const &proj, glm::mat4 const &view) {
+        UniformBufferObject ubo;
+        ubo.proj = die->alterPerspective(proj);
+        ubo.view = view;
+        ubo.model = die->model();
+        uniformBuffer->copyRawTo(&ubo, sizeof (ubo));
     }
 
     bool needsReroll() {
@@ -169,32 +179,15 @@ struct Dice {
 private:
     void initDice(std::vector<std::string> const &symbols, glm::vec3 &position, std::vector<float> const &color) {
         isBeingReRolled = false;
-        long nbrSides = symbols.size();
-        if (nbrSides == 2) {
-            die.reset(new DiceModelCoin(symbols, position, color));
-        } else if (nbrSides == 4) {
-            die.reset(new DiceModelTetrahedron(symbols, position, color));
-        } else if (nbrSides == 12) {
-            die.reset(new DiceModelDodecahedron(symbols, position, color));
-        } else if (nbrSides == 20) {
-            die.reset(new DiceModelIcosahedron(symbols, position, color));
-        } else if (nbrSides == 30) {
-            die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color));
-        } else if (6 % nbrSides == 0) {
-            die.reset(new DiceModelCube(symbols, position, color));
-        } else {
-            die.reset(new DiceModelHedron(symbols, position, color));
-        }
+        die = std::move(createDice(symbols, color));
     }
 };
 
 class RainbowDiceVulkan : public RainbowDice {
 public:
-    RainbowDiceVulkan(WindowType *window, std::vector<std::string> &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                      std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
-                      std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
-                      std::unique_ptr<unsigned char[]> const &inBitmap, size_t inBitmapSize)
-            : m_instance{new vulkan::Instance{window}},
+    explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window)
+            : RainbowDice{},
+              m_instance{new vulkan::Instance{std::move(window)}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
               m_renderPass{new vulkan::RenderPass{m_device, m_swapChain}},
@@ -204,59 +197,146 @@ public:
                   getBindingDescription(), getAttributeDescriptions(), SHADER_VERT_FILE, SHADER_FRAG_FILE}},
               m_commandPool{new vulkan::CommandPool{m_device}},
               m_viewPointBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (glm::vec3))},
-              m_imageAvailableSemaphore{m_device},
-              m_renderFinishedSemaphore{m_device},
+              m_imageAvailableSemaphore{new vulkan::Semaphore{m_device}},
+              m_renderFinishedSemaphore{new vulkan::Semaphore{m_device}},
               m_depthImageView{new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
                                                      m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT}},
               m_swapChainCommands{new vulkan::SwapChainCommands{m_swapChain, m_commandPool,
                                                                 m_renderPass, m_depthImageView}},
-              m_textureAtlas{new TextureAtlasVulkan{std::shared_ptr<vulkan::ImageSampler>{
-                  new vulkan::ImageSampler{m_device, m_commandPool,
-                        std::shared_ptr<vulkan::ImageView>{new vulkan::ImageView{
-                            createTextureImage(inWidth, inHeightTexture, inBitmap, inBitmapSize), VK_FORMAT_R8G8B8A8_UNORM,
-                                VK_IMAGE_ASPECT_COLOR_BIT}}}},
-                  symbols, inWidth, inHeightTexture, textureCoordsLeftRight, textureCoordsTopBottom}}
+              m_preTransform{1.0f}
     {
+        setView();
+        updatePerspectiveMatrix(m_swapChain->extent().width, m_swapChain->extent().height);
+
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
-        m_viewPointBuffer->copyRawTo(&viewPoint, sizeof(viewPoint));
+        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
+
+
+        switch (m_swapChain->preTransform()) {
+            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+                m_preTransform = glm::rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                break;
+            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+                m_preTransform = glm::rotate(glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                break;
+            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+                m_preTransform = glm::rotate(glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR:
+                m_preTransform[0][0] = -1.0f;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR:
+                m_preTransform[0][0] = -1.0f;
+                m_preTransform = glm::rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * m_preTransform;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR:
+                m_preTransform[0][0] = -1.0f;
+                m_preTransform = glm::rotate(glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * m_preTransform;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR:
+                m_preTransform[0][0] = -1.0f;
+                m_preTransform = glm::rotate(glm::radians(270.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * m_preTransform;
+                break;
+            case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
+            default:
+                break;
+        }
     }
 
-    virtual void initModels();
+    void initModels() override;
 
-    virtual void initThread() {}
+    void initThread() override {}
 
-    virtual void cleanupThread() {}
+    void cleanupThread() override {}
 
-    virtual void drawFrame();
+    void drawFrame() override;
 
-    virtual bool updateUniformBuffer();
+    bool updateUniformBuffer() override;
 
-    virtual bool allStopped();
+    bool allStopped() override;
 
-    virtual std::vector<std::vector<uint32_t>> getDiceResults();
+    std::vector<std::vector<uint32_t>> getDiceResults() override;
 
-    virtual void loadObject(std::vector<std::string> const &symbols,
+    void loadObject(std::vector<std::string> const &symbols,
                             std::vector<uint32_t> const &rerollIndices,
-                            std::vector<float> const &color);
+                            std::vector<float> const &color) override;
 
-    virtual void recreateModels();
+    void recreateModels() override;
 
-    virtual void recreateSwapChain();
+    void recreateSwapChain(uint32_t width, uint32_t height) override;
 
-    virtual void updateAcceleration(float x, float y, float z);
+    void updateAcceleration(float x, float y, float z) override;
 
-    virtual void resetPositions();
+    void resetPositions() override;
 
-    virtual void resetPositions(std::set<int> &dice);
+    void resetPositions(std::set<int> &dice) override;
 
-    virtual void resetToStoppedPositions(std::vector<uint32_t> const &symbols);
+    void resetToStoppedPositions(std::vector<uint32_t> const &symbols) override;
 
-    virtual void addRollingDice();
+    void addRollingDice() override;
 
-    virtual bool needsReroll();
+    bool needsReroll() override;
 
-    virtual ~RainbowDiceVulkan() { }
+    void newSurface(std::shared_ptr<WindowType> surface) override;
+
+    void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) override {
+        RainbowDice::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
+
+        /* GLM has the y axis inverted from Vulkan's perspective, invert the y-axis on the
+         * projection matrix.
+         */
+        m_proj[1][1] *= -1;
+
+        /* some hardware have their screen rotated in different directions.  We need to apply the
+         * preTransform that we promised the window manager/hardware that we would do.
+         */
+        m_proj = m_preTransform * m_proj;
+    }
+
+    void scale(float scaleFactor) override {
+        RainbowDice::scale(scaleFactor);
+
+        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
+        for (auto const & die : dice) {
+            die->updateUniformBuffer(m_proj, m_view);
+        }
+    }
+
+    void scroll(float distanceX, float distanceY) override {
+        auto ext = m_swapChain->extent();
+        RainbowDice::scroll(distanceX, distanceY, ext.width, ext.height);
+
+        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
+        for (auto const & die : dice) {
+            die->updateUniformBuffer(m_proj, m_view);
+        }
+    }
+
+    void setTexture(std::shared_ptr<TextureAtlas> texture) override {
+        std::shared_ptr<vulkan::ImageView> imgView = std::make_shared<vulkan::ImageView>(
+                createTextureImage(texture->getImageWidth(), texture->getImageHeight(),
+                                   texture->bitmap(), texture->bitmapLength()),
+                VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+        std::shared_ptr<vulkan::ImageSampler> imgSampler = std::make_shared<vulkan::ImageSampler>(
+                m_device, m_commandPool, imgView);
+        m_texture = std::make_shared<TextureVulkan>(std::move(texture), imgSampler);
+    }
+
+    void setDice(std::string const &inDiceName,
+            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions) override {
+        RainbowDice::setDice(inDiceName, inDiceDescriptions);
+
+        dice.clear();
+        for (auto const &diceDescription : m_diceDescriptions) {
+            for (int i = 0; i < diceDescription->m_nbrDice; i++) {
+                loadObject(diceDescription->m_symbols, diceDescription->m_rerollOnIndices,
+                           diceDescription->m_color);
+            }
+        }
+    }
+
+    ~RainbowDiceVulkan() override = default;
 private:
     static std::string const SHADER_VERT_FILE;
     static std::string const SHADER_FRAG_FILE;
@@ -281,19 +361,23 @@ private:
      * but fences are more for coordinating in our program itself and not for internal
      * Vulkan coordination of resource usage.
      */
-    vulkan::Semaphore m_imageAvailableSemaphore;
-    vulkan::Semaphore m_renderFinishedSemaphore;
+    std::shared_ptr<vulkan::Semaphore> m_imageAvailableSemaphore;
+    std::shared_ptr<vulkan::Semaphore> m_renderFinishedSemaphore;
 
     /* depth buffer image */
     std::shared_ptr<vulkan::ImageView> m_depthImageView;
 
     std::shared_ptr<vulkan::SwapChainCommands> m_swapChainCommands;
 
-    std::shared_ptr<TextureAtlasVulkan> m_textureAtlas;
+    std::shared_ptr<TextureVulkan> m_texture;
+
+    /* the preTransform matrix.  Perform this transform after all other matrices have been applied.
+     * It matches what we would promise the hardware we would do.
+     */
+    glm::mat4 m_preTransform;
 
     std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
     std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
-    void updatePerspectiveMatrix();
 
     void cleanupSwapChain();
     void initializeCommandBuffers();

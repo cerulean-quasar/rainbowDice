@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -23,7 +23,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <native_window.h>
-#include <string.h>
+#include <cstring>
 #include <jni.h>
 #include "rainbowDiceGL.hpp"
 #include "rainbowDiceGlobal.hpp"
@@ -78,9 +78,9 @@ namespace graphicsGL {
             destroySurface();
             throw std::runtime_error("Could not get display format");
         }
-        ANativeWindow_setBuffersGeometry(m_window, 0, 0, format);
+        ANativeWindow_setBuffersGeometry(m_window.get(), 0, 0, format);
 
-        if ((m_surface = eglCreateWindowSurface(m_display, m_config, m_window, nullptr)) ==
+        if ((m_surface = eglCreateWindowSurface(m_display, m_config, m_window.get(), nullptr)) ==
             EGL_NO_SURFACE) {
             destroySurface();
             throw std::runtime_error("Could not create surface");
@@ -114,6 +114,8 @@ namespace graphicsGL {
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glViewport(0, 0, m_width, m_height);
     }
 
     void Surface::destroySurface() {
@@ -130,9 +132,6 @@ namespace graphicsGL {
         m_display = EGL_NO_DISPLAY;
         m_context = EGL_NO_CONTEXT;
         m_surface = EGL_NO_SURFACE;
-
-        /* release the java window object */
-        ANativeWindow_release(m_window);
     }
 
     void Surface::initThread() {
@@ -147,6 +146,15 @@ namespace graphicsGL {
         }
     }
 
+    void Surface::reloadSurfaceDimensions() {
+        if (!eglQuerySurface(m_display, m_surface, EGL_WIDTH, &m_width) ||
+            !eglQuerySurface(m_display, m_surface, EGL_HEIGHT, &m_height)) {
+            destroySurface();
+            throw std::runtime_error("Could not get width and height of surface");
+        }
+
+        glViewport(0, 0, m_width, m_height);
+    }
 } /* namespace graphicsGL */
 
 std::string const SHADER_VERT_FILE("shaderGL.vert");
@@ -161,7 +169,7 @@ void RainbowDiceGL::init() {
 
 void RainbowDiceGL::initModels() {
     for (auto &&die : dice) {
-        die->loadModel(m_surface.width(), m_surface.height(), m_textureAtlas);
+        die->loadModel(m_texture->textureAtlas());
     }
 
     for (auto &&die : dice) {
@@ -184,11 +192,11 @@ void RainbowDiceGL::drawFrame() {
 
     GLint textureID = glGetUniformLocation(programID, "texSampler");
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_textureAtlas->texture());
+    glBindTexture(GL_TEXTURE_2D, m_texture->texture());
     glUniform1i(textureID, 0);
 
     GLint viewPos = glGetUniformLocation(programID, "viewPosition");
-    glUniform3fv(viewPos, 1, &viewPoint[0]);
+    glUniform3fv(viewPos, 1, &m_viewPoint[0]);
 
     for (auto && die : dice) {
         // Send our transformation to the currently bound shader, in the "MVP"
@@ -197,22 +205,21 @@ void RainbowDiceGL::drawFrame() {
 
         // the projection matrix
         GLint MatrixID = glGetUniformLocation(programID, "proj");
-        glm::mat4 matrix = die->die->ubo.proj;
+        glm::mat4 matrix = die->die->alterPerspective(m_proj);
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // view matrix
         MatrixID = glGetUniformLocation(programID, "view");
-        matrix = die->die->ubo.view;
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_view[0][0]);
 
         // model matrix
         MatrixID = glGetUniformLocation(programID, "model");
-        matrix = die->die->ubo.model;
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+        glm::mat4 model = die->die->model();
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &model[0][0]);
 
         // the model matrix for the normal vector
         MatrixID = glGetUniformLocation(programID, "normalMatrix");
-        matrix = glm::transpose(glm::inverse(die->die->ubo.model));
+        matrix = glm::transpose(glm::inverse(model));
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
         // 1st attribute buffer : colors
@@ -466,18 +473,18 @@ bool RainbowDiceGL::updateUniformBuffer() {
 
     bool needsRedraw = false;
     uint32_t i = 0;
+    float width = screenWidth(m_surface.width(), m_surface.height());
+    float height = screenHeight(m_surface.width(), m_surface.height());
     for (auto &&die : dice) {
         if (die->die->updateModelMatrix()) {
             needsRedraw = true;
         }
         if (die->die->isStopped() && !die->die->isStoppedAnimationStarted()) {
-            float width = screenWidth;
-            float height = screenHeight;
             uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
             uint32_t stoppedX = i%nbrX;
             uint32_t stoppedY = i/nbrX;
             float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
             die->die->animateMove(x, y);
         }
         i++;
@@ -548,8 +555,9 @@ void RainbowDiceGL::recreateModels() {
     }
 }
 
-void RainbowDiceGL::recreateSwapChain() {
-    // do nothing
+void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
+    m_surface.reloadSurfaceDimensions();
+    updatePerspectiveMatrix(m_surface.width(), m_surface.height());
 }
 
 void RainbowDiceGL::updateAcceleration(float x, float y, float z) {
@@ -559,21 +567,27 @@ void RainbowDiceGL::updateAcceleration(float x, float y, float z) {
 }
 
 void RainbowDiceGL::resetPositions() {
+    float width = screenWidth(m_surface.width(), m_surface.height());
+    float height = screenHeight(m_surface.width(), m_surface.height());
     for (auto && die: dice) {
-        die->die->resetPosition();
+        die->die->resetPosition(width, height);
     }
 }
 
 void RainbowDiceGL::resetPositions(std::set<int> &diceIndices) {
     int i = 0;
+    float width = screenWidth(m_surface.width(), m_surface.height());
+    float height = screenHeight(m_surface.width(), m_surface.height());
     for (auto &&die : dice) {
         if (diceIndices.find(i) != diceIndices.end()) {
-            die->die->resetPosition();
+            die->die->resetPosition(width, height);
         }
         i++;
     }
 }
 void RainbowDiceGL::addRollingDice() {
+    float width = screenWidth(m_surface.width(), m_surface.height());
+    float height = screenHeight(m_surface.width(), m_surface.height());
     for (DiceList::iterator diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
         // Skip dice already being rerolled or does not get rerolled.
         if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollIndices.size() == 0) {
@@ -600,7 +614,7 @@ void RainbowDiceGL::addRollingDice() {
         diceIt->get()->isBeingReRolled = true;
         int32_t w = m_surface.width();
         int32_t h = m_surface.height();
-        die->loadModel(w, h, m_textureAtlas);
+        die->loadModel(m_texture->textureAtlas());
 
         // the vertex buffer
         glGenBuffers(1, &die->vertexBuffer);
@@ -613,7 +627,7 @@ void RainbowDiceGL::addRollingDice() {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * die->die->getIndices().size(),
                      die->die->getIndices().data(), GL_STATIC_DRAW);
-        die->die->resetPosition();
+        die->die->resetPosition(width, height);
 
         diceIt++;
         dice.insert(diceIt, die);
@@ -623,13 +637,11 @@ void RainbowDiceGL::addRollingDice() {
     int i=0;
     for (auto &&die : dice) {
         if (die->die->isStopped()) {
-            float width = screenWidth;
-            float height = screenHeight;
             uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
             uint32_t stoppedX = i%nbrX;
             uint32_t stoppedY = i/nbrX;
             float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = -height/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
             die->die->animateMove(x, y);
         }
         i++;
@@ -638,12 +650,14 @@ void RainbowDiceGL::addRollingDice() {
 
 void RainbowDiceGL::resetToStoppedPositions(std::vector<uint32_t> const &inUpFaceIndices) {
     uint32_t i = 0;
+    float width = screenWidth(m_surface.width(), m_surface.height());
+    float height = screenHeight(m_surface.width(), m_surface.height());
     for (auto &&die : dice) {
-        uint32_t nbrX = static_cast<uint32_t>(screenWidth/(2*DicePhysicsModel::stoppedRadius));
+        uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
         uint32_t stoppedX = i%nbrX;
         uint32_t stoppedY = i/nbrX;
-        float x = -screenWidth/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-        float y = -screenHeight/2 + (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+        float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+        float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
 
         die->die->positionDice(inUpFaceIndices[i++], x, y);
     }

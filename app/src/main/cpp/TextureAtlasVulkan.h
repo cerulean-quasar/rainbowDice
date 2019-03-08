@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -26,16 +26,25 @@
 #include "rainbowDiceGlobal.hpp"
 #include "graphicsVulkan.hpp"
 
-class TextureAtlasVulkan : public TextureAtlas {
+class TextureVulkan {
+    std::shared_ptr<TextureAtlas> m_textureAtlas;
     std::shared_ptr<vulkan::ImageSampler> m_textureSampler;
 
 public:
-    TextureAtlasVulkan(std::shared_ptr<vulkan::ImageSampler> const &inSampler,
-                       std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                       std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
-                       std::vector<std::pair<float, float>> const &textureCoordsTopBottom)
-        : TextureAtlas{symbols, inWidth, inHeightTexture, textureCoordsLeftRight, textureCoordsTopBottom},
-          m_textureSampler{inSampler}
+    TextureVulkan(std::shared_ptr<TextureAtlas> textureAtlas,
+            std::shared_ptr<vulkan::ImageSampler> inSampler)
+            : m_textureAtlas{std::move(textureAtlas)}, m_textureSampler{std::move(inSampler)} {
+    }
+
+    TextureVulkan(std::shared_ptr<vulkan::ImageSampler> inSampler,
+                  std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                  std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
+                  std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
+                  std::unique_ptr<unsigned char[]> &&inBitmap, uint32_t inBitmapLength)
+        : m_textureAtlas{new TextureAtlas(symbols, inWidth, inHeightTexture,
+                textureCoordsLeftRight, textureCoordsTopBottom,
+                std::move(inBitmap), inBitmapLength)},
+          m_textureSampler{std::move(inSampler)}
     {}
 
     std::vector<VkDescriptorImageInfo> getImageInfosForDescriptorSet() {
@@ -47,7 +56,10 @@ public:
         imageInfos.push_back(imageInfo);
         return imageInfos;
     }
-};
 
+    inline std::shared_ptr<TextureAtlas> const &textureAtlas() {
+        return m_textureAtlas;
+    }
+};
 
 #endif //RAINBOWDICE_TEXTUREATLASVULKAN_H

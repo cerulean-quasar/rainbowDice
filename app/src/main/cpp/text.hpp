@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -17,8 +17,8 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#ifndef TEXT_HPP
-#define TEXT_HPP
+#ifndef RAINBOWDICE_TEXT_HPP
+#define RAINBOWDICE_TEXT_HPP
 #include <string>
 #include <map>
 #include <vector>
@@ -30,25 +30,40 @@ struct TextureImage {
     float bottom;
 };
 
-/* texture image */
-typedef std::map<std::string, TextureImage>::iterator texture_iterator;
-
 class TextureAtlas {
 protected:
-    uint32_t width;
-    uint32_t height;
-    std::map<std::string, TextureImage> textureImages;
+    uint32_t m_width;
+    uint32_t m_height;
+    std::map<std::string, TextureImage> m_textureImages;
+    std::unique_ptr<unsigned char[]> m_bitmap;
+    uint32_t m_bitmapLength;
 
 public:
-    uint32_t getImageWidth() { return width; }
-    uint32_t getImageHeight() {return height; }
-    uint32_t getNbrImages() {
-        return (uint32_t)textureImages.size();
+    TextureAtlas(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+                 std::vector<std::pair<float, float>> const &inLeftRightTextureCoordinate,
+                 std::vector<std::pair<float, float>> const &inTopBottomTextureCoordinate,
+                 std::unique_ptr<unsigned char[]> &&inBitmap, uint32_t inBitmapLength)
+            : m_width(inWidth), m_height(inHeightTexture), m_textureImages(),
+              m_bitmap{std::move(inBitmap)}, m_bitmapLength{inBitmapLength}
+    {
+        for (uint32_t i=0; i < symbols.size(); i++) {
+            TextureImage tex = { inLeftRightTextureCoordinate[i].first,
+                                 inLeftRightTextureCoordinate[i].second,
+                                 inTopBottomTextureCoordinate[i].first,
+                                 inTopBottomTextureCoordinate[i].second };
+            m_textureImages.insert(std::make_pair(symbols[i], tex));
+        }
     }
 
-    virtual TextureImage getTextureCoordinates(std::string const &symbol) {
-        std::map<std::string, TextureImage>::iterator it = textureImages.find(symbol);
-        if (it == textureImages.end()) {
+    uint32_t getImageWidth() { return m_width; }
+    uint32_t getImageHeight() {return m_height; }
+    uint32_t getNbrImages() {
+        return (uint32_t)m_textureImages.size();
+    }
+
+    TextureImage getTextureCoordinates(std::string const &symbol) {
+        auto it = m_textureImages.find(symbol);
+        if (it == m_textureImages.end()) {
             // shouldn't happen
             throw std::runtime_error(std::string("Texture not found for symbol: ") + symbol);
         }
@@ -56,20 +71,14 @@ public:
         return it->second;
     }
 
-    TextureAtlas(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
-                 std::vector<std::pair<float, float>> const &inLeftRightTextureCoordinate,
-                 std::vector<std::pair<float, float>> const &inTopBottomTextureCoordinate)
-        :width(inWidth), height(inHeightTexture), textureImages()
-    {
-        for (uint32_t i=0; i < symbols.size(); i++) {
-            TextureImage tex = { inLeftRightTextureCoordinate[i].first,
-                                 inLeftRightTextureCoordinate[i].second,
-                                 inTopBottomTextureCoordinate[i].first,
-                                 inTopBottomTextureCoordinate[i].second };
-            textureImages.insert(std::make_pair(symbols[i], tex));
-        }
+    std::unique_ptr<unsigned char[]> const &bitmap() {
+        return m_bitmap;
     }
 
-    virtual ~TextureAtlas() {}
+    uint32_t bitmapLength() {
+        return m_bitmapLength;
+    }
+
+    ~TextureAtlas() = default;
 };
 #endif

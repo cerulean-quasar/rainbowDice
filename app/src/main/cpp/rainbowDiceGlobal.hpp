@@ -25,14 +25,5 @@
 
 typedef ANativeWindow WindowType;
 
-#include "rainbowDice.hpp"
-#include "text.hpp"
-#include <memory>
-#include <GLES2/gl2.h>
-#include <glm/vec3.hpp>
-
-extern float const screenWidth;
-extern float const screenHeight;
-extern glm::vec3 const viewPoint;
 
 #endif

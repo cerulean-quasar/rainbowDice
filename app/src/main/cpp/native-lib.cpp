@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -17,127 +17,19 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include <jni.h>
 #include <string>
-#include "string.h"
+#include <cstring>
 #include <looper.h>
 #include <native_window.h>
 #include <native_window_jni.h>
-#include <sensor.h>
-#include <atomic>
-#include "rainbowDice.hpp"
-#include "rainbowDiceGL.hpp"
-#include "rainbowDiceGlobal.hpp"
+#include <vector>
 #include "android.hpp"
+#include "native-lib.hpp"
+#include "drawer.hpp"
+#include "dice.hpp"
 
-#ifdef CQ_ENABLE_VULKAN
-#include "rainbowDiceVulkan.hpp"
-#include "TextureAtlasVulkan.h"
-#endif
-
-/* Used to communicate between the gui thread and the drawing thread.  When the GUI thread wants
- * the drawer to stop drawing, cleanup, and exit, it sets this value to true.  The drawing thread
- * will set this value to false before starting drawing.
- */
-std::atomic<bool> stopDrawing(false);
-
-class Sensors {
-public:
-    struct AccelerationEvent {
-        float x;
-        float y;
-        float z;
-    };
-
-    Sensors() {
-        initSensors();
-    }
-
-    inline bool hasEvents() {
-        return ASensorEventQueue_hasEvents(eventQueue) > 0;
-    }
-
-    inline std::vector<AccelerationEvent> getEvents() {
-        std::vector<ASensorEvent> events;
-        events.resize(100);
-        ssize_t nbrEvents = ASensorEventQueue_getEvents(eventQueue, events.data(), events.size());
-        if (nbrEvents < 0) {
-            // an error has occurred
-            throw std::runtime_error("Error on retrieving sensor events.");
-        }
-
-        std::vector<AccelerationEvent> avector;
-        for (int i = 0; i < nbrEvents; i++) {
-            AccelerationEvent a{
-                events[i].acceleration.x,
-                events[i].acceleration.y,
-                events[i].acceleration.z};
-            avector.push_back(a);
-        }
-
-        return avector;
-    }
-
-    ~Sensors(){
-        ASensorEventQueue_disableSensor(eventQueue, sensor);
-        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
-    }
-private:
-// microseconds
-    static int const MAX_EVENT_REPORT_TIME;
-
-// event identifier for identifying an event that occurs during a poll.  It doesn't matter what this
-// value is, it just has to be unique among all the other sensors the program receives events for.
-    static int const EVENT_TYPE_ACCELEROMETER;
-
-    ASensorManager *sensorManager = nullptr;
-    ASensor const *sensor = nullptr;
-    ASensorEventQueue *eventQueue = nullptr;
-    ALooper *looper = nullptr;
-
-    void initSensors();
-};
-
-int const Sensors::MAX_EVENT_REPORT_TIME = 20000;
-int const Sensors::EVENT_TYPE_ACCELEROMETER = 462;
-
-void Sensors::initSensors() {
-    sensorManager = ASensorManager_getInstance();
-    sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
-    if (sensor == nullptr) {
-        // TODO: use a flick gesture instead?
-        throw std::runtime_error("Accelerometer not present.");
-    }
-
-    looper = ALooper_forThread();
-    if (looper == nullptr) {
-        looper = ALooper_prepare(0);
-    }
-
-    if (looper == nullptr) {
-        throw std::runtime_error("Could not initialize looper.");
-    }
-
-    eventQueue = ASensorManager_createEventQueue(sensorManager, looper, EVENT_TYPE_ACCELEROMETER, nullptr, nullptr);
-
-    int rc = ASensorEventQueue_enableSensor(eventQueue, sensor);
-    if (rc < 0) {
-        throw std::runtime_error("Could not enable sensor");
-    }
-    int minDelay = ASensor_getMinDelay(sensor);
-    minDelay = std::max(minDelay, MAX_EVENT_REPORT_TIME);
-
-    rc = ASensorEventQueue_setEventRate(eventQueue, sensor, minDelay);
-    if (rc < 0) {
-        ASensorEventQueue_disableSensor(eventQueue, sensor);
-        throw std::runtime_error("Could not set event rate");
-    }
-}
-
-std::shared_ptr<RainbowDice> initDice(
+std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<TextureAtlas>> initDice(
         JNIEnv *env,
-        jobject surface,
-        jobject manager,
         jobjectArray jDiceConfigs,
         jobjectArray jSymbols,
         jint width,
@@ -148,13 +40,6 @@ std::shared_ptr<RainbowDice> initDice(
         jfloatArray jArrayTextureCoordsBottom,
         jbyteArray jbitmap) {
 
-    // get the texture data
-    jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
-    size_t bitmapSize = static_cast<size_t>(env->GetArrayLength(jbitmap));
-    auto bitmap = std::make_unique<unsigned char[]>(bitmapSize);
-    memcpy(bitmap.get(), bytes, bitmapSize);
-    env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
-
     std::vector<std::string> symbols;
     size_t nbrSymbols = static_cast<size_t>(env->GetArrayLength(jSymbols));
     for (int i = 0; i < nbrSymbols; i++) {
@@ -164,6 +49,13 @@ std::shared_ptr<RainbowDice> initDice(
         env->ReleaseStringUTFChars(obj, csymbol);
         symbols.push_back(symbol);
     }
+
+    // get the texture data
+    jbyte *bytes = env->GetByteArrayElements(jbitmap, nullptr);
+    size_t bitmapSize = static_cast<size_t>(env->GetArrayLength(jbitmap));
+    auto bitmap = std::make_unique<unsigned char[]>(bitmapSize);
+    memcpy(bitmap.get(), bytes, bitmapSize);
+    env->ReleaseByteArrayElements(jbitmap, bytes, JNI_ABORT);
 
     std::vector<std::pair<float, float>> textureCoordsTopBottom;
     jfloat *jTextureCoordsBottom = env->GetFloatArrayElements(jArrayTextureCoordsBottom, nullptr);
@@ -183,44 +75,17 @@ std::shared_ptr<RainbowDice> initDice(
     env->ReleaseFloatArrayElements(jArrayTextureCoordsLeft, jTextureCoordsLeft, JNI_ABORT);
     env->ReleaseFloatArrayElements(jArrayTextureCoordsRight, jTextureCoordsRight, JNI_ABORT);
 
-    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
-    if (window == nullptr) {
-        throw std::runtime_error("Unable to acquire window from surface.");
-    }
-
-    setAssetManager(AAssetManager_fromJava(env, manager));
-
-    bool useGl = false;
-    std::shared_ptr<RainbowDice> diceGraphics;
-#ifdef CQ_ENABLE_VULKAN
-    try {
-        diceGraphics.reset(new RainbowDiceVulkan(window, symbols, static_cast<uint32_t>(width),
-                                                 static_cast<uint32_t>(height), textureCoordsLeftRight,
-                                                 textureCoordsTopBottom, bitmap, bitmapSize));
-    } catch (std::runtime_error &e) {
-        useGl = true;
-    }
-#else
-    useGl = true;
-#endif
-
-    if (useGl) {
-        try {
-            diceGraphics.reset(new RainbowDiceGL(window, symbols, static_cast<uint32_t>(width),
-                                                 static_cast<uint32_t>(height), textureCoordsLeftRight,
-                                                 textureCoordsTopBottom, bitmap));
-        } catch (std::runtime_error &e) {
-            ANativeWindow_release(window);
-            throw;
-        }
-    }
+    auto texture = std::make_shared<TextureAtlas>(symbols, width, height, textureCoordsLeftRight,
+            textureCoordsTopBottom, std::move(bitmap), bitmapSize);
 
     // Load the models.
     jint nbrDiceConfigs = env->GetArrayLength(jDiceConfigs);
+    std::vector<std::shared_ptr<DiceDescription>> dice;
     for (int i = 0; i < nbrDiceConfigs; i++) {
         jobject obj = env->GetObjectArrayElement(jDiceConfigs, i);
         jclass diceConfigClass = env->GetObjectClass(obj);
 
+        // number of symbols and values to expect
         jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberOfSides", "()I");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
@@ -231,6 +96,7 @@ std::shared_ptr<RainbowDice> initDice(
             continue;
         }
 
+        // symbols
         std::vector<std::string> symbolsDiceVector;
         mid = env->GetMethodID(diceConfigClass, "getSymbolsString", "(I)Ljava/lang/String;");
         if (mid == 0) {
@@ -246,12 +112,38 @@ std::shared_ptr<RainbowDice> initDice(
             symbolsDiceVector.push_back(symbolsDice);
         }
 
+        // Get the values that the symbols correspond to. We will need these to rebuild the dice
+        // config when the roll is done so that the java GUI can display the result, save it to the
+        // log file, etc.
+        std::vector<std::shared_ptr<int32_t>> values;
+        mid = env->GetMethodID(diceConfigClass, "getValues", "([Ljava/lang/Integer;)V");
+        if (mid == 0) {
+            throw std::runtime_error("Could not load dice models");
+        }
+
+        jclass jintegerclass = env->FindClass("java/lang/Integer");
+        jobjectArray jvalueArray = env->NewObjectArray(nbrSides, jintegerclass, nullptr);
+        env->CallVoidMethod(obj, mid, jvalueArray);
+
+        mid = env->GetMethodID(jintegerclass, "intValue", "()I");
+        for (int j = 0; j < nbrSides; j++) {
+            jobject jvalue = env->GetObjectArrayElement(jvalueArray, j);
+            if (jvalue != nullptr) {
+                int32_t value = env->CallIntMethod(jvalue, mid);
+                values.push_back(std::make_shared<int32_t>(value));
+            } else {
+                values.push_back(std::shared_ptr<int32_t>());
+            }
+        }
+
+        // get the number of dice
         mid = env->GetMethodID(diceConfigClass, "getNumberOfDice", "()I");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
         jint nbrDice = env->CallIntMethod(obj, mid);
 
+        // get reroll indices (into symbols vector
         mid = env->GetMethodID(diceConfigClass, "getNbrIndicesReRollOn", "()I");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
@@ -278,6 +170,7 @@ std::shared_ptr<RainbowDice> initDice(
             env->ReleaseIntArrayElements(jarrayindicesRerollOn, jindicesRerollOn, JNI_ABORT);
         }
 
+        // color
         mid = env->GetMethodID(diceConfigClass, "isRainbow", "()Z");
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
@@ -296,7 +189,7 @@ std::shared_ptr<RainbowDice> initDice(
 
             jboolean result = env->CallBooleanMethod(obj, mid, jarrayColor);
             if (result) {
-                jfloat *jcolor = env->GetFloatArrayElements(jarrayColor, NULL);
+                jfloat *jcolor = env->GetFloatArrayElements(jarrayColor, nullptr);
                 for (int i = 0; i < 4; i++) {
                     color.push_back(jcolor[i]);
                 }
@@ -306,60 +199,26 @@ std::shared_ptr<RainbowDice> initDice(
             }
         }
 
-        for (int j = 0; j < nbrDice; j++) {
-            diceGraphics->loadObject(symbolsDiceVector, indicesRerollOn, color);
+        // Is this dice config being added or subtracted?
+        mid = env->GetMethodID(diceConfigClass, "isAddOperation", "()Z");
+        if (mid == 0) {
+            throw std::runtime_error("Could not load dice models");
         }
+
+        bool isAddOperation = env->CallBooleanMethod(obj, mid);
+
+        dice.push_back(std::make_shared<DiceDescription>(static_cast<uint32_t>(nbrDice),
+                symbolsDiceVector, values, color, indicesRerollOn, isAddOperation));
     }
 
-    diceGraphics->initModels();
-
-    return diceGraphics;
-}
-
-std::string drawRollingDice(std::shared_ptr<RainbowDice> const &diceGraphics)
-{
-    Sensors sensor;
-
-    while (!stopDrawing.load()) {
-        if (sensor.hasEvents()) {
-            std::vector<Sensors::AccelerationEvent> events = sensor.getEvents();
-            for (auto const &event : events) {
-                diceGraphics->updateAcceleration(event.x, event.y, event.z);
-            }
-
-        }
-        bool needsRedraw = diceGraphics->updateUniformBuffer();
-        if (needsRedraw) {
-            diceGraphics->drawFrame();
-        }
-
-        if (diceGraphics->allStopped()) {
-            if (diceGraphics->needsReroll()) {
-                diceGraphics->addRollingDice();
-                continue;
-            }
-            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
-            std::string totalResult;
-            for (auto const &result : results) {
-                for (auto const &dieResult : result) {
-                    totalResult += std::to_string(dieResult) + "\t";
-                }
-                totalResult[totalResult.length() - 1] = '\n';
-            }
-            totalResult[totalResult.length() - 1] = '\0';
-            return totalResult;
-        }
-    }
-
-    return std::string();
+    return std::make_pair(dice, texture);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
         JNIEnv *env,
-        jobject jthis,
-        jobject surface,
-        jobject manager,
+        jclass jclass1,
+        jstring jdiceName,
         jobjectArray jDiceConfigs,
         jobjectArray jSymbols,
         jint width,
@@ -370,15 +229,19 @@ Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
         jfloatArray textureCoordBottom,
         jbyteArray jbitmap) {
 
-    stopDrawing.store(false);
-
     try {
-        std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
-                jSymbols, width, height, textureCoordLeft, textureCoordRight,
-                textureCoordTop, textureCoordBottom, jbitmap);
-        diceGraphics->resetPositions();
-        std::string results = drawRollingDice(diceGraphics);
-        return env->NewStringUTF(results.c_str());
+        std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<TextureAtlas>> dice =
+                initDice(env, jDiceConfigs, jSymbols, width, height, textureCoordLeft, textureCoordRight,
+                         textureCoordTop, textureCoordBottom, jbitmap);
+
+        const char *cdiceName = env->GetStringUTFChars(jdiceName, nullptr);
+        std::string diceName(cdiceName);
+        env->ReleaseStringUTFChars(jdiceName, cdiceName);
+
+        auto event = std::make_shared<DiceChangeEvent>(diceName, std::move(dice.first), dice.second);
+
+        diceChannel().sendEvent(event);
+        return env->NewStringUTF("");
     } catch (std::runtime_error &e) {
         if (strlen(e.what()) > 0) {
             return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
@@ -389,19 +252,67 @@ Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_quasar_cerulean_rainbowdice_MainActivity_tellDrawerStop(
+Java_com_quasar_cerulean_rainbowdice_Draw_tellDrawerStop(
         JNIEnv *env,
-        jobject jthis) {
-    stopDrawing.store(true);
+        jclass jclass1) {
+    diceChannel().sendStopDrawingEvent();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_tellDrawerSurfaceChanged(
+        JNIEnv *env,
+        jclass jclass1,
+        jint width,
+        jint height) {
+    try {
+        auto event = std::make_shared<SurfaceChangedEvent>(width, height);
+        diceChannel().sendEvent(event);
+        return env->NewStringUTF("");
+    } catch (std::runtime_error &e) {
+        if (strlen(e.what()) > 0) {
+            return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+        } else {
+            return env->NewStringUTF("error: Error in initializing graphics.");
+        }
+    }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_tellDrawerSurfaceDirty(
+        JNIEnv *env,
+        jclass jclass1,
+        jobject jsurface) {
+    try {
+        ANativeWindow *window = ANativeWindow_fromSurface(env, jsurface);
+        if (window == nullptr) {
+            return env->NewStringUTF("Unable to acquire window from surface.");
+        }
+
+        auto deleter = [](WindowType *windowRaw) {
+            /* release the java window object */
+            if (windowRaw != nullptr) {
+                ANativeWindow_release(windowRaw);
+            }
+        };
+
+        std::shared_ptr<WindowType> surface{window, deleter};
+        auto event = std::make_shared<SurfaceDirtyEvent>(surface);
+        diceChannel().sendEvent(event);
+        return env->NewStringUTF("");
+    } catch (std::runtime_error &e) {
+        if (strlen(e.what()) > 0) {
+            return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+        } else {
+            return env->NewStringUTF("error: Error in initializing graphics.");
+        }
+    }
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         JNIEnv *env,
-        jobject jthis,
+        jclass jclass1,
         jintArray jFaceIndicesUpArray,
-        jobject surface,
-        jobject manager,
         jobjectArray jDiceConfigs,
         jobjectArray jSymbols,
         jint width,
@@ -421,14 +332,184 @@ Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
     env->ReleaseIntArrayElements(jFaceIndicesUpArray, jFaceIndicesUp, JNI_ABORT);
 
     try {
-        std::shared_ptr<RainbowDice> diceGraphics = initDice(env, surface, manager, jDiceConfigs,
-                                                             jSymbols, width, height, textureCoordLeft,
-                                                             textureCoordRight, textureCoordTop,
-                                                             textureCoordBottom, jbitmap);
-        diceGraphics->resetToStoppedPositions(faceIndicesUp);
-        diceGraphics->drawFrame();
+        std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<TextureAtlas>> dice =
+                initDice(env, jDiceConfigs,
+                         jSymbols, width, height, textureCoordLeft,
+                         textureCoordRight, textureCoordTop,
+                         textureCoordBottom, jbitmap);
+        std::shared_ptr<DrawEvent> event = std::make_shared<DrawStoppedDiceEvent>(std::move(dice.first), dice.second,
+                                                                    std::move(faceIndicesUp));
+        diceChannel().sendEvent(event);
         return env->NewStringUTF("");
     } catch (std::runtime_error &e) {
         return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_scroll(
+        JNIEnv *env,
+        jclass jclass1,
+        jfloat distanceX,
+        jfloat distanceY) {
+    auto event = std::make_shared<ScrollEvent>(distanceX, distanceY);
+    diceChannel().sendEvent(event);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_scale(
+        JNIEnv *env,
+        jclass jclass1,
+        jfloat scaleFactor) {
+    auto event = std::make_shared<ScaleEvent>(scaleFactor);
+    diceChannel().sendEvent(event);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
+        JNIEnv *env,
+        jobject jthis,
+        jobject jsurface,
+        jobject jmanager,
+        jobject jnotify) {
+
+    try {
+        setAssetManager(AAssetManager_fromJava(env, jmanager));
+
+        ANativeWindow *window = ANativeWindow_fromSurface(env, jsurface);
+        if (window == nullptr) {
+            return env->NewStringUTF("Unable to acquire window from surface.");
+        }
+
+        auto deleter = [](WindowType *windowRaw) {
+            /* release the java window object */
+            if (windowRaw != nullptr) {
+                ANativeWindow_release(windowRaw);
+            }
+        };
+
+        std::shared_ptr<WindowType> surface(window, deleter);
+
+        std::unique_ptr<Notify> notify(new Notify(env, jnotify));
+        DiceWorker worker(surface, notify);
+        surface.reset();
+
+        worker.waitingLoop();
+        return env->NewStringUTF("");
+    } catch (std::runtime_error &e) {
+        if (strlen(e.what()) > 0) {
+            return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+        } else {
+            return env->NewStringUTF("error: Error in initializing graphics.");
+        }
+    }
+}
+
+void Notify::sendResult(
+        std::string const &diceName,
+        std::vector<std::vector<uint32_t>> const &results,
+        std::vector<std::shared_ptr<DiceDescription>> const &dice) {
+    std::string totalResult;
+    jclass notifyClass = m_env->GetObjectClass(m_notify);
+
+    jmethodID midAddMultiResult = m_env->GetMethodID(notifyClass, "addResult", "([I)V");
+    if (midAddMultiResult == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
+
+    jmethodID midAddSingleResult = m_env->GetMethodID(notifyClass, "addResult", "(I)V");
+    if (midAddSingleResult == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
+
+    for (auto const &result : results) {
+        if (result.size() == 1) {
+            m_env->CallVoidMethod(m_notify, midAddSingleResult, result[0]);
+        } else {
+            jintArray jresultsArray = m_env->NewIntArray(static_cast<jsize>(result.size()));
+            jint *jresults = m_env->GetIntArrayElements(jresultsArray, nullptr);
+            int i = 0;
+            for (auto const &dieResult : result) {
+                jresults[i++] = dieResult;
+            }
+            m_env->ReleaseIntArrayElements(jresultsArray, jresults, JNI_COMMIT);
+            m_env->CallVoidMethod(m_notify, midAddMultiResult, jresultsArray);
+        }
+    }
+
+    jmethodID midAddDice = m_env->GetMethodID(notifyClass, "addDice",
+            "(I[Ljava/lang/String;[Ljava/lang/Integer;[I[FZ)V");
+    if (midAddDice == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
+    for (auto const &die : dice) {
+        jobjectArray jsymbolArray = m_env->NewObjectArray(die->m_symbols.size(),
+                m_env->FindClass("java/lang/String"), m_env->NewStringUTF(""));
+        int i = 0;
+        for (auto const & symbol : die->m_symbols) {
+            m_env->SetObjectArrayElement(jsymbolArray, i++, m_env->NewStringUTF(symbol.c_str()));
+        }
+
+        jintArray jrerollIndicesArray = m_env->NewIntArray(static_cast<jsize>(die->m_rerollOnIndices.size()));
+        jint *jindices = m_env->GetIntArrayElements(jrerollIndicesArray, nullptr);
+        i = 0;
+        for (auto const &rerollIndex : die->m_rerollOnIndices) {
+            jindices[i++] = rerollIndex;
+        }
+        m_env->ReleaseIntArrayElements(jrerollIndicesArray, jindices, JNI_COMMIT);
+
+        jfloatArray jcolorArray = m_env->NewFloatArray(static_cast<jsize>(die->m_color.size()));
+        jfloat *jcolor = m_env->GetFloatArrayElements(jcolorArray, nullptr);
+        i = 0;
+        for (auto const &colorValue : die->m_color) {
+            jcolor[i++] = colorValue;
+        }
+        m_env->ReleaseFloatArrayElements(jcolorArray, jcolor, JNI_COMMIT);
+
+        jclass jIntegerClass = m_env->FindClass("java/lang/Integer");
+        jmethodID midIntegerInit = m_env->GetMethodID(jIntegerClass, "<init>", "(I)V");
+        jobjectArray jvalueArray = m_env->NewObjectArray(die->m_values.size(),
+                                                          jIntegerClass,
+                                                          nullptr);
+        i = 0;
+        for (auto const & value : die->m_values) {
+            if (value != nullptr) {
+                m_env->SetObjectArrayElement(jvalueArray, i,
+                                             m_env->NewObject(jIntegerClass, midIntegerInit,
+                                                              *value));
+            }
+            i++;
+        }
+
+        m_env->CallVoidMethod(m_notify, midAddDice, die->m_nbrDice, jsymbolArray, jvalueArray,
+                jrerollIndicesArray, jcolorArray, die->m_isAddOperation);
+    }
+
+    if (diceName.empty()) {
+        jmethodID midSend = m_env->GetMethodID(notifyClass, "sendResults", "()V");
+        if (midSend == nullptr) {
+            throw std::runtime_error("Could not send message.");
+        }
+
+        m_env->CallVoidMethod(m_notify, midSend);
+    } else {
+        jmethodID midSend = m_env->GetMethodID(notifyClass, "sendResults", "(Ljava/lang/String;)V");
+        if (midSend == nullptr) {
+            throw std::runtime_error("Could not send message.");
+        }
+
+        m_env->CallVoidMethod(m_notify, midSend, m_env->NewStringUTF(diceName.c_str()));
+    }
+}
+
+void Notify::sendError(std::string const &error) {
+    jclass notifyClass = m_env->GetObjectClass(m_notify);
+
+    jmethodID midSend = m_env->GetMethodID(notifyClass, "sendError", "(Ljava/lang/String;)V");
+    if (midSend == nullptr) {
+        throw std::runtime_error("Could not send error message.");
+    }
+
+    jstring jerror = m_env->NewStringUTF(error.c_str());
+    m_env->CallVoidMethod(m_notify, midSend, jerror);
 }

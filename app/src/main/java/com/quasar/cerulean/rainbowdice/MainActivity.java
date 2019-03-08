@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -24,6 +24,7 @@ import android.content.res.AssetManager;
 import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Message;
+import android.os.Parcelable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.TypedValue;
@@ -126,7 +127,6 @@ public class MainActivity extends AppCompatActivity {
                     TextView result = findViewById(R.id.rollResult);
                     result.setText(getString(R.string.diceMessageToStartRolling));
                     Button b = (Button) v;
-                    joinDrawer();
                     String diceFileName = b.getText().toString();
                     DieConfiguration[] diceConfig = loadFromFile(diceFileName);
                     if (diceConfig == null) {
@@ -142,14 +142,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        joinDrawer();
         logFile.writeFile();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        joinDrawer();
     }
 
     @Override
@@ -200,25 +198,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onConfigure(MenuItem item) {
-        joinDrawer();
         Intent intent = new Intent(this, DiceConfigurationActivity.class);
         startActivityForResult(intent, DICE_CONFIGURATION_ACTIVITY);
     }
 
     public void onOpenLogFile(MenuItem item) {
-        joinDrawer();
         Intent intent = new Intent(this, DiceLogActivity.class);
         startActivityForResult(intent, Constants.DICE_LOG_FILE_ACTIVITY);
     }
 
     public void onSelectTheme(MenuItem item) {
-        joinDrawer();
         Intent intent = new Intent(this, ActivityThemeSelector.class);
         startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
     }
 
     public void onNewDice(MenuItem item) {
-        joinDrawer();
         Intent intent = new Intent(this, DiceCustomizationActivity.class);
         startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
     }
@@ -265,8 +259,7 @@ public class MainActivity extends AppCompatActivity {
 
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        Draw draw = new Draw(null, drawSurfaceHolder, diceConfig, assetManager);
-        String err = draw.startDrawingStoppedDice(indices);
+        String err = Draw.startDrawingStoppedDice(diceConfig, indices);
         if (err != null && err.length() > 0) {
             TextView text = findViewById(R.id.rollResult);
             text.setText(err);
@@ -376,6 +369,7 @@ public class MainActivity extends AppCompatActivity {
             dice = new DieConfiguration[1];
             dice[0] = new DieConfiguration(12, 6, 1, 1,
                     null, true, null);
+            diceGroup = new DiceGroup(dice);
             filename = "12D6";
             configurationFile.addDice(filename, diceGroup);
 
@@ -398,30 +392,40 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void createWorker() {
+        if (drawer != null) {
+            return;
+        }
+        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
+        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
+        TextView resultView = findViewById(R.id.rollResult);
+        Handler notify = new Handler(new ResultHandler(resultView));
+        drawer = new Thread(new DiceWorker(notify, drawSurfaceHolder, assetManager));
+        drawer.start();
+    }
+
     private void rollTheDice(DieConfiguration[] diceConfig, String diceFileName) {
         if (!surfaceReady) {
             // shouldn't happen.
             return;
         }
 
-        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        joinDrawer();
-        TextView resultView = findViewById(R.id.rollResult);
-        Handler notify = new Handler(new ResultHandler(resultView, diceConfig, diceFileName));
-        drawer = new Thread(new Draw(notify, drawSurfaceHolder, diceConfig, assetManager));
-        drawer.start();
+        String err = Draw.startDrawingRoll(diceConfig, diceFileName);
+        if (err != null && !err.isEmpty()) {
+            TextView resultView = findViewById(R.id.rollResult);
+            resultView.setText(err);
+        }
     }
 
     public void joinDrawer() {
-        boolean done = false;
-        while (!done && drawer != null) {
-            tellDrawerStop();
-            try {
-                drawer.join();
-                done = true;
-            } catch (InterruptedException e) {
-            }
+        if (drawer == null) {
+            return;
+        }
+
+        try {
+            Draw.tellDrawerStop();
+            drawer.join();
+        } catch (InterruptedException e) {
         }
         drawer = null;
     }
@@ -439,39 +443,44 @@ public class MainActivity extends AppCompatActivity {
 
     private class ResultHandler implements Handler.Callback {
         private TextView text;
-        private DieConfiguration[] diceConfig;
-        private String diceFileLoaded;
-        public ResultHandler(TextView textToUpdate, DieConfiguration[] inDiceConfig, String inDiceFileName) {
+        public ResultHandler(TextView textToUpdate) {
             text = textToUpdate;
-            diceConfig = inDiceConfig;
-            diceFileLoaded = inDiceFileName;
         }
         public boolean handleMessage(Message message) {
             Bundle data = message.getData();
-            String svalue = data.getString("results");
-            joinDrawer();
-            if (svalue.contains("error: ")) {
+            if (data.containsKey(DiceDrawerReturnChannel.errorMsg)) {
+                String serror = data.getString(DiceDrawerReturnChannel.errorMsg);
                 // the result is an error message.  Print the error message to the text view
-                text.setText(svalue);
+                text.setText(serror);
                 return true;
+            } else if (data.containsKey(DiceDrawerReturnChannel.resultsMsg) &&
+                    data.containsKey(DiceDrawerReturnChannel.diceConfigMsg)) {
+
+                DiceDrawerMessage results = data.getParcelable(DiceDrawerReturnChannel.resultsMsg);
+
+                Parcelable[] diceConfigParcels =
+                        data.getParcelableArray(DiceDrawerReturnChannel.diceConfigMsg);
+                DieConfiguration[] diceConfig = new DieConfiguration[diceConfigParcels.length];
+                for (int i = 0; i < diceConfigParcels.length; i++) {
+                    diceConfig[i] = (DieConfiguration)diceConfigParcels[i];
+                }
+
+                String filename = "modified roll";
+                if (data.containsKey(DiceDrawerReturnChannel.fileNameMsg)) {
+                    filename = data.getString(DiceDrawerReturnChannel.fileNameMsg);
+                }
+
+                DiceResult diceResult = new DiceResult(results, diceConfig);
+
+                // no dice need reroll, just update the results text view with the results.
+                logFile.addRoll(filename, diceResult, diceConfig);
+                drawingStarted = false;
+                text.setText(diceResult.generateResultsString(diceConfig,
+                        getString(R.string.diceMessageResult),
+                        getString(R.string.diceMessageResult2),
+                        getString(R.string.addition), getString(R.string.subtraction)));
             }
-
-            DiceResult diceResult = new DiceResult(svalue, diceConfig);
-
-            // no dice need reroll, just update the results text view with the results.
-            logFile.addRoll(diceFileLoaded, diceResult, diceConfig);
-            drawingStarted = false;
-            text.setText(diceResult.generateResultsString(diceConfig,
-                    getString(R.string.diceMessageResult),
-                    getString(R.string.diceMessageResult2),
-                    getString(R.string.addition), getString(R.string.subtraction)));
             return true;
         }
     }
-
-    /**
-     * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
-     */
-    private native void tellDrawerStop();
 }

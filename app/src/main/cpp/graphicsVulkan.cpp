@@ -46,8 +46,8 @@ namespace vulkan {
         createInfo.window = m_window.get();
 
         VkSurfaceKHR surfaceRaw;
-        if (vkCreateAndroidSurfaceKHR(m_instance.get(), &createInfo, nullptr, &surfaceRaw) !=
-            VK_SUCCESS) {
+        auto rc = vkCreateAndroidSurfaceKHR(m_instance.get(), &createInfo, nullptr, &surfaceRaw);
+        if (rc != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
 
@@ -505,10 +505,25 @@ namespace vulkan {
             createInfo.pQueueFamilyIndices = nullptr;
         }
 
-        /* Specify the transform to perform (like 90 degree clockwise rotation).  For no transform
-         * set this to current transform.
+        /* Specify the transform to perform (like 90 degree clockwise rotation).  Use the
+         * VkSurfaceCapabilitiesKHR::currentTransform for all cases were we know what that means
+         * to save performance. It costs performance if the compositor needs to do this transform.
          */
-        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+        switch (swapChainSupport.capabilities.currentTransform) {
+            case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+                createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+                break;
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR:
+            case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR:
+            default:
+                createInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+                break;
+        }
 
         /*
          * specifies if the alpha channel should be used for blending with other windows in the
@@ -548,6 +563,7 @@ namespace vulkan {
 
         m_imageFormat = surfaceFormat.format;
         m_extent = extent;
+        m_preTransform = createInfo.preTransform;
     }
 
     /**

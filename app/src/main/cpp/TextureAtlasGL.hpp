@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -21,17 +21,53 @@
 #ifndef RAINBOWDICE_TEXTUREATLASGL_HPP
 #define RAINBOWDICE_TEXTUREATLASGL_HPP
 
+#include <memory>
 #include <GLES2/gl2.h>
 #include "text.hpp"
 
-class TextureAtlasGL : public TextureAtlas {
+class TextureGL {
 public:
-    TextureAtlasGL(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
+    explicit TextureGL(std::shared_ptr<TextureAtlas> inTextureAtlas) :
+        m_textureAtlas{std::move(inTextureAtlas)}
+    {
+        init();
+    }
+
+    TextureGL(std::vector<std::string> const &symbols, uint32_t inWidth, uint32_t inHeightTexture,
                    std::vector<std::pair<float, float>> const &textureCoordsLeftRight,
                    std::vector<std::pair<float, float>> const &textureCoordsTopBottom,
-                   std::unique_ptr<unsigned char[]> const &inBitmap)
-        : TextureAtlas{symbols, inWidth, inHeightTexture, textureCoordsLeftRight, textureCoordsTopBottom}
-    {
+                   std::unique_ptr<unsigned char[]> &&inBitmap, uint32_t inBitmapSize)
+        : m_textureAtlas{std::make_shared<TextureAtlas>(symbols, inWidth, inHeightTexture,
+                                                       textureCoordsLeftRight, textureCoordsTopBottom,
+                                                       std::move(inBitmap), inBitmapSize)} {
+        init();
+    }
+
+    // TODO: reverse texture coordinates in atlas...
+    /*
+    TextureImage getTextureCoordinates(std::string const &symbol) {
+        TextureImage coords = TextureAtlas::getTextureCoordinates(symbol);
+        float temp = coords.left;
+        coords.left = coords.right;
+        coords.right = temp;
+
+        return coords;
+    }
+    */
+
+    ~TextureGL() {
+        glDeleteTextures(1, &m_texture);
+    }
+
+    inline GLuint texture() { return m_texture; }
+
+    inline std::shared_ptr<TextureAtlas> const &textureAtlas() { return m_textureAtlas; }
+
+private:
+    std::shared_ptr<TextureAtlas> m_textureAtlas;
+    GLuint m_texture;
+
+    void init() {
         // load the textures
         glGenTextures(1, &m_texture);
         glActiveTexture(GL_TEXTURE0);
@@ -45,30 +81,13 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, /*GL_LINEAR_MIPMAP_LINEAR*/GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, /*GL_LINEAR*/ GL_NEAREST);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width,
-                     height, 0, GL_RGBA, GL_UNSIGNED_BYTE, inBitmap.get());
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_textureAtlas->getImageWidth(),
+                     m_textureAtlas->getImageHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     m_textureAtlas->bitmap().get());
 
         glGenerateMipmap(GL_TEXTURE_2D);
 
     }
-
-    TextureImage getTextureCoordinates(std::string const &symbol) {
-        TextureImage coords = TextureAtlas::getTextureCoordinates(symbol);
-        float temp = coords.left;
-        coords.left = coords.right;
-        coords.right = temp;
-
-        return coords;
-    }
-
-    ~TextureAtlasGL() {
-        glDeleteTextures(1, &m_texture);
-    }
-
-    inline GLuint texture() { return m_texture; }
-
-private:
-    GLuint m_texture;
 };
 
 #endif /* RAINBOWDICE_TEXTUREATLASGL_HPP */

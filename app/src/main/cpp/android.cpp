@@ -27,6 +27,42 @@
 
 std::unique_ptr<AssetManagerWrapper> assetWrapper;
 
+int const Sensors::MAX_EVENT_REPORT_TIME = 20000;
+int const Sensors::EVENT_TYPE_ACCELEROMETER = 462;
+
+void Sensors::initSensors() {
+    sensorManager = ASensorManager_getInstance();
+    sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
+    if (sensor == nullptr) {
+        // TODO: use a flick gesture instead?
+        throw std::runtime_error("Accelerometer not present.");
+    }
+
+    looper = ALooper_forThread();
+    if (looper == nullptr) {
+        looper = ALooper_prepare(0);
+    }
+
+    if (looper == nullptr) {
+        throw std::runtime_error("Could not initialize looper.");
+    }
+
+    eventQueue = ASensorManager_createEventQueue(sensorManager, looper, EVENT_TYPE_ACCELEROMETER, nullptr, nullptr);
+
+    int rc = ASensorEventQueue_enableSensor(eventQueue, sensor);
+    if (rc < 0) {
+        throw std::runtime_error("Could not enable sensor");
+    }
+    int minDelay = ASensor_getMinDelay(sensor);
+    minDelay = std::max(minDelay, MAX_EVENT_REPORT_TIME);
+
+    rc = ASensorEventQueue_setEventRate(eventQueue, sensor, minDelay);
+    if (rc < 0) {
+        ASensorEventQueue_disableSensor(eventQueue, sensor);
+        throw std::runtime_error("Could not set event rate");
+    }
+}
+
 void setAssetManager(AAssetManager *mgr) {
     assetWrapper.reset(new AssetManagerWrapper(mgr));
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -43,8 +43,8 @@ const float Vertex::MODE_CENTER_DISTANCE = 1.0f;
 float const DicePhysicsModel::errorVal = 0.15f;
 float const DicePhysicsModel::viscosity = 2.0f;
 float const DicePhysicsModel::radius = 0.2f;
-float const DicePhysicsModel::maxposx = 0.5f;
-float const DicePhysicsModel::maxposy = 0.5f;
+float const DicePhysicsModel::maxposx = 1.0f;
+float const DicePhysicsModel::maxposy = 1.0f;
 float const DicePhysicsModel::maxposz = 1.0f;
 
 // Time for the stopped animation to complete
@@ -57,7 +57,7 @@ float const DicePhysicsModel::goingToStopAnimationTime = 0.2f; // seconds
 float const DicePhysicsModel::waitAfterDoneTime = 0.6f; // seconds
 
 // the radius of the dice after it has moved to the top of the screen.
-float const DicePhysicsModel::stoppedRadius = 0.12f;
+float const DicePhysicsModel::stoppedRadius = 0.15f;
 
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
@@ -92,25 +92,31 @@ bool Vertex::operator==(const Vertex& other) const {
     return pos == other.pos && color == other.color && texCoord == other.texCoord && normal == other.normal;
 }
 
-void DicePhysicsModel::setView() {
-    /* glm::lookAt takes the eye position, the center position, and the up axis as parameters */
-    ubo.view = glm::lookAt(viewPoint, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
+        std::vector<float> const &color, bool isOpenGL) {
+    std::shared_ptr<DicePhysicsModel> die;
+    glm::vec3 position(0.0f, 0.0f, -1.0f);
+    long nbrSides = symbols.size();
+    if (nbrSides == 2) {
+        die.reset(new DiceModelCoin(symbols, position, color, isOpenGL));
+    } else if (nbrSides == 4) {
+        die.reset(new DiceModelTetrahedron(symbols, position, color, isOpenGL));
+    } else if (nbrSides == 12) {
+        die.reset(new DiceModelDodecahedron(symbols, position, color, isOpenGL));
+    } else if (nbrSides == 20) {
+        die.reset(new DiceModelIcosahedron(symbols, position, color, isOpenGL));
+    } else if (nbrSides == 30) {
+        die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color, isOpenGL));
+    } else if (6 % nbrSides == 0) {
+        die.reset(new DiceModelCube(symbols, position, color, isOpenGL));
+    } else {
+        die.reset(new DiceModelHedron(symbols, position, color, 0, isOpenGL));
+    }
 
+    return die;
 }
 
-void DicePhysicsModel::updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) {
-    /* perspective matrix: takes the perspective projection, the aspect ratio, near and far
-     * view planes.
-     */
-    ubo.proj = glm::perspective(glm::radians(45.0f), surfaceWidth / (float) surfaceHeight, 0.1f, 10.0f);
-
-    /* GLM has the y axis inverted from Vulkan's perspective, invert the y-axis on the
-     * projection matrix.
-     */
-    ubo.proj[1][1] *= -1;
-}
-
-void DicePhysicsModel::resetPosition() {
+void DicePhysicsModel::resetPosition(float screenWidth, float screenHeight) {
     prevTime = std::chrono::high_resolution_clock::now();
     stopped = false;
     goingToStop = false;
@@ -130,13 +136,13 @@ void DicePhysicsModel::resetPosition() {
     angularVelocity.setAngularSpeed(0);
     angularVelocity.setSpinAxis(glm::vec3(0.0f, 0.0f, 1.0f));
 
+    randomizeUpFace(screenWidth, screenHeight);
+    checkQuaternion(qTotalRotated);
+
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(glm::mat4(1.0f), position);
-    ubo.model = translate * rotate * scale;
-
-    randomizeUpFace();
-    checkQuaternion(qTotalRotated);
+    m_model = translate * rotate * scale;
 }
 
 void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
@@ -217,7 +223,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             checkQuaternion(qTotalRotated);
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
-            ubo.model = translate * rotate * scale;
+            m_model = translate * rotate * scale;
             return true;
         } else if (stoppedAnimationTime <= animationTime) {
             // all animations after the dice lands are done.
@@ -232,7 +238,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             checkQuaternion(qTotalRotated);
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
-            ubo.model = translate * rotate * scale;
+            m_model = translate * rotate * scale;
             return true;
         } else if (stopped) {
             // we need to animate the move to the location it is supposed to go when it is done
@@ -258,7 +264,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             }
             glm::mat4 scale = glm::scale(glm::vec3(r, r, r));
             glm::mat4 translate = glm::translate(position);
-            ubo.model = translate * rotate * scale;
+            m_model = translate * rotate * scale;
             return true;
         } else if (waitAfterDoneTime <= stoppedRotateTime) {
             // done settling the dice to the floor.  Wait for some time before moving the die to the
@@ -268,7 +274,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
-            ubo.model = translate * rotate * scale;
+            m_model = translate * rotate * scale;
             return true;
         } else if (goingToStopAnimationTime > stoppedRotateTime){
             // we need to animate the dice slowly settling to the floor.
@@ -287,7 +293,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             }
             glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
             glm::mat4 translate = glm::translate(position);
-            ubo.model = translate * rotate * scale;
+            m_model = translate * rotate * scale;
             return true;
         } else {
             stoppedRotateTime += time;
@@ -302,7 +308,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
             glm::mat4 rotate = glm::toMat4(qTotalRotated);
             glm::mat4 translate = glm::translate(position);
-            ubo.model = translate * rotate * scale;
+            m_model = translate * rotate * scale;
             return true;
         }
     }
@@ -388,7 +394,7 @@ bool DicePhysicsModel::updateModelMatrix() {
     checkQuaternion(qTotalRotated);
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(position);
-    ubo.model = translate * rotate * scale;
+    m_model = translate * rotate * scale;
 
     if (goingToStop) {
         return true;
@@ -453,7 +459,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     // once we get the rotation to do on the die.
     glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
     glm::mat4 translate = glm::translate(position);
-    ubo.model = translate * scale;
+    m_model = translate * scale;
     getAngleAxis(faceIndex, angle, normalVector);
 
     glm::vec3 cross = glm::cross(normalVector, zaxis);
@@ -472,7 +478,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     }
 
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
-    ubo.model = translate * rotate * scale;
+    m_model = translate * rotate * scale;
 
     yAlign(faceIndex);
     if (stoppedAngle != 0) {
@@ -483,10 +489,12 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     }
 
     rotate = glm::toMat4(qTotalRotated);
-    ubo.model = translate * rotate * scale;
+    m_model = translate * rotate * scale;
+    stopped = true;
+    animationDone = true;
 }
 
-void DicePhysicsModel::randomizeUpFace() {
+void DicePhysicsModel::randomizeUpFace(float screenWidth, float screenHeight) {
     Random random;
     uint32_t upFace = random.getUInt(0, numberFaces-1);
 
@@ -685,9 +693,9 @@ void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
 
     if (faceIndex == 0) {
         /* what was the top face at the start (y being up) */
-        glm::vec4 p04 = ubo.model * glm::vec4(vertices[2].pos, 1.0f);
-        glm::vec4 q4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
-        glm::vec4 r4 = ubo.model * glm::vec4(vertices[6].pos, 1.0f);
+        glm::vec4 p04 = m_model * glm::vec4(vertices[2].pos, 1.0f);
+        glm::vec4 q4 = m_model * glm::vec4(vertices[0].pos, 1.0f);
+        glm::vec4 r4 = m_model * glm::vec4(vertices[6].pos, 1.0f);
         glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
         glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
         glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
@@ -695,9 +703,9 @@ void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
         angle = glm::acos(glm::dot(axis, zaxis));
     } else if (faceIndex == 1) {
         /* what was the bottom face at the start */
-        glm::vec4 p04 = ubo.model * glm::vec4(vertices[7].pos, 1.0f);
-        glm::vec4 q4 = ubo.model * glm::vec4(vertices[1].pos, 1.0f);
-        glm::vec4 r4 = ubo.model * glm::vec4(vertices[3].pos, 1.0f);
+        glm::vec4 p04 = m_model * glm::vec4(vertices[7].pos, 1.0f);
+        glm::vec4 q4 = m_model * glm::vec4(vertices[1].pos, 1.0f);
+        glm::vec4 r4 = m_model * glm::vec4(vertices[3].pos, 1.0f);
         glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
         glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
         glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
@@ -705,9 +713,9 @@ void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
         angle = glm::acos(glm::dot(axis, zaxis));
     } else {
         /* what were the side faces at the start */
-        glm::vec4 p04 = ubo.model * glm::vec4(vertices[4 * faceIndex].pos, 1.0f);
-        glm::vec4 q4 = ubo.model * glm::vec4(vertices[1 + 4 * faceIndex].pos, 1.0f);
-        glm::vec4 r4 = ubo.model * glm::vec4(vertices[3 + 4 * faceIndex].pos, 1.0f);
+        glm::vec4 p04 = m_model * glm::vec4(vertices[4 * faceIndex].pos, 1.0f);
+        glm::vec4 q4 = m_model * glm::vec4(vertices[1 + 4 * faceIndex].pos, 1.0f);
+        glm::vec4 r4 = m_model * glm::vec4(vertices[3 + 4 * faceIndex].pos, 1.0f);
         glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
         glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
         glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
@@ -719,17 +727,12 @@ void DiceModelCube::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
 void DiceModelCube::yAlign(uint32_t faceIndex) {
     glm::vec3 yaxis;
     glm::vec3 zaxis;
-    if (isOpenGl) {
-        zaxis = {0.0f, 0.0f, -1.0f};
-        yaxis = {0.0f, -1.0f, 0.0f};
-    } else {
-        zaxis = {0.0f, 0.0f, 1.0f};
-        yaxis = {0.0f, 1.0f, 0.0f};
-    }
+    zaxis = {0.0f, 0.0f, 1.0f};
+    yaxis = {0.0f, 1.0f, 0.0f};
     glm::vec3 axis;
     if (faceIndex == 0 || faceIndex == 1) {
-        glm::vec4 p24 = ubo.model * glm::vec4(vertices[2].pos, 1.0f);
-        glm::vec4 p04 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
+        glm::vec4 p24 = m_model * glm::vec4(vertices[2].pos, 1.0f);
+        glm::vec4 p04 = m_model * glm::vec4(vertices[0].pos, 1.0f);
         glm::vec3 p2 = {p24.x, p24.y, p24.z};
         glm::vec3 p0 = {p04.x, p04.y, p04.z};
         axis = p2 - p0;
@@ -737,8 +740,8 @@ void DiceModelCube::yAlign(uint32_t faceIndex) {
             axis = -axis;
         }
     } else {
-        glm::vec4 p84 = ubo.model * glm::vec4(vertices[8+4*(faceIndex-2)].pos, 1.0f);
-        glm::vec4 p94 = ubo.model * glm::vec4(vertices[9+4*(faceIndex-2)].pos, 1.0f);
+        glm::vec4 p84 = m_model * glm::vec4(vertices[8+4*(faceIndex-2)].pos, 1.0f);
+        glm::vec4 p94 = m_model * glm::vec4(vertices[9+4*(faceIndex-2)].pos, 1.0f);
         glm::vec3 p9 = {p94.x, p94.y, p94.z};
         glm::vec3 p8 = {p84.x, p84.y, p84.z};
         axis = p8 - p9;
@@ -848,11 +851,6 @@ void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &textAtlas
         a = (symbolHeightTextureSpace*textAtlas->getImageHeight())/(symbolWidthTextureSpace*textAtlas->getImageWidth());
     }
 
-    int factor = 1;
-    if (isOpenGl) {
-        factor = -1;
-    }
-
     float k = a * glm::length((r+q)/2.0f-p0) / glm::length(r-q);
 
     glm::vec3 p2 = (1.0f - 1.0f/(2.0f * k + 2.0f)) * r + (1.0f/(2.0f*k+2.0f)) * q;
@@ -876,11 +874,11 @@ void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &textAtlas
     vertex.pos = p0;
     vertex.cornerNormal = p0Normal;
     if (rotate) {
-        vertex.texCoord = {textureCoords.left + factor * glm::length(0.5f*(r+q) - p0)/glm::length(p1-p2) *
+        vertex.texCoord = {textureCoords.left + glm::length(0.5f*(r+q) - p0)/glm::length(p1-p2) *
                            symbolWidthTextureSpace,
                            textureCoords.top + symbolHeightTextureSpace*0.5f};
     } else {
-        vertex.texCoord = {textureCoords.left + factor * symbolWidthTextureSpace * 0.5,
+        vertex.texCoord = {textureCoords.left + symbolWidthTextureSpace * 0.5,
                            textureCoords.bottom -
                            glm::length(0.5f * (r + q) - p0) / glm::length(p1 - p2) *
                            symbolHeightTextureSpace};
@@ -897,7 +895,7 @@ void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &textAtlas
                            glm::length(q-p3)/glm::length(p2-p3) * symbolHeightTextureSpace};
     } else {
         vertex.texCoord = {textureCoords.left -
-                           factor * glm::length(q - p3) / glm::length(p2 - p3) * symbolWidthTextureSpace,
+                           glm::length(q - p3) / glm::length(p2 - p3) * symbolWidthTextureSpace,
                            textureCoords.bottom};
     }
     vertex.color = color(i+2);
@@ -912,7 +910,7 @@ void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &textAtlas
                            glm::length(r-p2)/glm::length(p2-p3) * symbolHeightTextureSpace};
     } else {
         vertex.texCoord = {textureCoords.right +
-                           factor * glm::length(r - p2) / glm::length(p2 - p3) * symbolWidthTextureSpace,
+                           glm::length(r - p2) / glm::length(p2 - p3) * symbolWidthTextureSpace,
                            textureCoords.bottom};
     }
     vertex.color = color(i+2);
@@ -922,9 +920,9 @@ void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &textAtlas
 void DiceModelHedron::getAngleAxis(uint32_t face, float &angle, glm::vec3 &axis) {
     const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
-    glm::vec4 p04 = ubo.model * glm::vec4(vertices[face * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 q4 = ubo.model * glm::vec4(vertices[1 + face * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 r4 = ubo.model * glm::vec4(vertices[2 + face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 p04 = m_model * glm::vec4(vertices[face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 q4 = m_model * glm::vec4(vertices[1 + face * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 r4 = m_model * glm::vec4(vertices[2 + face * nbrVerticesPerFace].pos, 1.0f);
     glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
     glm::vec3 q = glm::vec3(q4.x, q4.y, q4.z);
     glm::vec3 r = glm::vec3(r4.x, r4.y, r4.z);
@@ -944,20 +942,14 @@ void DiceModelHedron::yAlign(uint32_t faceIndex) {
     glm::vec3 yaxis;
     glm::vec3 zaxis;
     glm::vec3 xaxis;
-    if (isOpenGl) {
-        xaxis = {-1.0f, 0.0f, 0.0f};
-        zaxis = {0.0f, 0.0f, -1.0f};
-        yaxis = {0.0f, -1.0f, 0.0f};
-    } else {
-        xaxis = {1.0f, 0.0f, 0.0f};
-        zaxis = {0.0f, 0.0f, 1.0f};
-        yaxis = {0.0f, 1.0f, 0.0f};
-    }
+    xaxis = {1.0f, 0.0f, 0.0f};
+    zaxis = {0.0f, 0.0f, 1.0f};
+    yaxis = {0.0f, 1.0f, 0.0f};
     glm::vec3 axis;
 
-    glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
-    glm::vec4 q4 = ubo.model * glm::vec4(vertices[1 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
-    glm::vec4 r4 = ubo.model * glm::vec4(vertices[2 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 p04 = m_model * glm::vec4(vertices[0 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 q4 = m_model * glm::vec4(vertices[1 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 r4 = m_model * glm::vec4(vertices[2 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
     glm::vec3 p0 = {p04.x, p04.y, p04.z};
     glm::vec3 q = {q4.x, q4.y, q4.z};
     glm::vec3 r = {r4.x, r4.y, r4.z};
@@ -1762,9 +1754,9 @@ void DiceModelDodecahedron::getAngleAxis(uint32_t faceIndex, float &angle, glm::
     uint32_t const nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 zaxis = glm::vec3(0.0f,0.0f,1.0f);
 
-    glm::vec4 a4 = ubo.model * glm::vec4(vertices[faceIndex * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 b4 = ubo.model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 c4 = ubo.model * glm::vec4(vertices[4 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 a4 = m_model * glm::vec4(vertices[faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 b4 = m_model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 c4 = m_model * glm::vec4(vertices[4 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
     glm::vec3 a = glm::vec3(a4.x, a4.y, a4.z);
     glm::vec3 b = glm::vec3(b4.x, b4.y, b4.z);
     glm::vec3 c = glm::vec3(c4.x, c4.y, c4.z);
@@ -1776,17 +1768,12 @@ void DiceModelDodecahedron::yAlign(uint32_t faceIndex){
     const uint32_t nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 yaxis;
     glm::vec3 zaxis;
-    if (isOpenGl) {
-        zaxis = {0.0f, 0.0f, -1.0f};
-        yaxis = {0.0f, -1.0f, 0.0f};
-    } else {
-        zaxis = {0.0f, 0.0f, 1.0f};
-        yaxis = {0.0f, 1.0f, 0.0f};
-    }
+    zaxis = {0.0f, 0.0f, 1.0f};
+    yaxis = {0.0f, 1.0f, 0.0f};
     glm::vec3 axis;
 
-    glm::vec4 p14 = ubo.model * glm::vec4(vertices[5 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
-    glm::vec4 c4 = ubo.model * glm::vec4(vertices[4 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 p14 = m_model * glm::vec4(vertices[5 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 c4 = m_model * glm::vec4(vertices[4 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
     glm::vec3 p1 = {p14.x, p14.y, p14.z};
     glm::vec3 c = {c4.x, c4.y, c4.z};
     axis = p1 - c;
@@ -1847,11 +1834,6 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
                 (0.5f*symbolWidthTextureSpace*textAtlas->getImageWidth());
     }
 
-    int factor = 1;
-    if (isOpenGl) {
-        factor = -1;
-    }
-
     float k = a * glm::length((p1+p3)/2.0f-p0) / glm::length(p1-p3);
 
     glm::vec3 v = (1.0f - 1.0f/(2.0f * k + 2.0f)) * p1 + (1.0f/(2.0f*k+2.0f)) * p3;
@@ -1874,11 +1856,11 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.color = color(faceIndex);
     vertex.cornerNormal = cornerNormal0;
     if (rotate) {
-        vertex.texCoord = {textureCoords.left + factor*(0.5*symbolWidthTextureSpace +
+        vertex.texCoord = {textureCoords.left + (0.5*symbolWidthTextureSpace +
                            glm::length(0.5f * (p1 + p3) - p0) / glm::length(t1 - t2) * symbolWidthTextureSpace),
                            textureCoords.bottom - 0.5f * symbolHeightTextureSpace};
     } else {
-        vertex.texCoord = {textureCoords.left + factor*0.5*symbolWidthTextureSpace,
+        vertex.texCoord = {textureCoords.left + 0.5*symbolWidthTextureSpace,
                            textureCoords.bottom - 0.5f * symbolHeightTextureSpace -
                            glm::length(0.5f * (p1 + p3) - p0) / glm::length(t1 - t2) *
                            symbolHeightTextureSpace};
@@ -1889,12 +1871,12 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.color = color(faceIndex+1);
     vertex.cornerNormal = cornerNormal1;
     if (rotate) {
-        vertex.texCoord = {textureCoords.left + factor*0.5*symbolWidthTextureSpace,
+        vertex.texCoord = {textureCoords.left + 0.5*symbolWidthTextureSpace,
                            textureCoords.bottom +
                            symbolHeightTextureSpace * glm::length(0.5f*(t1+t2) - p1)/glm::length(t0-t1)};
     } else {
         vertex.texCoord = {textureCoords.right +
-                           factor * symbolWidthTextureSpace * glm::length(p1 - v) / glm::length(v - u),
+                           symbolWidthTextureSpace * glm::length(p1 - v) / glm::length(v - u),
                            textureCoords.bottom - symbolHeightTextureSpace * 0.5f};
     }
     vertices.push_back(vertex);
@@ -1904,10 +1886,10 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.cornerNormal = cornerNormal2;
     if (rotate) {
         vertex.texCoord = {textureCoords.left -
-                           factor * symbolWidthTextureSpace*glm::length(0.5f*(t3+t2) - p2)/glm::length(t2-t1),
+                           symbolWidthTextureSpace*glm::length(0.5f*(t3+t2) - p2)/glm::length(t2-t1),
                            textureCoords.bottom - symbolHeightTextureSpace * 0.5f};
     } else {
-        vertex.texCoord = {textureCoords.left + factor*symbolWidthTextureSpace * 0.5f,
+        vertex.texCoord = {textureCoords.left + symbolWidthTextureSpace * 0.5f,
                            textureCoords.bottom - 0.5f * symbolHeightTextureSpace +
                            glm::length(0.5f * (p1 + p3) - p2) / glm::length(t1 - t2) *
                            symbolHeightTextureSpace};
@@ -1918,12 +1900,12 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.color = color(faceIndex+3);
     vertex.cornerNormal = cornerNormal3;
     if (rotate) {
-        vertex.texCoord = {textureCoords.left + factor*symbolWidthTextureSpace * 0.5f,
+        vertex.texCoord = {textureCoords.left + symbolWidthTextureSpace * 0.5f,
                            textureCoords.top -
                            symbolHeightTextureSpace*glm::length(0.5f*(t3+t0) - p3)/glm::length(t0-t1)};
     } else {
         vertex.texCoord = {textureCoords.left -
-                           factor*symbolWidthTextureSpace * glm::length(p3 - u) / glm::length(v - u),
+                           symbolWidthTextureSpace * glm::length(p3 - u) / glm::length(v - u),
                            textureCoords.bottom - symbolHeightTextureSpace * 0.5f};
     }
     vertices.push_back(vertex);
@@ -2289,9 +2271,9 @@ void DiceModelRhombicTriacontahedron::getAngleAxis(uint32_t faceIndex, float &an
     uint32_t const nbrVerticesPerFace = static_cast<uint32_t>(vertices.size())/numberFaces;
     glm::vec3 zaxis{0.0f, 0.0f, 1.0f};
 
-    glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 p14 = ubo.model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
-    glm::vec4 p24 = ubo.model * glm::vec4(vertices[2 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 p04 = m_model * glm::vec4(vertices[0 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 p14 = m_model * glm::vec4(vertices[1 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
+    glm::vec4 p24 = m_model * glm::vec4(vertices[2 + faceIndex * nbrVerticesPerFace].pos, 1.0f);
     glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
     glm::vec3 p1 = glm::vec3(p14.x, p14.y, p14.z);
     glm::vec3 p2 = glm::vec3(p24.x, p24.y, p24.z);
@@ -2304,19 +2286,13 @@ void DiceModelRhombicTriacontahedron::yAlign(uint32_t faceIndex) {
     glm::vec3 xaxis;
     glm::vec3 yaxis;
     glm::vec3 zaxis;
-    if (isOpenGl) {
-        xaxis = {-1.0f, 0.0f, 0.0f};
-        zaxis = {0.0f, 0.0f, -1.0f};
-        yaxis = {0.0f, -1.0f, 0.0f};
-    } else {
-        xaxis = {1.0f, 0.0f, 0.0f};
-        zaxis = {0.0f, 0.0f, 1.0f};
-        yaxis = {0.0f, 1.0f, 0.0f};
-    }
+    xaxis = {1.0f, 0.0f, 0.0f};
+    zaxis = {0.0f, 0.0f, 1.0f};
+    yaxis = {0.0f, 1.0f, 0.0f};
     glm::vec3 axis;
 
-    glm::vec4 p04 = ubo.model * glm::vec4(vertices[0 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
-    glm::vec4 p24 = ubo.model * glm::vec4(vertices[2 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 p04 = m_model * glm::vec4(vertices[0 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
+    glm::vec4 p24 = m_model * glm::vec4(vertices[2 + nbrVerticesPerFace * faceIndex].pos, 1.0f);
     glm::vec3 p0 = {p04.x, p04.y, p04.z};
     glm::vec3 p2 = {p24.x, p24.y, p24.z};
     axis = p0 - p2;
@@ -2337,17 +2313,16 @@ void DiceModelRhombicTriacontahedron::yAlign(uint32_t faceIndex) {
     stoppedAngle = angle;
 }
 
-void DiceModelRhombicTriacontahedron::updatePerspectiveMatrix(uint32_t surfaceWidth,
-                                                              uint32_t surfaceHeight) {
-    DicePhysicsModel::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
-
+glm::mat4 DiceModelRhombicTriacontahedron::alterPerspective(glm::mat4 proj) {
     // I don't know why, but we need to invert the z-axis if using OpenGL for this dice type only.
     if (isOpenGl) {
-        ubo.proj[0][2] *= -1;
-        ubo.proj[1][2] *= -1;
-        ubo.proj[2][2] *= -1;
-        ubo.proj[3][2] *= -1;
+        proj[0][2] *= -1;
+        proj[1][2] *= -1;
+        proj[2][2] *= -1;
+        proj[3][2] *= -1;
     }
+
+    return proj;
 }
 
 constexpr float DiceModelCoin::radius;
@@ -2490,8 +2465,8 @@ void DiceModelCoin::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
 void DiceModelCoin::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) {
     glm::vec3 zaxis{0.0f, 0.0f, 1.0f};
 
-    glm::vec4 top4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
-    glm::vec4 bottom4 = ubo.model * glm::vec4(vertices[1].pos, 1.0f);
+    glm::vec4 top4 = m_model * glm::vec4(vertices[0].pos, 1.0f);
+    glm::vec4 bottom4 = m_model * glm::vec4(vertices[1].pos, 1.0f);
     glm::vec3 top = glm::vec3(top4.x, top4.y, top4.z);
     glm::vec3 bottom = glm::vec3(bottom4.x, bottom4.y, bottom4.z);
     if (faceIndex == 0) {
@@ -2505,17 +2480,12 @@ void DiceModelCoin::getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &ax
 void DiceModelCoin::yAlign(uint32_t faceIndex) {
     glm::vec3 yaxis;
     glm::vec3 zaxis;
-    if (isOpenGl) {
-        zaxis = {0.0f, 0.0f, -1.0f};
-        yaxis = {0.0f, -1.0f, 0.0f};
-    } else {
-        zaxis = {0.0f, 0.0f, 1.0f};
-        yaxis = {0.0f, 1.0f, 0.0f};
-    }
+    zaxis = {0.0f, 0.0f, 1.0f};
+    yaxis = {0.0f, 1.0f, 0.0f};
     glm::vec3 axis;
 
-    glm::vec4 center4 = ubo.model * glm::vec4(vertices[0].pos, 1.0f);
-    glm::vec4 top4 = ubo.model * glm::vec4(vertices[2 + nbrPoints/2].pos, 1.0f);
+    glm::vec4 center4 = m_model * glm::vec4(vertices[0].pos, 1.0f);
+    glm::vec4 top4 = m_model * glm::vec4(vertices[2 + nbrPoints/2].pos, 1.0f);
     glm::vec3 center = {center4.x, center4.y, center4.z};
     glm::vec3 top = {top4.x, top4.y, top4.z};
     axis = top - center;

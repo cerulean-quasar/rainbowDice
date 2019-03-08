@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -34,7 +34,8 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include "vulkanWrapper.hpp"
+//#include "vulkanWrapper.hpp"
+#include "text.hpp"
 
 struct Vertex {
     glm::vec3 pos;
@@ -62,7 +63,7 @@ struct UniformBufferObject {
 
 class AngularVelocity {
 public:
-    AngularVelocity(float inAngularSpeed, glm::vec3 inSpinAxis) {
+    AngularVelocity(float inAngularSpeed, glm::vec3 const &inSpinAxis) {
         _spinAxis = inSpinAxis;
         setAngularSpeed(inAngularSpeed);
     }
@@ -79,7 +80,7 @@ public:
             _angularSpeed = inAngularSpeed;
         }
     }
-    void setSpinAxis(glm::vec3 inSpinAxis) {
+    void setSpinAxis(glm::vec3 const &inSpinAxis) {
         _spinAxis = inSpinAxis;
     }
 private:
@@ -105,7 +106,7 @@ public:
         :highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()) {
 
     }
-    glm::vec3 acceleration(glm::vec3 sensorInputs) {
+    glm::vec3 acceleration(glm::vec3 const &sensorInputs) {
         float RC = 3.0f;
         auto currentTime = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
@@ -160,21 +161,21 @@ protected:
     std::vector<uint32_t> indices;
 
 public:
-    DiceModel(std::vector<std::string> const &inSymbols, bool inIsOpenGl = false)
+    explicit DiceModel(std::vector<std::string> const &inSymbols, bool inIsOpenGl = false)
     {
         isOpenGl = inIsOpenGl;
         symbols = inSymbols;
     }
 
-    bool operator==(DiceModel other) {
+    bool operator==(DiceModel const &other) {
         return symbols == other.symbols;
     }
 
-    bool operator>(DiceModel other) {
+    bool operator>(DiceModel const &other) {
         return symbols > other.symbols;
     }
 
-    bool operator<(DiceModel other) {
+    bool operator<(DiceModel const &other) {
         return symbols < other.symbols;
     }
 
@@ -194,9 +195,7 @@ public:
         return vertices;
     }
 
-    virtual ~DiceModel() {
-        /* do nothing */
-    }
+    virtual ~DiceModel() = default;
 };
 
 class DicePhysicsModel : public DiceModel {
@@ -209,6 +208,9 @@ protected:
     // the number so that it is upright.
     float stoppedAngle;
     glm::vec3 stoppedRotationAxis;
+
+    /* model matrix */
+    glm::mat4 m_model;
 
     glm::vec4 color(int i) {
         glm::vec4 color;
@@ -273,9 +275,6 @@ public:
     // radius of a die when it is done rolling (It is shrinked and moved out of the rolling space).
     static float const stoppedRadius;
 
-    /* MVP matrix */
-    UniformBufferObject ubo = {};
-
     /* Set previous position to a bogus value to make sure the die is drawn first thing */
     DicePhysicsModel(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
                      uint32_t inNumberFaces, bool inIsOpenGl = false)
@@ -302,8 +301,14 @@ public:
     {
     }
 
-    void setView();
-    virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
+    virtual glm::mat4 alterPerspective(glm::mat4 proj) {
+        return proj;
+    }
+
+    glm::mat4 model() {
+        return m_model;
+    }
+
     void updateAcceleration(float x, float y, float z);
     bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
@@ -332,10 +337,10 @@ public:
     bool isStoppedAnimationDone() { return animationDone; }
     bool isStoppedAnimationStarted() { return doneY != 0.0f; }
     uint32_t getResult() { return result; }
-    void resetPosition();
+    void resetPosition(float screenWidth, float screenHeight);
     virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) = 0;
     uint32_t calculateUpFace();
-    void randomizeUpFace();
+    void randomizeUpFace(float screenWidth, float screenHeight);
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
     virtual uint32_t getFaceIndexForSymbol(uint32_t symbolIndex) { return symbolIndex; }
     virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
@@ -534,7 +539,7 @@ public:
         }
     }
 
-    virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight);
+    virtual glm::mat4 alterPerspective(glm::mat4 proj);
     virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
@@ -564,4 +569,8 @@ public:
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };
+
+std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
+                                             std::vector<float> const &color, bool isOpenGL = false);
+
 #endif /* RAINBOWDICE_DICE_HPP */

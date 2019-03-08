@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -58,20 +58,12 @@ namespace vulkan {
 
     class Instance {
     public:
-        Instance(WindowType *inWindow)
+        Instance(std::shared_ptr<WindowType> inWindow)
                 : m_loader{},
-                  m_window{},
+                  m_window{std::move(inWindow)},
                   m_instance{},
                   m_callback{},
                   m_surface{} {
-            auto deleter = [](WindowType *windowRaw) {
-                /* release the java window object */
-                if (windowRaw != nullptr) {
-                    ANativeWindow_release(windowRaw);
-                }
-            };
-
-            m_window.reset(inWindow, deleter);
 
             createInstance();
             setupDebugCallback();
@@ -230,11 +222,13 @@ namespace vulkan {
         inline std::shared_ptr<VkSwapchainKHR_T> const &swapChain() {return m_swapChain; }
         inline VkFormat imageFormat() { return m_imageFormat; }
         inline VkExtent2D extent() { return m_extent; }
+        inline VkSurfaceTransformFlagBitsKHR preTransform() { return m_preTransform; }
     private:
         std::shared_ptr<Device> m_device;
         std::shared_ptr<VkSwapchainKHR_T> m_swapChain;
         VkFormat m_imageFormat;
         VkExtent2D m_extent;
+        VkSurfaceTransformFlagBitsKHR m_preTransform;
 
         void createSwapChain();
 

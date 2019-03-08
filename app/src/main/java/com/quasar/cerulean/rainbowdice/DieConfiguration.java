@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -162,6 +162,52 @@ public class DieConfiguration implements Parcelable {
     public int describeContents() {
         // not sending a file descriptor so return 0.
         return 0;
+    }
+
+    public DieConfiguration(
+            int inNbrDice,
+            String[] inSymbols,
+            Integer[] inValues,
+            int[] inRerollIndices,
+            float[] inColor,
+            boolean inIsAddOperation)
+    {
+        m_color = inColor;
+        m_numberOfDice = inNbrDice;
+        m_isAdditionOperation = inIsAddOperation;
+        m_rainbow = false;
+        init(inSymbols, inValues, inRerollIndices);
+    }
+
+    public DieConfiguration(
+            int inNbrDice,
+            String[] inSymbols,
+            Integer[] inValues,
+            int[] inRerollIndices,
+            boolean inIsAddOperation)
+    {
+        m_color = null;
+        m_numberOfDice = inNbrDice;
+        m_isAdditionOperation = inIsAddOperation;
+        m_rainbow = true;
+        init(inSymbols, inValues, inRerollIndices);
+    }
+
+    private void init(
+            String[] inSymbols,
+            Integer[] inValues,
+            int[] inRerollIndices) {
+        m_sides = new DieSideConfiguration[inSymbols.length];
+        for (int i = 0; i < inSymbols.length; i++) {
+            boolean reroll = false;
+            for (int rerollIndex : inRerollIndices) {
+                if (rerollIndex == i) {
+                    reroll = true;
+                    break;
+                }
+            }
+            m_sides[i] = new DieSideConfiguration(inSymbols[i], inValues[i], reroll);
+        }
     }
 
     // Constructor for using a specified color for the dice color
@@ -474,6 +520,17 @@ public class DieConfiguration implements Parcelable {
         }
 
         return symbols;
+    }
+
+    public void getValues(Integer[] values) {
+        if (values.length != m_sides.length) {
+            // should not happen
+            return;
+        }
+
+        for (int i = 0; i < m_sides.length; i++) {
+            values[i] = m_sides[i].value();
+        }
     }
 
     public String getSymbolsString(int i) {

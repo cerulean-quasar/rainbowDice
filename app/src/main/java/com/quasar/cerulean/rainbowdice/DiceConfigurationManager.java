@@ -36,10 +36,15 @@ public class DiceConfigurationManager {
 
         LinkedList<String> diceConfigList = config.getDiceList();
         if (diceConfigList != null && diceConfigList.size() > 0) {
+            LinkedList<String> needsRemove = new LinkedList<>();
             for (String dice : diceConfigList) {
                 if (!diceFileList.contains(dice)) {
-                    config.remove(dice);
+                    needsRemove.add(dice);
                 }
+            }
+
+            for (String dice : needsRemove) {
+                config.remove(dice);
             }
 
             for (String dice : diceFileList) {

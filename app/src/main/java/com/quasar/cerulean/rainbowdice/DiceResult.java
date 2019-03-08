@@ -24,6 +24,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
@@ -99,9 +100,9 @@ public class DiceResult {
 
     private ArrayList<ArrayList<DieResult>> diceResults;
 
-    public DiceResult(String result, DieConfiguration[] diceConfigurations) {
+    public DiceResult(DiceDrawerMessage result, DieConfiguration[] diceConfigurations) {
         diceResults = new ArrayList<>();
-        String[] values = result.split("\n");
+        LinkedList<LinkedList<Integer>> values = result.results();
         int i=0;
         for (DieConfiguration die: diceConfigurations) {
             int numberOfDice = die.getNumberOfDice();
@@ -115,7 +116,7 @@ public class DiceResult {
                     dieResults.add(dieResult);
                     diceResults.add(dieResults);
                 } else {
-                    ArrayList<DieResult> dieResults = getResultForString(die, values[i], isAddOperation);
+                    ArrayList<DieResult> dieResults = getResultForIndex(values.get(i), die, isAddOperation);
                     diceResults.add(dieResults);
                     i++;
                 }
@@ -123,11 +124,9 @@ public class DiceResult {
         }
     }
 
-    private ArrayList<DieResult> getResultForString(DieConfiguration die, String dieResultsString, boolean isAddOperation) {
+    private ArrayList<DieResult> getResultForIndex(LinkedList<Integer> values, DieConfiguration die, boolean isAddOperation) {
         ArrayList<DieResult> dieResults = new ArrayList<>();
-        String[] values = dieResultsString.split("\t");
-        for (String value: values) {
-            int index = Integer.valueOf(value);
+        for (Integer index: values) {
             // Take %die.getNumberOfSides() because C++ returns the dice face index, not the index
             // into the dice sides array.  This is critical for some dice like the 3 sided die, where
             // the actual virtual die has six sides, but the configuration only has three sides.
