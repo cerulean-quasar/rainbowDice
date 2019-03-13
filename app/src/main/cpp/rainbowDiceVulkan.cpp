@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -247,19 +247,6 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
 }
 
 void RainbowDiceVulkan::initModels() {
-    for (auto && die : dice) {
-        die->loadModel(m_texture->textureAtlas());
-        std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device,
-            sizeof (UniformBufferObject))};
-        std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
-            m_device, sizeof (PerObjectFragmentVariables))};
-        std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
-            uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
-        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
-    }
     updateDepthResources();
 
     initializeCommandBuffers();
@@ -292,125 +279,11 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
         updatePerspectiveMatrix(width, height);
     }
 
-    for (auto const & die : dice) {
-        die->updateUniformBuffer(m_proj, m_view);
+    for (auto const &die : m_dice) {
+        die->updateUniformBuffer(m_projWithPreTransform, m_view);
     }
 
     initializeCommandBuffers();
-}
-
-void RainbowDiceVulkan::newSurface(std::shared_ptr<WindowType> surface) {
-    auto atlas = m_texture->textureAtlas();
-    m_texture.reset();
-    m_swapChainCommands.reset();
-    m_depthImageView.reset();
-    m_imageAvailableSemaphore.reset();
-    m_renderFinishedSemaphore.reset();
-    m_viewPointBuffer.reset();
-    m_commandPool.reset();
-    m_graphicsPipeline.reset();
-    for (auto const & die : dice) {
-        die->destroyVulkanMemory();
-    }
-    m_descriptorPools.reset();
-    m_descriptorSetLayout.reset();
-    m_renderPass.reset();
-    m_swapChain.reset();
-    m_device.reset();
-    m_instance.reset();
-
-
-    m_instance = std::make_shared<vulkan::Instance>(std::move(surface));
-    m_device = std::make_shared<vulkan::Device>(m_instance);
-    m_swapChain = std::make_shared<vulkan::SwapChain>(m_device);
-    m_renderPass = std::make_shared<vulkan::RenderPass>(m_device, m_swapChain);
-    m_descriptorSetLayout = std::make_shared<DiceDescriptorSetLayout>(m_device);
-    m_descriptorPools = std::make_shared<vulkan::DescriptorPools>(m_device, m_descriptorSetLayout);
-    m_graphicsPipeline = std::make_shared<vulkan::Pipeline>(m_swapChain, m_renderPass, m_descriptorSetLayout,
-                                            getBindingDescription(), getAttributeDescriptions(),
-                                            SHADER_VERT_FILE, SHADER_FRAG_FILE);
-    m_commandPool = std::make_shared<vulkan::CommandPool>(m_device);
-    m_viewPointBuffer = vulkan::Buffer::createUniformBuffer(m_device, sizeof (glm::vec3));
-    m_imageAvailableSemaphore = std::make_shared<vulkan::Semaphore>(m_device);
-    m_renderFinishedSemaphore = std::make_shared<vulkan::Semaphore>(m_device);
-    m_depthImageView = std::make_shared<vulkan::ImageView>(vulkan::ImageFactory::createDepthImage(m_swapChain),
-                                           m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT);
-    m_swapChainCommands = std::make_shared<vulkan::SwapChainCommands>(m_swapChain, m_commandPool,
-                                                      m_renderPass, m_depthImageView);
-
-    m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-
-    setTexture(atlas);
-
-    for (auto const &die : dice) {
-        die->m_device = m_device;
-    }
-    initModels();
-}
-
-// call to finish loading the new models and their associated resources.
-// it is assumed that the caller will first destroy the old models with destroyModels, then
-// create the new ones, then call this function to recreate all the associated Vulkan resources.
-void RainbowDiceVulkan::recreateModels() {
-    m_commandPool.reset(new vulkan::CommandPool{m_device});
-    m_swapChainCommands.reset(new vulkan::SwapChainCommands{m_swapChain, m_commandPool, m_renderPass,
-        m_depthImageView});
-    for (auto && die : dice) {
-        die->loadModel(m_texture->textureAtlas());
-        std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(m_device,
-                sizeof (UniformBufferObject))};
-        std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
-                m_device, sizeof (PerObjectFragmentVariables))};
-        std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
-                uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
-        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
-    }
-
-    initializeCommandBuffers();
-}
-
-std::shared_ptr<vulkan::Buffer> RainbowDiceVulkan::createVertexBuffer(Dice *die) {
-    VkDeviceSize bufferSize = sizeof(die->die->getVertices()[0]) * die->die->getVertices().size();
-
-    /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
-     * memory.  Then use a copy command to copy the data into fast graphics card only memory.
-     */
-    vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-
-    stagingBuffer.copyRawTo(die->die->getVertices().data(), static_cast<size_t>(bufferSize));
-
-    std::shared_ptr<vulkan::Buffer> vertexBuffer{new vulkan::Buffer{m_device, bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
-
-    vertexBuffer->copyTo(m_commandPool, stagingBuffer, bufferSize);
-
-    return vertexBuffer;
-}
-
-/* buffer for the indices - used to reference which vertex in the vertex array (by index) to
- * draw.  This way normally duplicated vertices would not need to be specified twice.
- * Only one index buffer per pipeline is allowed.  Put all dice in the same index buffer.
- */
-std::shared_ptr<vulkan::Buffer>  RainbowDiceVulkan::createIndexBuffer(Dice *die) {
-    VkDeviceSize bufferSize = sizeof(die->die->getIndices()[0]) * die->die->getIndices().size();
-
-    vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-
-    stagingBuffer.copyRawTo(die->die->getIndices().data(), sizeof(die->die->getIndices()[0]) *
-                                                           die->die->getIndices().size());
-
-    std::shared_ptr<vulkan::Buffer> indexBuffer{new vulkan::Buffer{m_device, bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
-
-    indexBuffer->copyTo(m_commandPool, stagingBuffer, bufferSize);
-
-    return indexBuffer;
 }
 
 void RainbowDiceVulkan::cleanupSwapChain() {
@@ -473,13 +346,13 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->pipeline().get());
 
         VkDeviceSize offsets[1] = {0};
-        for (auto die : dice) {
-            VkBuffer vertexBuffer = die->vertexBuffer->buffer().get();
+        for (auto const &die : m_dice) {
+            VkBuffer vertexBuffer = die->vertexBuffer()->buffer().get();
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, die->indexBuffer->buffer().get(), 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(commandBuffer, die->indexBuffer()->buffer().get(), 0, VK_INDEX_TYPE_UINT32);
 
             /* The MVP matrix and texture samplers */
-            VkDescriptorSet descriptorSet = die->descriptorSet->descriptorSet().get();
+            VkDescriptorSet descriptorSet = die->descriptorSet()->descriptorSet().get();
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     m_graphicsPipeline->layout().get(), 0, 1, &descriptorSet, 0, nullptr);
 
@@ -500,7 +373,7 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
              * parameter 5 - offset to add to the indices in the index buffer
              * parameter 6 - offset for instance rendering
              */
-            vkCmdDrawIndexed(commandBuffer, die->die->getIndices().size(), 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, die->nbrIndices(), 1, 0, 0, 0);
         }
 
         vkCmdEndRenderPass(commandBuffer);
@@ -647,195 +520,45 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t te
     return textureImage;
 }
 
-void RainbowDiceVulkan::loadObject(std::vector<std::string> const &symbols,
-                                   std::vector<uint32_t> const &rerollIndices,
-                                   std::vector<float> const &color) {
-    glm::vec3 position(0.0f, 0.0f, -1.0f);
-    std::shared_ptr<Dice> o(new Dice(m_device, symbols, rerollIndices, position, color));
-    dice.push_back(o);
-}
-
 bool RainbowDiceVulkan::updateUniformBuffer() {
-    for (DiceList::iterator iti = dice.begin(); iti != dice.end(); iti++) {
-        if (!iti->get()->die->isStopped()) {
-            for (DiceList::iterator itj = iti; itj != dice.end(); itj++) {
-                if (!itj->get()->die->isStopped() && iti != itj) {
-                    iti->get()->die->calculateBounce(itj->get()->die.get());
-                }
-            }
-        }
-    }
-
-    bool needsRedraw = false;
-    uint32_t i=0;
-
-    auto const ext = m_swapChain->extent();
-    float width = screenWidth(ext.width, ext.height);
-    float height = screenHeight(ext.width, ext.height);
-    for (auto && die : dice) {
-        if (die->die->updateModelMatrix()) {
-            needsRedraw = true;
-        }
-        if (die->die->isStopped() && !die->die->isStoppedAnimationStarted()) {
-            uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
-            uint32_t stoppedX = i%nbrX;
-            uint32_t stoppedY = i/nbrX;
-            float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
-            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die->animateMove(x, y);
-        }
-        die->updateUniformBuffer(m_proj, m_view);
-        i++;
+    bool needsRedraw = RainbowDiceGraphics::updateUniformBuffer();
+    for (auto const &die : m_dice) {
+        die->updateUniformBuffer(m_projWithPreTransform, m_view);
     }
 
     return needsRedraw;
 }
 
-void RainbowDiceVulkan::updateAcceleration(float x, float y, float z) {
-    for (auto &&die : dice) {
-        die->die->updateAcceleration(x, y, z);
-    }
-}
-
-void RainbowDiceVulkan::resetPositions() {
-    auto ext = m_swapChain->extent();
-    float width = screenWidth(ext.width, ext.height);
-    float height = screenHeight(ext.width, ext.height);
-    for (auto &&die: dice) {
-        die->die->resetPosition(width, height);
-    }
-}
-
-void RainbowDiceVulkan::resetPositions(std::set<int> &diceIndices) {
-    int i = 0;
-    auto ext = m_swapChain->extent();
-    float width = screenWidth(ext.width, ext.height);
-    float height = screenHeight(ext.width, ext.height);
-    for (auto &&die : dice) {
-        if (diceIndices.find(i) != diceIndices.end()) {
-            die->die->resetPosition(width, height);
-        }
-        i++;
-    }
-}
-
 void RainbowDiceVulkan::addRollingDice() {
-    auto ext = m_swapChain->extent();
-    float width = screenWidth(ext.width, ext.height);
-    float height = screenHeight(ext.width, ext.height);
-    for (DiceList::iterator diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
-        // Skip dice already being rerolled or does not get rerolled.
-        if (diceIt->get()->isBeingReRolled || diceIt->get()->rerollIndices.size() == 0) {
-            continue;
-        }
-
-        uint32_t result = diceIt->get()->die->getResult() % diceIt->get()->die->getNumberOfSymbols();
-        bool shouldReroll = false;
-        for (auto const &rerollIndex : diceIt->get()->rerollIndices) {
-            if (result == rerollIndex) {
-                shouldReroll = true;
-                break;
-            }
-        }
-
-        if (!shouldReroll) {
-            continue;
-        }
-
-        glm::vec3 position(0.0f, 0.0f, -1.0f);
-        std::shared_ptr<Dice> die(new Dice(m_device, diceIt->get()->die->getSymbols(),
-                                           diceIt->get()->rerollIndices, position,
-                                           diceIt->get()->die->dieColor()));
-        diceIt->get()->isBeingReRolled = true;
-
-        die->loadModel(m_texture->textureAtlas());
-        std::shared_ptr<vulkan::Buffer> indexBuffer{createIndexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> vertexBuffer{createVertexBuffer(die.get())};
-        std::shared_ptr<vulkan::Buffer> uniformBuffer{vulkan::Buffer::createUniformBuffer(
-                m_device, sizeof (UniformBufferObject))};
-        std::shared_ptr<vulkan::Buffer> uniformBufferPerObjFrag{vulkan::Buffer::createUniformBuffer(
-                m_device, sizeof (PerObjectFragmentVariables))};
-        std::shared_ptr<vulkan::DescriptorSet> descriptorSet = m_descriptorPools->allocateDescriptor();
-        m_descriptorSetLayout->updateDescriptorSet(uniformBuffer, m_viewPointBuffer,
-                uniformBufferPerObjFrag, descriptorSet, m_texture->getImageInfosForDescriptorSet());
-        die->init(descriptorSet, indexBuffer, vertexBuffer, uniformBuffer, uniformBufferPerObjFrag);
-        die->die->resetPosition(width, height);
-        die->updateUniformBuffer(m_proj, m_view);
-
-        diceIt++;
-        dice.insert(diceIt, die);
-        diceIt--;
-    }
-
+    RainbowDiceGraphics::addRollingDice();
     initializeCommandBuffers();
-
-    int i = 0;
-    for (auto &&die : dice) {
-        if (die->die->isStopped()) {
-            uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
-            uint32_t stoppedX = i%nbrX;
-            uint32_t stoppedY = i/nbrX;
-            float x = -width/2 + (2*stoppedX++ + 1) * DicePhysicsModel::stoppedRadius;
-            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die->animateMove(x, y);
-        }
-        i++;
-    }
-}
-
-bool RainbowDiceVulkan::allStopped() {
-    for (auto &&die : dice) {
-        if (!die->die->isStopped() || !die->die->isStoppedAnimationDone()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-std::vector<std::vector<uint32_t >> RainbowDiceVulkan::getDiceResults() {
-    std::vector<std::vector<uint32_t>> results;
-    for (DiceList::iterator dieIt = dice.begin(); dieIt != dice.end(); dieIt++) {
-        if (!dieIt->get()->die->isStopped()) {
-            // Should not happen
-            throw std::runtime_error("Not all die are stopped!");
-        }
-        std::vector<uint32_t > dieResults;
-        while (dieIt->get()->isBeingReRolled) {
-            dieResults.push_back(dieIt->get()->die->getResult());
-            dieIt++;
-        }
-        dieResults.push_back(dieIt->get()->die->getResult());
-        results.push_back(dieResults);
-    }
-
-    return results;
-}
-
-bool RainbowDiceVulkan::needsReroll() {
-    for (auto const &die : dice) {
-        if (die->needsReroll()) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 void RainbowDiceVulkan::resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) {
-    uint32_t i = 0;
-    auto const ext = m_swapChain->extent();
-    float width = screenWidth(ext.width, ext.height);
-    float height = screenHeight(ext.width, ext.height);
-    for (auto &&die : dice) {
-        uint32_t nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
-        uint32_t stoppedX = i%nbrX;
-        uint32_t stoppedY = i/nbrX;
-        float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-        float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-
-        die->die->positionDice(upFaceIndices[i++], x, y);
-        die->updateUniformBuffer(m_proj, m_view);
+    RainbowDiceGraphics::resetToStoppedPositions(upFaceIndices);
+    for (auto const &die : m_dice) {
+        die->updateUniformBuffer(m_projWithPreTransform, m_view);
     }
+}
+
+std::shared_ptr<DiceVulkan> RainbowDiceVulkan::createDie(std::vector<std::string> const &symbols,
+                                  std::vector<uint32_t> const &inRerollIndices,
+                                  std::vector<float> const &color) {
+    return std::make_shared<DiceVulkan>(m_device, m_texture, m_descriptorSetLayout,
+                                        m_descriptorPools, m_commandPool, m_viewPointBuffer,
+                                        m_projWithPreTransform, m_view,
+                                        symbols,
+                                        inRerollIndices,
+                                        color);
+}
+
+std::shared_ptr<DiceVulkan> RainbowDiceVulkan::createDie(std::shared_ptr<DiceVulkan> const &inDice) {
+    return std::make_shared<DiceVulkan>(m_device, m_texture, m_descriptorSetLayout,
+                                          m_descriptorPools, m_commandPool, m_viewPointBuffer,
+                                          m_projWithPreTransform, m_view,
+                                          inDice->die()->getSymbols(),
+                                          inDice->rerollIndices(),
+                                          inDice->die()->dieColor());
 }
 
 /*
@@ -889,33 +612,3 @@ bool RainbowDiceVulkan::tapDice(float x, float y) {
     return true;
 }
 */
-
-// returns true if it needs a redraw
-bool RainbowDiceVulkan::tapDice(float x, float y) {
-    bool needsRedraw = false;
-    auto const ext = m_swapChain->extent();
-    float swidth = screenWidth(ext.width, ext.height);
-    float sheight = screenHeight(ext.width, ext.height);
-    float xnorm = x/m_width * swidth - swidth / 2.0f;
-    float ynorm = y/m_height * sheight - sheight / 2.0f;
-    glm::vec4 point1{xnorm, ynorm, 1.0f, 1.0f};
-    glm::vec4 point2{xnorm, ynorm, -1.0f, 1.0f};
-
-    glm::vec4 transformedP1 = glm::inverse(m_view) * glm::inverse(m_projWithoutPreTransform) * point1;
-    glm::vec4 transformedP2 = glm::inverse(m_view) * glm::inverse(m_projWithoutPreTransform) * point2;
-
-    glm::vec3 start = glm::vec3{transformedP1.x, transformedP1.y, transformedP1.z}/transformedP1.w;
-    glm::vec3 line =  glm::vec3{transformedP2.x, transformedP2.y, transformedP2.z}/transformedP2.w - start;
-
-    line = glm::normalize(line);
-    for (auto const &die : dice) {
-        float distanceToLine = glm::length(glm::cross(line, die->die->position() - start));
-        if (distanceToLine < DicePhysicsModel::stoppedRadius) {
-            die->toggleSelected();
-            needsRedraw = true;
-            break;
-        }
-    }
-
-    return needsRedraw;
-}

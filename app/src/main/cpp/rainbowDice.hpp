@@ -19,8 +19,9 @@
  */
 #ifndef RAINBOWDICE_HPP
 #define RAINBOWDICE_HPP
-#include <vector>
+#include <list>
 #include <set>
+#include <vector>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -32,29 +33,79 @@
 
 #include "rainbowDiceGlobal.hpp"
 #include "diceDescription.hpp"
+#include "dice.hpp"
 #include "text.hpp"
 
-class RainbowDice {
-protected:
-    std::string m_diceName;
-    std::vector<std::shared_ptr<DiceDescription>> m_diceDescriptions;
-
-    glm::mat4 m_proj;
-    glm::mat4 m_view;
-
-    glm::vec3 m_viewPoint;
-    glm::vec3 m_viewPointCenterPosition;
-
-    static constexpr float m_maxZ = 10.0f;
-    static constexpr float m_minZ = 1.5f;
-    static constexpr float m_maxScroll = 10.0f;
-
+template <typename GraphicsType>
+class DiceGraphics {
 public:
-    RainbowDice()
-        : m_viewPoint{0.0f, 0.0f, 3.0f},
-          m_viewPointCenterPosition{0.0f, 0.0f, 0.0f}
-    {}
+    inline typename GraphicsType::Buffer const &indexBuffer() { return m_indexBuffer; }
+    inline typename GraphicsType::Buffer const &vertexBuffer() { return m_vertexBuffer; }
 
+    virtual void toggleSelected() {
+        m_isSelected = !m_isSelected;
+    }
+
+    bool needsReroll() {
+        if (!m_die->isStopped()) {
+            // should not happen!
+            return false;
+        }
+
+        if (m_isBeingRerolled) {
+            return false;
+        }
+
+        uint32_t result = m_die->getResult();
+
+        for (auto const & rerollIndex : m_rerollIndices) {
+            if (result % m_die->getNumberOfSymbols() == rerollIndex) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    inline std::shared_ptr<DicePhysicsModel> const &die() { return m_die; }
+    inline bool isBeingRerolled() { return m_isBeingRerolled; }
+    inline std::vector<uint32_t> const &rerollIndices() { return m_rerollIndices; }
+    inline bool isSelected() { return m_isSelected; }
+    inline size_t nbrIndices() { return m_die->getIndices().size(); }
+    inline void setIsBeingRerolled(bool inIsBeingReRolled) { m_isBeingRerolled = inIsBeingReRolled; }
+
+    DiceGraphics(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
+                 std::vector<float> const &color,
+                 std::shared_ptr<TextureAtlas> const &textureAtlas)
+            : m_die{std::move(createDice(symbols, color))},
+              m_isBeingRerolled{false},
+              m_rerollIndices{std::move(inRerollIndices)},
+              m_isSelected{false},
+              m_vertexBuffer{},
+              m_indexBuffer{}
+
+    {
+        m_die->loadModel(textureAtlas);
+        m_die->resetPosition(screenWidth, screenHeight);
+    }
+
+    virtual ~DiceGraphics() = default;
+protected:
+    std::shared_ptr<DicePhysicsModel> m_die;
+    bool m_isBeingRerolled;
+    std::vector<uint32_t> m_rerollIndices;
+    bool m_isSelected;
+
+    /* vertex buffer and index buffer. the index buffer indicates which vertices to draw and in
+     * the specified order.  Note, vertices can be listed twice if they should be part of more
+     * than one triangle.
+     */
+    typename GraphicsType::Buffer m_vertexBuffer;
+    typename GraphicsType::Buffer m_indexBuffer;
+};
+
+class RainbowDice {
+public:
     virtual void initModels()=0;
 
     virtual void initThread()=0;
@@ -73,8 +124,6 @@ public:
                             std::vector<uint32_t> const &rerollSymbol,
                             std::vector<float> const &color)=0;
 
-    virtual void recreateModels()=0;
-
     virtual void recreateSwapChain(uint32_t width, uint32_t height)=0;
 
     virtual void updateAcceleration(float x, float y, float z)=0;
@@ -91,8 +140,7 @@ public:
 
     virtual void setTexture(std::shared_ptr<TextureAtlas> texture) = 0;
 
-    virtual void newSurface(std::shared_ptr<WindowType> surface) = 0;
-
+    // returns true if it needs a redraw
     virtual bool tapDice(float x, float y) = 0;
 
     virtual void scale(float scaleFactor) {
@@ -137,30 +185,6 @@ public:
         setView();
     }
 
-    inline float screenWidth(uint32_t width, uint32_t height) {
-        //float avg = (width + height)/2.0f;
-        //return width/avg*2.0f;
-
-        //if (width < height) {
-        //    return 2.0f;
-        //} else {
-        //    return width / (float) height * 2.0f;
-        //}
-        return 2.0f;
-    }
-
-    inline float screenHeight(uint32_t width, uint32_t height) {
-        //if (height < width) {
-        //    return 2.0f;
-        //} else {
-        //    return height / (float) width * 2.0f;
-        //}
-        //float avg = (width + height)/2.0f;
-        //return height/avg*2.0f;
-
-        return 2.0f;
-    }
-
     void setView() {
         /* glm::lookAt takes the eye position, the center position, and the up axis as parameters */
         m_view = glm::lookAt(m_viewPoint, m_viewPointCenterPosition, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -188,5 +212,267 @@ public:
     }
 
     virtual ~RainbowDice() = default;
+
+    RainbowDice()
+            : m_viewPoint{0.0f, 0.0f, 3.0f},
+              m_viewPointCenterPosition{0.0f, 0.0f, 0.0f}
+    {}
+protected:
+    std::string m_diceName;
+    std::vector<std::shared_ptr<DiceDescription>> m_diceDescriptions;
+
+    glm::mat4 m_proj;
+    glm::mat4 m_view;
+
+    glm::vec3 m_viewPoint;
+    glm::vec3 m_viewPointCenterPosition;
+
+    static constexpr float m_maxZ = 10.0f;
+    static constexpr float m_minZ = 1.5f;
+    static constexpr float m_maxScroll = 10.0f;
 };
+
+template <typename DiceType>
+class RainbowDiceGraphics : public RainbowDice {
+public:
+    virtual std::shared_ptr<DiceType> createDie(std::vector<std::string> const &symbols,
+                                      std::vector<uint32_t> const &inRerollIndices,
+                                      std::vector<float> const &color) = 0;
+    virtual std::shared_ptr<DiceType> createDie(std::shared_ptr<DiceType> const &inDice) = 0;
+
+    void addRollingDice() override;
+
+    bool tapDice(float x, float y, uint32_t width, uint32_t height);
+    bool updateUniformBuffer() override;
+    std::vector<std::vector<uint32_t >> getDiceResults() override;
+    void resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) override;
+    void setDice(std::string const &inDiceName,
+            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions) override;
+
+    void loadObject(std::vector<std::string> const &symbols,
+                                       std::vector<uint32_t> const &rerollIndices,
+                                       std::vector<float> const &color) override {
+        m_dice.push_back(createDie(symbols, rerollIndices, color));
+    }
+
+    void updateAcceleration(float x, float y, float z) override {
+        for (auto const &die : m_dice) {
+            die->die()->updateAcceleration(x, y, z);
+        }
+    }
+
+    void resetPositions() override {
+        float width = screenWidth;
+        float height = screenHeight;
+        for (auto const &die: m_dice) {
+            die->die()->resetPosition(width, height);
+        }
+    }
+
+    void resetPositions(std::set<int> &diceIndices) override {
+        int i = 0;
+        float width = screenWidth;
+        float height = screenHeight;
+        for (auto const &die : m_dice) {
+            if (diceIndices.find(i) != diceIndices.end()) {
+                die->die()->resetPosition(width, height);
+            }
+            i++;
+        }
+    }
+
+    bool needsReroll() override {
+        for (auto const &die : m_dice) {
+            if (die->needsReroll()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool allStopped() override {
+        for (auto &&die : m_dice) {
+            if (!die->die()->isStopped() || !die->die()->isStoppedAnimationDone()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    RainbowDiceGraphics()
+      : RainbowDice{},
+        m_dice{}
+    {}
+
+    ~RainbowDiceGraphics() override = default;
+protected:
+    using DiceList = std::list<std::shared_ptr<DiceType>>;
+    DiceList m_dice;
+
+    virtual bool invertY() = 0;
+};
+
+// Template class functions
+
+template <typename DiceType>
+bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, uint32_t height) {
+    bool needsRedraw = false;
+    float swidth = screenWidth;
+    float sheight = screenHeight;
+    float xnorm = x/width * swidth - swidth / 2.0f;
+    float ynorm = invertY() ? -y/height * sheight + sheight / 2.0f
+                            : y/height * sheight - sheight / 2.0f;
+    glm::vec4 point1{xnorm, ynorm, 1.0f, 1.0f};
+    glm::vec4 point2{xnorm, ynorm, -1.0f, 1.0f};
+
+    glm::vec4 transformedP1 = glm::inverse(m_view) * glm::inverse(m_proj) * point1;
+    glm::vec4 transformedP2 = glm::inverse(m_view) * glm::inverse(m_proj) * point2;
+
+    glm::vec3 start = glm::vec3{transformedP1.x, transformedP1.y, transformedP1.z}/transformedP1.w;
+    glm::vec3 line =  glm::vec3{transformedP2.x, transformedP2.y, transformedP2.z}/transformedP2.w - start;
+
+    line = glm::normalize(line);
+    for (auto const &die : m_dice) {
+        float distanceToLine = glm::length(glm::cross(line, die->die()->position() - start));
+        if (distanceToLine < DicePhysicsModel::stoppedRadius) {
+            die->toggleSelected();
+            needsRedraw = true;
+            break;
+        }
+    }
+
+    return needsRedraw;
+}
+
+template <typename DiceType>
+bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
+    for (auto iti = m_dice.begin(); iti != m_dice.end(); iti++) {
+        if (!iti->get()->die()->isStopped()) {
+            for (auto itj = iti; itj != m_dice.end(); itj++) {
+                if (!itj->get()->die()->isStopped() && iti != itj) {
+                    iti->get()->die()->calculateBounce(itj->get()->die().get());
+                }
+            }
+        }
+    }
+
+    bool needsRedraw = false;
+    uint32_t i = 0;
+    float width = screenWidth;
+    float height = screenHeight;
+    for (auto &&die : m_dice) {
+        if (die->die()->updateModelMatrix()) {
+            needsRedraw = true;
+        }
+        if (die->die()->isStopped() && !die->die()->isStoppedAnimationStarted()) {
+            auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
+            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die()->animateMove(x, y);
+        }
+        i++;
+    }
+
+    return needsRedraw;
+}
+
+template <typename DiceType>
+std::vector<std::vector<uint32_t >> RainbowDiceGraphics<DiceType>::getDiceResults() {
+    std::vector<std::vector<uint32_t>> results;
+    for (auto dieIt = m_dice.begin(); dieIt != m_dice.end(); dieIt++) {
+        if (!dieIt->get()->die()->isStopped()) {
+            // Should not happen
+            throw std::runtime_error("Not all die are stopped!");
+        }
+        std::vector<uint32_t > dieResults;
+        while (dieIt->get()->isBeingRerolled()) {
+            dieResults.push_back(dieIt->get()->die()->getResult());
+            dieIt++;
+        }
+        dieResults.push_back(dieIt->get()->die()->getResult());
+        results.push_back(dieResults);
+    }
+
+    return results;
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) {
+    uint32_t i = 0;
+    float width = screenWidth;
+    float height = screenHeight;
+    for (auto const &die : m_dice) {
+        auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+        uint32_t stoppedX = i%nbrX;
+        uint32_t stoppedY = i/nbrX;
+        float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+        float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+
+        die->die()->positionDice(upFaceIndices[i++], x, y);
+    }
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
+                                            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions) {
+    RainbowDice::setDice(inDiceName, inDiceDescriptions);
+
+    m_dice.clear();
+    for (auto const &diceDescription : m_diceDescriptions) {
+        for (int i = 0; i < diceDescription->m_nbrDice; i++) {
+            loadObject(diceDescription->m_symbols, diceDescription->m_rerollOnIndices,
+                       diceDescription->m_color);
+        }
+    }
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::addRollingDice() {
+    float width = screenWidth;
+    float height = screenHeight;
+    for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
+        // Skip dice already being rerolled or does not get rerolled.
+        if (diceIt->get()->isBeingRerolled() || diceIt->get()->rerollIndices().empty()) {
+            continue;
+        }
+
+        uint32_t result = diceIt->get()->die()->getResult() % diceIt->get()->die()->getNumberOfSymbols();
+        bool shouldReroll = false;
+        for (auto const &rerollIndex : diceIt->get()->rerollIndices()) {
+            if (result == rerollIndex) {
+                shouldReroll = true;
+                break;
+            }
+        }
+
+        if (!shouldReroll) {
+            continue;
+        }
+
+        glm::vec3 position(0.0f, 0.0f, -1.0f);
+        auto die = createDie(*diceIt);
+        diceIt->get()->setIsBeingRerolled(true);
+
+        diceIt++;
+        m_dice.insert(diceIt, die);
+        diceIt--;
+    }
+
+    int i=0;
+    for (auto const &die : m_dice) {
+        if (die->die()->isStopped()) {
+            auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
+            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die()->animateMove(x, y);
+        }
+        i++;
+    }
+}
+
 #endif // RAINBOWDICE_HPP

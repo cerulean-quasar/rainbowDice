@@ -33,7 +33,6 @@ public class MySurfaceCallback implements SurfaceHolder.Callback {
                 int width,
                 int height)
     {
-        //Draw.tellDrawerSurfaceDirty(holder.getSurface());
         Draw.tellDrawerSurfaceChanged(width, height);
     }
 

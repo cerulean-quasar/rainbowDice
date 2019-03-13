@@ -44,8 +44,8 @@ namespace graphicsGL {
         void initThread();
         void cleanupThread();
 
-        inline int width() { return m_width; }
-        inline int height() { return m_height; }
+        inline uint32_t width() { return m_width; }
+        inline uint32_t height() { return m_height; }
         inline EGLSurface surface() { return m_surface; }
         inline EGLDisplay display() { return m_display; }
         inline std::shared_ptr<WindowType> window() { return m_window; }
@@ -61,89 +61,56 @@ namespace graphicsGL {
         EGLSurface m_surface;
         EGLDisplay m_display;
 
-        int m_width;
-        int m_height;
+        uint32_t m_width;
+        uint32_t m_height;
 
         void createSurface();
         void destroySurface();
     };
 } /* namespace graphicsGL */
 
-struct DiceGL {
-    GLuint vertexBuffer;
-    GLuint indexBuffer;
-    std::shared_ptr<DicePhysicsModel> die;
+struct GLGraphics {
+    using Buffer = GLuint;
+};
 
-    // If the die is being rerolled, then don't count it in the results list returned because
-    // the GUI is expecting a new list of results that only contains one set of rolls for a die
-    // and then uses the index to determine what the reroll value was.
-    bool isBeingReRolled;
-
-    std::vector<uint32_t> rerollIndices;
-
+struct DiceGL : DiceGraphics<GLGraphics> {
     DiceGL(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
-           glm::vec3 &position, std::vector<float> const &color)
-            : vertexBuffer{0},
-              indexBuffer{0},
-              die{},
-              isBeingReRolled{false},
-              rerollIndices{std::move(inRerollIndices)},
-              m_isSelected{false}
+           std::vector<float> const &color, std::shared_ptr<TextureAtlas> const &inTextureAtlas)
+            : DiceGraphics{symbols, std::move(inRerollIndices), color, inTextureAtlas}
     {
-        initDice(symbols, position, color);
-    }
-
-    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
-        die->loadModel(texAtlas);
-    }
-
-    bool needsReroll() {
-        if (!die->isStopped()) {
-            // should not happen!
-            return false;
-        }
-
-        if (isBeingReRolled) {
-            return false;
-        }
-
-        uint32_t result = die->getResult();
-
-        for (auto const & rerollIndex : rerollIndices) {
-            if (result == rerollIndex) {
-                return true;
-            }
-        }
-
-        return false;
+        createGLResources();
     }
 
     void destroyGLResources() {
-        glDeleteBuffers(1, &vertexBuffer);
-        glDeleteBuffers(1, &indexBuffer);
+        glDeleteBuffers(1, &m_vertexBuffer);
+        glDeleteBuffers(1, &m_indexBuffer);
     }
 
-    ~DiceGL() {
+    void createGLResources() {
+        // the vertex buffer
+        glGenBuffers(1, &m_vertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, m_vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * m_die->getVertices().size(),
+                     m_die->getVertices().data(), GL_STATIC_DRAW);
+
+        // the index buffer
+        glGenBuffers(1, &m_indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * m_die->getIndices().size(),
+                     m_die->getIndices().data(), GL_STATIC_DRAW);
+    }
+
+    ~DiceGL() override {
         destroyGLResources();
     }
 
-    inline bool isSelected() { return m_isSelected; }
-    inline void toggleSelected() { m_isSelected = !m_isSelected; }
-
 private:
-    bool m_isSelected;
-
-    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position,
-                  std::vector<float> const &color) {
-        isBeingReRolled = false;
-        die = std::move(createDice(symbols, color, true));
-    }
 };
 
-class RainbowDiceGL : public RainbowDice {
+class RainbowDiceGL : public RainbowDiceGraphics<DiceGL> {
 public:
     explicit RainbowDiceGL(std::shared_ptr<WindowType> window)
-            : RainbowDice{},
+            : RainbowDiceGraphics{},
               m_surface{std::make_shared<graphicsGL::Surface>(std::move(window))},
               programID{0}
     {
@@ -160,36 +127,12 @@ public:
 
     void drawFrame() override;
 
-    bool updateUniformBuffer() override;
-
-    bool allStopped() override;
-
-    std::vector<std::vector<uint32_t >> getDiceResults() override;
-
-    bool needsReroll() override;
-
-    void loadObject(std::vector<std::string> const &symbols,
-                            std::vector<uint32_t> const &inRerollIndices,
-                            std::vector<float> const &color) override;
-
-    void recreateModels() override;
+    void recreateModels();
 
     void recreateSwapChain(uint32_t width, uint32_t height) override;
 
-    void updateAcceleration(float x, float y, float z) override;
-
-    void resetPositions() override;
-
-    void resetPositions(std::set<int> &dice) override;
-
-    void resetToStoppedPositions(std::vector<uint32_t > const &inUpFaceIndices) override;
-
-    void addRollingDice() override;
-
-    bool tapDice(float x, float y) override;
-
-    void newSurface(std::shared_ptr<WindowType> surface) override {
-        // TODO: do something here
+    bool tapDice(float x, float y) override {
+        return RainbowDiceGraphics::tapDice(x, y, m_surface->width(), m_surface->height());
     }
 
     void scroll(float distanceX, float distanceY) override {
@@ -200,36 +143,26 @@ public:
         m_texture = std::make_shared<TextureGL>(std::move(inTexture));
     }
 
-    void setDice(std::string const &inDiceName,
-            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescription) override {
-        RainbowDice::setDice(inDiceName, inDiceDescription);
-
-        dice.clear();
-        for (auto const &diceDescription : m_diceDescriptions) {
-            for (int i = 0; i < diceDescription->m_nbrDice; i++) {
-                loadObject(diceDescription->m_symbols, diceDescription->m_rerollOnIndices,
-                           diceDescription->m_color);
-            }
-        }
-
-    }
-
     void destroyModelGLResources();
 
     void destroyGLResources() {
         glDeleteProgram(programID);
     }
 
-    ~RainbowDiceGL() {
+    ~RainbowDiceGL() override {
         destroyGLResources();
     }
+protected:
+    bool invertY() override { return true; }
+
+    std::shared_ptr<DiceGL> createDie(std::vector<std::string> const &symbols,
+                                      std::vector<uint32_t> const &inRerollIndices,
+                                      std::vector<float> const &color) override;
+    std::shared_ptr<DiceGL> createDie(std::shared_ptr<DiceGL> const &inDice) override;
 private:
     std::shared_ptr<graphicsGL::Surface> m_surface;
     GLuint programID;
     std::shared_ptr<TextureGL> m_texture;
-
-    typedef std::list<std::shared_ptr<DiceGL> > DiceList;
-    DiceList dice;
 
     GLuint loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile);
     void init();

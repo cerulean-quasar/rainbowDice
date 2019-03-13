@@ -27,7 +27,6 @@ add_library( # Sets the name of the library.
              ${platform64_files}
              src/main/cpp/android.cpp
              src/main/cpp/rainbowDiceGL.cpp
-             src/main/cpp/rainbowDiceGlobal.cpp
              src/main/cpp/random.cpp
              src/main/cpp/dice.cpp
              src/main/cpp/drawer.cpp)

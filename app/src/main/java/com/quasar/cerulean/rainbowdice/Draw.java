@@ -339,8 +339,6 @@ public class Draw {
                                           float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
     public static native void tellDrawerStop();
 
-    public static native String tellDrawerSurfaceDirty(Surface jsurface);
-
     public static native String tellDrawerSurfaceChanged(int width, int height);
 
     public static native void scroll(float distanceX, float distanceY);

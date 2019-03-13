@@ -34,7 +34,6 @@ class DrawEvent {
 public:
     enum evtype {
         stopDrawing,
-        surfaceDirty,
         surfaceChanged,
         diceChange,
         drawStoppedDice,
@@ -192,34 +191,17 @@ public:
         diceGraphics->initModels();
         diceGraphics->resetPositions();
         diceGraphics->updateUniformBuffer();
-        return true;
+
+        // return false here because we will enter the drawing loop and then the dice will get
+        // redrawn.  If we return true here, then the dice will display, but then there will be
+        // a longish pause (about half a second) as the sensors get initialized at the top of the
+        // drawing loop.
+        return false;
     }
 
     evtype type() override { return diceChange; }
 
     ~DiceChangeEvent() override = default;
-};
-
-class SurfaceDirtyEvent : public DrawEvent {
-    std::shared_ptr<WindowType> m_surface;
-public:
-    explicit SurfaceDirtyEvent(std::shared_ptr<WindowType> inSurface)
-        : m_surface{std::move(inSurface)} {
-    }
-
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
-        diceGraphics->newSurface(m_surface);
-
-        // redraw the frame right away and then return false because this event means that we
-        // should redraw immediately and not wait for some number of events to come up before we
-        // do the redraw.
-        diceGraphics->drawFrame();
-        return false;
-    }
-
-    evtype type() override { return surfaceDirty; }
-
-    ~SurfaceDirtyEvent() override = default;
 };
 
 /* Used to communicate between the gui thread and the drawing thread.
@@ -232,12 +214,10 @@ private:
     std::shared_ptr<WindowType> m_nextSurface;
     std::queue<std::shared_ptr<DrawEvent>> m_drawEventQueue;
     bool m_stopDrawing;
-    bool m_surfaceDirty;
 
 public:
     DiceChannel()
-            : m_stopDrawing{false},
-              m_surfaceDirty{false}
+            : m_stopDrawing{false}
     {}
 
     std::shared_ptr<DrawEvent> getEventNoWait();
@@ -246,7 +226,6 @@ public:
     // blocks on sending event
     void sendEvent(std::shared_ptr<DrawEvent> const &event);
     void sendStopDrawingEvent();
-    void sendSurfaceDirtyEvent(std::shared_ptr<WindowType> inSurface);
 };
 
 DiceChannel &diceChannel();

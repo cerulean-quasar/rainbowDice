@@ -25,5 +25,7 @@
 
 typedef ANativeWindow WindowType;
 
+constexpr float screenWidth = 2.0f;
+constexpr float screenHeight = 2.0f;
 
 #endif

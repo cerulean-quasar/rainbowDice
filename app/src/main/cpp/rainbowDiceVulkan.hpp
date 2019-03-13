@@ -57,8 +57,8 @@ std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
 
 class DiceDescriptorSetLayout : public vulkan::DescriptorSetLayout {
 public:
-    DiceDescriptorSetLayout(std::shared_ptr<vulkan::Device> const &inDevice)
-            : m_device{inDevice},
+    DiceDescriptorSetLayout(std::shared_ptr<vulkan::Device> inDevice)
+            : m_device{std::move(inDevice)},
               m_descriptorSetLayout{},
               m_poolInfo{},
               m_poolSizes{}
@@ -102,115 +102,112 @@ private:
     void createDescriptorSetLayout();
 };
 
-struct Dice {
-    std::shared_ptr<vulkan::Device> m_device;
-    std::shared_ptr<DicePhysicsModel> die;
+struct VulkanGraphics {
+    using Buffer = std::shared_ptr<vulkan::Buffer>;
+};
 
-    /* vertex buffer and index buffer. the index buffer indicates which vertices to draw and in
-     * the specified order.  Note, vertices can be listed twice if they should be part of more
-     * than one triangle.
-     */
-    std::shared_ptr<vulkan::Buffer> vertexBuffer;
-    std::shared_ptr<vulkan::Buffer> indexBuffer;
-
-    /* for passing data other than the vertex data to the vertex shader */
-    std::shared_ptr<vulkan::DescriptorSet> descriptorSet;
-    std::shared_ptr<vulkan::Buffer> uniformBuffer;
-    std::shared_ptr<vulkan::Buffer> uniformBufferFrag;
-
-    bool isBeingReRolled;
-    std::vector<uint32_t> rerollIndices;
-
-    Dice(std::shared_ptr<vulkan::Device> const &inDevice,
-         std::vector<std::string> const &symbols, std::vector<uint32_t> const &inRerollIndices,
-         glm::vec3 &position, std::vector<float> const &color)
-            : m_device{inDevice},
-              die(nullptr),
-              rerollIndices{inRerollIndices},
-              m_isSelected{false}
-    {
-        initDice(symbols, position, color);
-    }
-
-    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
-        die->loadModel(texAtlas);
-    }
-
-    void init(std::shared_ptr<vulkan::DescriptorSet> inDescriptorSet,
-              std::shared_ptr<vulkan::Buffer> inIndexBuffer,
-              std::shared_ptr<vulkan::Buffer> inVertexBuffer,
-              std::shared_ptr<vulkan::Buffer> inUniformBuffer,
-              std::shared_ptr<vulkan::Buffer> inPerObjFragVars) {
-        uniformBuffer = std::move(inUniformBuffer);
-        uniformBufferFrag = std::move(inPerObjFragVars);
-        indexBuffer = std::move(inIndexBuffer);
-        vertexBuffer = std::move(inVertexBuffer);
-        descriptorSet = std::move(inDescriptorSet);
-        updateUniformBufferFragmentVariables();
-    }
-
-    void destroyVulkanMemory() {
-        uniformBuffer.reset();
-        indexBuffer.reset();
-        vertexBuffer.reset();
-        descriptorSet.reset();
-        m_device.reset();
-    }
+class DiceVulkan : public DiceGraphics<VulkanGraphics> {
+public:
+    inline auto const &descriptorSet() { return m_descriptorSet; }
 
     void updateUniformBuffer(glm::mat4 const &proj, glm::mat4 const &view) {
         UniformBufferObject ubo;
-        ubo.proj = die->alterPerspective(proj);
+        ubo.proj = m_die->alterPerspective(proj);
         ubo.view = view;
-        ubo.model = die->model();
-        uniformBuffer->copyRawTo(&ubo, sizeof(ubo));
+        ubo.model = m_die->model();
+        m_uniformBuffer->copyRawTo(&ubo, sizeof(ubo));
     }
 
     void updateUniformBufferFragmentVariables() {
-        PerObjectFragmentVariables fragmentVariables;
+        PerObjectFragmentVariables fragmentVariables = {};
         fragmentVariables.isSelected = m_isSelected ? 1 : 0;
-        uniformBufferFrag->copyRawTo(&fragmentVariables, sizeof (fragmentVariables));
+        m_uniformBufferFrag->copyRawTo(&fragmentVariables, sizeof (fragmentVariables));
     }
 
-    bool needsReroll() {
-        if (!die->isStopped()) {
-            // should not happen!
-            return false;
-        }
-
-        if (isBeingReRolled) {
-            return false;
-        }
-
-        uint32_t result = die->getResult();
-
-        for (auto const & rerollIndex : rerollIndices) {
-            if (result % die->getNumberOfSymbols() == rerollIndex) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    inline bool isSelected() { return m_isSelected; }
-
-    void toggleSelected() {
-        m_isSelected = !m_isSelected;
+    void toggleSelected() override {
+        DiceGraphics::toggleSelected();
         updateUniformBufferFragmentVariables();
     }
-private:
-    bool m_isSelected;
 
-    void initDice(std::vector<std::string> const &symbols, glm::vec3 &position, std::vector<float> const &color) {
-        isBeingReRolled = false;
-        die = std::move(createDice(symbols, color));
+    DiceVulkan(std::shared_ptr<vulkan::Device> inDevice,
+               std::shared_ptr<TextureVulkan> const &texture,
+               std::shared_ptr<DiceDescriptorSetLayout> const &descriptorSetLayout,
+               std::shared_ptr<vulkan::DescriptorPools> const &descriptorPools,
+               std::shared_ptr<vulkan::CommandPool> const &commandPool,
+               std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
+               glm::mat4 const &proj,
+               glm::mat4 const &view,
+               std::vector<std::string> const &symbols,
+               std::vector<uint32_t> const &inRerollIndices,
+               std::vector<float> const &color)
+            : DiceGraphics{symbols, inRerollIndices, color, texture->textureAtlas()},
+              m_device{std::move(inDevice)},
+              m_descriptorSet{descriptorPools->allocateDescriptor()},
+              m_uniformBuffer{vulkan::Buffer::createUniformBuffer(
+                      m_device, sizeof (UniformBufferObject))},
+              m_uniformBufferFrag{vulkan::Buffer::createUniformBuffer(
+                      m_device, sizeof (PerObjectFragmentVariables))}
+    {
+        descriptorSetLayout->updateDescriptorSet(m_uniformBuffer, viewPointBuffer,
+                                                 m_uniformBufferFrag, m_descriptorSet,
+                                                 texture->getImageInfosForDescriptorSet());
+        m_vertexBuffer = createVertexBuffer(commandPool, m_die->getVertices());
+        m_indexBuffer = createIndexBuffer(commandPool, m_die->getIndices());
+        updateUniformBuffer(proj, view);
+        updateUniformBufferFragmentVariables();
+    }
+
+    ~DiceVulkan() override = default;
+private:
+    std::shared_ptr<vulkan::Device> m_device;
+
+    /* for passing data other than the vertex data to the vertex shader */
+    std::shared_ptr<vulkan::DescriptorSet> m_descriptorSet;
+    std::shared_ptr<vulkan::Buffer> m_uniformBuffer;
+    std::shared_ptr<vulkan::Buffer> m_uniformBufferFrag;
+
+    template <typename ArrayType>
+    std::shared_ptr<vulkan::Buffer> createArrayBuffer(
+            std::shared_ptr<vulkan::CommandPool> const &commandPool,
+            std::vector<ArrayType> const &vertices,
+            VkBufferUsageFlags usage)
+    {
+        VkDeviceSize bufferSize = sizeof (vertices[0]) * vertices.size();
+
+        /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
+         * memory.  Then use a copy command to copy the data into fast graphics card only memory.
+         */
+        vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+
+        stagingBuffer.copyRawTo(vertices.data(), static_cast<size_t>(bufferSize));
+
+        std::shared_ptr<vulkan::Buffer> vertexBuffer{new vulkan::Buffer{m_device, bufferSize,
+                                                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+                                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
+
+        vertexBuffer->copyTo(commandPool, stagingBuffer, bufferSize);
+
+        return vertexBuffer;
+    }
+
+    std::shared_ptr<vulkan::Buffer> createVertexBuffer(
+            std::shared_ptr<vulkan::CommandPool> const &commandPool,
+            std::vector<Vertex> const &vertices) {
+        return createArrayBuffer<Vertex>(commandPool, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    }
+
+    std::shared_ptr<vulkan::Buffer> createIndexBuffer(
+            std::shared_ptr<vulkan::CommandPool> const &commandPool,
+            std::vector<uint32_t> const &indices) {
+        return createArrayBuffer<uint32_t>(commandPool, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     }
 };
 
-class RainbowDiceVulkan : public RainbowDice {
+class RainbowDiceVulkan : public RainbowDiceGraphics<DiceVulkan> {
 public:
     explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window)
-            : RainbowDice{},
+            : RainbowDiceGraphics{},
               m_instance{new vulkan::Instance{std::move(window)}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
@@ -226,13 +223,16 @@ public:
               m_depthImageView{new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
                                                      m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT}},
               m_swapChainCommands{new vulkan::SwapChainCommands{m_swapChain, m_commandPool,
-                                                                m_renderPass, m_depthImageView}}
+                                                                m_renderPass, m_depthImageView}},
+              m_projWithPreTransform{},
+              m_width{m_swapChain->extent().width},
+              m_height{m_swapChain->extent().height}
     {
         setView();
         updatePerspectiveMatrix(m_swapChain->extent().width, m_swapChain->extent().height);
 
         // copy the view point of the scene into device memory to send to the fragment shader for the
-        // Blinn-Phong lighting model.  Copy it over here too since it is a constant.
+        // Blinn-Phong lighting model.  Copy it over here too.
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
     }
 
@@ -246,33 +246,15 @@ public:
 
     bool updateUniformBuffer() override;
 
-    bool allStopped() override;
-
-    std::vector<std::vector<uint32_t>> getDiceResults() override;
-
-    void loadObject(std::vector<std::string> const &symbols,
-                            std::vector<uint32_t> const &rerollIndices,
-                            std::vector<float> const &color) override;
-
-    void recreateModels() override;
-
     void recreateSwapChain(uint32_t width, uint32_t height) override;
-
-    void updateAcceleration(float x, float y, float z) override;
-
-    void resetPositions() override;
-
-    void resetPositions(std::set<int> &dice) override;
 
     void resetToStoppedPositions(std::vector<uint32_t> const &symbols) override;
 
     void addRollingDice() override;
 
-    bool needsReroll() override;
-
-    void newSurface(std::shared_ptr<WindowType> surface) override;
-
-    bool tapDice(float x, float y) override;
+    bool tapDice(float x, float y) override {
+        return RainbowDiceGraphics::tapDice(x, y, m_width, m_height);
+    }
 
     void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) override {
         RainbowDice::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
@@ -282,12 +264,10 @@ public:
          */
         m_proj[1][1] *= -1;
 
-        m_projWithoutPreTransform = m_proj;
-
         /* some hardware have their screen rotated in different directions.  We need to apply the
          * preTransform that we promised the window manager/hardware that we would do.
          */
-        m_proj = preTransform() * m_proj;
+        m_projWithPreTransform = preTransform() * m_proj;
 
         m_width = surfaceWidth;
         m_height = surfaceHeight;
@@ -297,8 +277,8 @@ public:
         RainbowDice::scale(scaleFactor);
 
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & die : dice) {
-            die->updateUniformBuffer(m_proj, m_view);
+        for (auto const & die : m_dice) {
+            die->updateUniformBuffer(m_projWithPreTransform, m_view);
         }
     }
 
@@ -307,8 +287,8 @@ public:
         RainbowDice::scroll(distanceX, distanceY, ext.width, ext.height);
 
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & die : dice) {
-            die->updateUniformBuffer(m_proj, m_view);
+        for (auto const & die : m_dice) {
+            die->updateUniformBuffer(m_projWithPreTransform, m_view);
         }
     }
 
@@ -322,20 +302,13 @@ public:
         m_texture = std::make_shared<TextureVulkan>(std::move(texture), imgSampler);
     }
 
-    void setDice(std::string const &inDiceName,
-            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions) override {
-        RainbowDice::setDice(inDiceName, inDiceDescriptions);
-
-        dice.clear();
-        for (auto const &diceDescription : m_diceDescriptions) {
-            for (int i = 0; i < diceDescription->m_nbrDice; i++) {
-                loadObject(diceDescription->m_symbols, diceDescription->m_rerollOnIndices,
-                           diceDescription->m_color);
-            }
-        }
-    }
-
     ~RainbowDiceVulkan() override = default;
+protected:
+    std::shared_ptr<DiceVulkan> createDie(std::vector<std::string> const &symbols,
+                                      std::vector<uint32_t> const &inRerollIndices,
+                                      std::vector<float> const &color) override;
+    std::shared_ptr<DiceVulkan> createDie(std::shared_ptr<DiceVulkan> const &inDice) override;
+    bool invertY() override { return false; }
 private:
     static std::string const SHADER_VERT_FILE;
     static std::string const SHADER_FRAG_FILE;
@@ -353,9 +326,6 @@ private:
     std::shared_ptr<vulkan::CommandPool> m_commandPool;
     std::shared_ptr<vulkan::Buffer> m_viewPointBuffer;
 
-    typedef std::list<std::shared_ptr<Dice> > DiceList;
-    DiceList dice;
-
     /* use semaphores to coordinate the rendering and presentation. Could also use fences
      * but fences are more for coordinating in our program itself and not for internal
      * Vulkan coordination of resource usage.
@@ -370,12 +340,9 @@ private:
 
     std::shared_ptr<TextureVulkan> m_texture;
 
-    glm::mat4 m_projWithoutPreTransform;
+    glm::mat4 m_projWithPreTransform;
     uint32_t m_width;
     uint32_t m_height;
-
-    std::shared_ptr<vulkan::Buffer> createVertexBuffer(Dice *die);
-    std::shared_ptr<vulkan::Buffer> createIndexBuffer(Dice *die);
 
     /* return the preTransform matrix.  Perform this transform after all other matrices have been applied.
      * It matches what we would promise the hardware we would do.

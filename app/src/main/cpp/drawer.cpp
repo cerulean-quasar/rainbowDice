@@ -37,11 +37,6 @@ std::shared_ptr<DrawEvent> DiceChannel::getEventNoWait() {
         return std::make_shared<StopDrawingEvent>(StopDrawingEvent{});
     }
 
-    if (m_surfaceDirty) {
-        m_surfaceDirty = false;
-        return std::make_shared<SurfaceDirtyEvent>(SurfaceDirtyEvent{std::move(m_nextSurface)});
-    }
-
     if (m_drawEventQueue.empty()) {
         return std::shared_ptr<DrawEvent>();
     }
@@ -61,11 +56,6 @@ std::shared_ptr<DrawEvent> DiceChannel::getEvent() {
         return std::make_shared<StopDrawingEvent>(StopDrawingEvent{});
     }
 
-    if (m_surfaceDirty) {
-        m_surfaceDirty = false;
-        return std::make_shared<SurfaceDirtyEvent>(SurfaceDirtyEvent{std::move(m_nextSurface)});
-    }
-
     if (m_drawEventQueue.empty()) {
         m_eventConditionVariable.wait(lock);
     }
@@ -73,11 +63,6 @@ std::shared_ptr<DrawEvent> DiceChannel::getEvent() {
     if (m_stopDrawing) {
         m_stopDrawing = false;
         return std::make_shared<StopDrawingEvent>(StopDrawingEvent{});
-    }
-
-    if (m_surfaceDirty) {
-        m_surfaceDirty = false;
-        return std::make_shared<SurfaceDirtyEvent>(SurfaceDirtyEvent{std::move(m_nextSurface)});
     }
 
     std::shared_ptr<DrawEvent> event = m_drawEventQueue.front();
@@ -89,14 +74,6 @@ void DiceChannel::sendEvent(std::shared_ptr<DrawEvent> const &event) {
     std::unique_lock<std::mutex> lock(m_eventLock);
 
     m_drawEventQueue.push(event);
-    m_eventConditionVariable.notify_one();
-}
-
-void DiceChannel::sendSurfaceDirtyEvent(std::shared_ptr<WindowType> inSurface) {
-    std::unique_lock<std::mutex> lock(m_eventLock);
-
-    m_nextSurface = std::move(inSurface);
-    m_surfaceDirty = true;
     m_eventConditionVariable.notify_one();
 }
 
@@ -189,7 +166,6 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                     case DrawEvent::diceChange:
                     case DrawEvent::drawStoppedDice:
                         return event;
-                    case DrawEvent::surfaceDirty:
                     case DrawEvent::surfaceChanged:
                     case DrawEvent::scrollSurface:
                     case DrawEvent::scaleSurface:

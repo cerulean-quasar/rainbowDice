@@ -278,37 +278,6 @@ Java_com_quasar_cerulean_rainbowdice_Draw_tellDrawerSurfaceChanged(
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_quasar_cerulean_rainbowdice_Draw_tellDrawerSurfaceDirty(
-        JNIEnv *env,
-        jclass jclass1,
-        jobject jsurface) {
-    try {
-        ANativeWindow *window = ANativeWindow_fromSurface(env, jsurface);
-        if (window == nullptr) {
-            return env->NewStringUTF("Unable to acquire window from surface.");
-        }
-
-        auto deleter = [](WindowType *windowRaw) {
-            /* release the java window object */
-            if (windowRaw != nullptr) {
-                ANativeWindow_release(windowRaw);
-            }
-        };
-
-        std::shared_ptr<WindowType> surface{window, deleter};
-        auto event = std::make_shared<SurfaceDirtyEvent>(surface);
-        diceChannel().sendEvent(event);
-        return env->NewStringUTF("");
-    } catch (std::runtime_error &e) {
-        if (strlen(e.what()) > 0) {
-            return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
-        } else {
-            return env->NewStringUTF("error: Error in initializing graphics.");
-        }
-    }
-}
-
-extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         JNIEnv *env,
         jclass jclass1,

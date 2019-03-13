@@ -281,7 +281,7 @@ namespace vulkan {
         virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() = 0;
         virtual uint32_t numberOfDescriptors() = 0;
         virtual VkDescriptorPoolCreateInfo const &poolCreateInfo() = 0;
-        virtual ~DescriptorSetLayout() {}
+        virtual ~DescriptorSetLayout() = default;
     };
 
     class DescriptorPool {
@@ -373,7 +373,7 @@ namespace vulkan {
                 m_unusedDescriptors.push_back(descSet);
             };
 
-            if (m_unusedDescriptors.size() > 0) {
+            if (!m_unusedDescriptors.empty()) {
                 VkDescriptorSet descriptorSet = m_unusedDescriptors.back();
                 m_unusedDescriptors.pop_back();
 

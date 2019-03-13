@@ -194,23 +194,6 @@ void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
 }
 
 bool DicePhysicsModel::updateModelMatrix() {
-    // reset the position in the case that it got stuck outside the boundry
-    if (m_position.x < -maxposx) {
-        m_position.x = -maxposx;
-    } else if (m_position.x > maxposx) {
-        m_position.x = maxposx;
-    }
-    if (m_position.y < -maxposy) {
-        m_position.y = -maxposy;
-    } else if (m_position.y > maxposy) {
-        m_position.y = maxposy;
-    }
-    if (m_position.z < -maxposz) {
-        m_position.z = -maxposz;
-    } else if (m_position.z > maxposz) {
-        m_position.z = maxposz;
-    }
-
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - prevTime).count();
     prevTime = currentTime;
@@ -230,6 +213,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             animationDone = true;
             m_position.x = doneX;
             m_position.y = doneY;
+            m_position.z = maxposz;
             glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
             if (stoppedAngle != 0) {
                 glm::quat q = glm::angleAxis(stoppedAngle, stoppedRotationAxis);
@@ -252,6 +236,7 @@ bool DicePhysicsModel::updateModelMatrix() {
                          stoppedPositionX;
             m_position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
                          stoppedPositionY;
+            m_position.z = maxposz;
             glm::mat4 rotate;
             if (stoppedAngle != 0) {
                 glm::quat q = glm::angleAxis(stoppedAngle/stoppedAnimationTime*animationTime,
@@ -311,6 +296,23 @@ bool DicePhysicsModel::updateModelMatrix() {
             m_model = translate * rotate * scale;
             return true;
         }
+    }
+
+    // reset the position in the case that it got stuck outside the boundary
+    if (m_position.x < -maxposx) {
+        m_position.x = -maxposx;
+    } else if (m_position.x > maxposx) {
+        m_position.x = maxposx;
+    }
+    if (m_position.y < -maxposy) {
+        m_position.y = -maxposy;
+    } else if (m_position.y > maxposy) {
+        m_position.y = maxposy;
+    }
+    if (m_position.z < -maxposz) {
+        m_position.z = -maxposz;
+    } else if (m_position.z > maxposz) {
+        m_position.z = maxposz;
     }
 
     float speed = glm::length(velocity);
