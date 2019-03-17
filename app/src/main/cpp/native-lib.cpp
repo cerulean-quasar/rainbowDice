@@ -393,6 +393,13 @@ Java_com_quasar_cerulean_rainbowdice_Draw_rerollSelected(
     diceChannel().sendEvent(std::make_shared<RerollSelected>());
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_addRerollSelected(
+        JNIEnv *env,
+        jclass jclass1) {
+    diceChannel().sendEvent(std::make_shared<AddRerollSelected>());
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         JNIEnv *env,

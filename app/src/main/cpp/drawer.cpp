@@ -175,6 +175,7 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                         break;
                     case DrawEvent::tapDice:
                     case DrawEvent::rerollSelected:
+                    case DrawEvent::addRerollSelected:
                         // ignore these events while drawing
                         break;
                 }

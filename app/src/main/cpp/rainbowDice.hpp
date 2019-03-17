@@ -140,6 +140,7 @@ public:
     virtual bool tapDice(float x, float y) = 0;
 
     virtual void rerollSelected() = 0;
+    virtual void addRerollSelected() = 0;
 
     virtual void scale(float scaleFactor) {
         m_viewPoint.z /= scaleFactor;
@@ -253,6 +254,7 @@ public:
             std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
             bool inIsModifiedRoll = false) override;
     void rerollSelected() override;
+    void addRerollSelected() override;
 
     void loadObject(std::vector<std::string> const &symbols,
                                        std::vector<uint32_t> const &rerollIndices,
@@ -510,6 +512,41 @@ void RainbowDiceGraphics<DiceType>::rerollSelected() {
             die->toggleSelected();
             m_isModifiedRoll = true;
         }
+    }
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::addRerollSelected() {
+    for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
+        if (diceIt->get()->isSelected()) {
+            m_isModifiedRoll = true;
+
+            auto die = createDie(*diceIt);
+            diceIt->get()->toggleSelected();
+
+            if (diceIt->get()->isBeingRerolled()) {
+                die->setIsBeingRerolled(true);
+            } else {
+                diceIt->get()->setIsBeingRerolled(true);
+            }
+
+            diceIt++;
+            m_dice.insert(diceIt, die);
+            diceIt--;
+        }
+    }
+
+    int i=0;
+    for (auto const &die : m_dice) {
+        if (die->die()->isStopped()) {
+            auto nbrX = static_cast<uint32_t>(screenWidth/(2*DicePhysicsModel::stoppedRadius));
+            uint32_t stoppedX = i%nbrX;
+            uint32_t stoppedY = i/nbrX;
+            float x = -screenWidth/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = screenHeight/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die()->animateMove(x, y);
+        }
+        i++;
     }
 }
 

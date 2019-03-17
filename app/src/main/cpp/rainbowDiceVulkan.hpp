@@ -256,6 +256,11 @@ public:
         return RainbowDiceGraphics::tapDice(x, y, m_width, m_height);
     }
 
+    void addRerollSelected() override {
+        RainbowDiceGraphics::addRerollSelected();
+        initializeCommandBuffers();
+    }
+
     void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) override {
         RainbowDice::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
 

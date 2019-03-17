@@ -223,7 +223,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onPlusReroll(View view) {
-
+        Draw.addRerollSelected();
     }
 
     public void onDeleteDiceFromRoll(View view) {

@@ -40,7 +40,8 @@ public:
         scrollSurface,
         scaleSurface,
         tapDice,
-        rerollSelected
+        rerollSelected,
+        addRerollSelected
     };
 
     // returns true if the surface needs redrawing after this event.
@@ -153,6 +154,20 @@ public:
     evtype type() override { return rerollSelected; }
 
     ~RerollSelected() = default;
+};
+
+class AddRerollSelected : public DrawEvent {
+public:
+    AddRerollSelected() = default;
+
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+        diceGraphics->addRerollSelected();
+        return false;
+    }
+
+    evtype type() override { return addRerollSelected; }
+
+    ~AddRerollSelected() = default;
 };
 
 class DrawStoppedDiceEvent : public DrawEvent {

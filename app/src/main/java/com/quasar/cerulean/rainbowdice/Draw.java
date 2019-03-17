@@ -350,4 +350,6 @@ public class Draw {
     public static native void tapDice(float x, float y);
 
     public static native void rerollSelected();
+
+    public static native void addRerollSelected();
 }
