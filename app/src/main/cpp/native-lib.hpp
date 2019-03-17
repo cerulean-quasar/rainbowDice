@@ -36,6 +36,7 @@ public:
           m_notify{inNotify} {}
     void sendResult(
             std::string const &diceName,
+            bool isModified,
             std::vector<std::vector<uint32_t>> const &results,
             std::vector<std::shared_ptr<DiceDescription>> const &dice);
     void sendError(std::string const &error);

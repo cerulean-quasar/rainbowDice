@@ -99,8 +99,13 @@ public class DiceResult {
     }
 
     private ArrayList<ArrayList<DieResult>> diceResults;
+    private boolean m_isModifiedRoll;
 
-    public DiceResult(DiceDrawerMessage result, DieConfiguration[] diceConfigurations) {
+    private static final String modified_roll_name = "modified_roll";
+    private static final String results_name = "results";
+
+    public DiceResult(DiceDrawerMessage result, DieConfiguration[] diceConfigurations, boolean isModifiedRoll) {
+        m_isModifiedRoll = isModifiedRoll;
         diceResults = new ArrayList<>();
         LinkedList<LinkedList<Integer>> values = result.results();
         int i=0;
@@ -141,7 +146,16 @@ public class DiceResult {
         return dieResults;
     }
 
-    public JSONArray toJSON() throws JSONException {
+    public JSONObject toJSON() throws JSONException {
+        JSONObject obj = new JSONObject();
+        JSONArray arr = toJSONArray();
+        obj.put(results_name, arr);
+        obj.put(modified_roll_name, m_isModifiedRoll);
+
+        return obj;
+    }
+
+    public JSONArray toJSONArray() throws JSONException {
         JSONArray arrDiceResults = new JSONArray();
         for (ArrayList<DieResult> diceResult : diceResults) {
             JSONArray arrDiceResult = new JSONArray();
@@ -156,7 +170,18 @@ public class DiceResult {
     }
 
     public DiceResult(JSONArray arr) throws JSONException {
-        diceResults = new ArrayList<>();
+        diceResults = diceResultsFromJsonArray(arr);
+        m_isModifiedRoll = false;
+    }
+
+    public DiceResult(JSONObject obj) throws JSONException {
+        JSONArray arr = obj.getJSONArray(results_name);
+        diceResults = diceResultsFromJsonArray(arr);
+        m_isModifiedRoll = obj.getBoolean(modified_roll_name);
+    }
+
+    private ArrayList<ArrayList<DieResult>> diceResultsFromJsonArray(JSONArray arr) throws JSONException {
+        ArrayList<ArrayList<DieResult>> res= new ArrayList<>();
         for (int i = 0; i < arr.length(); i++) {
             ArrayList<DieResult> diceResult = new ArrayList<>();
             JSONArray arr2 = arr.getJSONArray(i);
@@ -165,11 +190,13 @@ public class DiceResult {
                 DieResult result = new DieResult(obj);
                 diceResult.add(result);
             }
-            diceResults.add(diceResult);
+            res.add(diceResult);
         }
+
+        return res;
     }
 
-    public String generateResultsString(DieConfiguration[] configs, String resultFormat,
+    public String generateResultsString(DieConfiguration[] configs, String name, String resultFormat,
                                         String resultFormat2,
                                         String addition, String subtraction) {
         boolean isBegin = true;
@@ -274,10 +301,13 @@ public class DiceResult {
         }
 
         String finalResult;
+        if (m_isModifiedRoll) {
+            name = "(modified roll) " + name;
+        }
         if (resultBeforeAdd.equals(resultAfterAdd)) {
-            finalResult = String.format(Locale.getDefault(), resultFormat2, resultBeforeAdd);
+            finalResult = String.format(Locale.getDefault(), resultFormat2, name, resultBeforeAdd);
         } else {
-            finalResult = String.format(Locale.getDefault(), resultFormat, resultBeforeAdd, resultAfterAdd);
+            finalResult = String.format(Locale.getDefault(), resultFormat, name, resultBeforeAdd, resultAfterAdd);
         }
 
         return finalResult.replace('\n', ' ');
@@ -285,5 +315,14 @@ public class DiceResult {
 
     ArrayList<ArrayList<DieResult>> getDiceResults() {
         return diceResults;
+    }
+    boolean isModifiedRoll() { return m_isModifiedRoll; }
+    int getNbrResults() { return diceResults.size(); }
+    int geNbrResultsForDie(int i) { return diceResults.get(i).size(); }
+    void getResultsForDie(int i, int[] arr) {
+        ArrayList<DieResult> res = diceResults.get(i);
+        for (int j = 0; j < res.size(); j++) {
+            arr[j] = res.get(j).index();
+        }
     }
 }

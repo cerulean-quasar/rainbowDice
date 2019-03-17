@@ -272,7 +272,7 @@ private:
     uint32_t result;
     std::vector<float> m_color;
 public:
-    // radius of a die when it is done rolling (It is shrinked and moved out of the rolling space).
+    // radius of a die when it is done rolling (It is shrunk and moved out of the rolling space).
     static float const stoppedRadius;
 
     /* Set previous position to a bogus value to make sure the die is drawn first thing */

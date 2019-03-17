@@ -101,7 +101,8 @@ public class Draw {
         return change;
     }
 
-    public static String startDrawingStoppedDice(DieConfiguration[] diceConfig, int[] faceIndicesUp) {
+    public static String startDrawingStoppedDice(String name, DieConfiguration[] diceConfig,
+                                                 DiceResult diceResult) {
         if (diceConfig == null || diceConfig.length == 0) {
             // somehow someone managed to crash the code by having dice config null.  I don't know
             // how they did this, but returning here avoids the crash.
@@ -115,7 +116,7 @@ public class Draw {
             return "error: Could not create texture.";
         }
 
-        String err = drawStoppedDice(faceIndicesUp, diceConfig,
+        String err = drawStoppedDice(name, diceConfig, diceResult,
                 symbolSet.toArray(new String[symbolSet.size()]),
                 texture.width, texture.height,
                 texture.textureCoordLeft, texture.textureCoordRight, texture.textureCoordTop,
@@ -333,7 +334,8 @@ public class Draw {
                                    String[] symbols, int width, int height,
                                    float[] textureCoordLeft, float[] textureCoordRight,
                                    float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
-    private static native String drawStoppedDice(int[] symbolIndicesUp, DieConfiguration[] diceConfig,
+    private static native String drawStoppedDice(String diceName, DieConfiguration[] diceConfig,
+                                          DiceResult diceResult,
                                           String[] symbolsTexture, int width, int height,
                                           float[] textureCoordLeft, float[] textureCoordRight,
                                           float[] textureCoordTop, float[] textureCoordBottom,  byte[] bitmap);
@@ -346,4 +348,6 @@ public class Draw {
     public static native void scale(float scaleFactor);
 
     public static native void tapDice(float x, float y);
+
+    public static native void rerollSelected();
 }

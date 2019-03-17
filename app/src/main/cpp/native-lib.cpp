@@ -214,6 +214,42 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
     return std::make_pair(dice, texture);
 }
 
+std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults) {
+    std::vector<std::vector<uint32_t>> diceResults;
+
+    jclass diceResultsClass = env->GetObjectClass(jDiceResults);
+    jmethodID mid = env->GetMethodID(diceResultsClass, "getNbrResults", "()I");
+    if (mid == 0) {
+        throw std::runtime_error("Could not load dice results");
+    }
+    uint32_t nbrResults = env->CallIntMethod(jDiceResults, mid);
+
+    jmethodID midNbrResultsForDie = env->GetMethodID(diceResultsClass,"geNbrResultsForDie", "(I)I");
+    jmethodID midResultsForDie = env->GetMethodID(diceResultsClass, "getResultsForDie", "(I[I)V");
+    if (midNbrResultsForDie == 0 || midResultsForDie == 0) {
+        throw std::runtime_error("Could not load dice results");
+    }
+
+    for (uint32_t i = 0; i < nbrResults; i++) {
+        std::vector<uint32_t> resultsForDie;
+        uint32_t nbrResultsForDie = env->CallIntMethod(jDiceResults, midNbrResultsForDie, i);
+        jintArray jArrayResultsForDie = env->NewIntArray(nbrResultsForDie);
+
+        env->CallVoidMethod(jDiceResults, midResultsForDie, i, jArrayResultsForDie);
+        jint *jresultsForDie = env->GetIntArrayElements(jArrayResultsForDie, NULL);
+        for (uint32_t i = 0; i < nbrResultsForDie; i++) {
+            resultsForDie.push_back(jresultsForDie[i]);
+        }
+        // we don't want to copy back changes to the array so use JNI_ABORT mode.
+        env->ReleaseIntArrayElements(jArrayResultsForDie, jresultsForDie, JNI_ABORT);
+
+        diceResults.push_back(resultsForDie);
+    }
+
+    return std::move(diceResults);
+}
+
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_rollDice(
         JNIEnv *env,
@@ -281,8 +317,9 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         JNIEnv *env,
         jclass jclass1,
-        jintArray jFaceIndicesUpArray,
+        jstring jdiceName,
         jobjectArray jDiceConfigs,
+        jobject jDiceResults,
         jobjectArray jSymbols,
         jint width,
         jint height,
@@ -292,26 +329,31 @@ Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         jfloatArray textureCoordBottom,
         jbyteArray jbitmap)
 {
-    int count = env->GetArrayLength(jFaceIndicesUpArray);
-    std::vector<uint32_t > faceIndicesUp;
-    jint* jFaceIndicesUp = env->GetIntArrayElements(jFaceIndicesUpArray, nullptr);
-    for (int i = 0; i < count; i++) {
-        faceIndicesUp.push_back(static_cast<uint32_t >(jFaceIndicesUp[i]));
+    const char *cdiceName = env->GetStringUTFChars(jdiceName, nullptr);
+    std::string diceName(cdiceName);
+    env->ReleaseStringUTFChars(jdiceName, cdiceName);
+
+    jclass diceResultsClass = env->GetObjectClass(jDiceResults);
+    jmethodID mid = env->GetMethodID(diceResultsClass, "isModifiedRoll", "()Z");
+    if (mid == 0) {
+        return env->NewStringUTF("Could not load dice results");
     }
-    env->ReleaseIntArrayElements(jFaceIndicesUpArray, jFaceIndicesUp, JNI_ABORT);
+    bool isModifiedRoll = env->CallBooleanMethod(jDiceResults, mid);
 
     try {
+
+        std::vector<std::vector<uint32_t>> upFaceIndices = std::move(initResults(env, jDiceResults));
         std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<TextureAtlas>> dice =
                 initDice(env, jDiceConfigs,
                          jSymbols, width, height, textureCoordLeft,
                          textureCoordRight, textureCoordTop,
                          textureCoordBottom, jbitmap);
-        std::shared_ptr<DrawEvent> event = std::make_shared<DrawStoppedDiceEvent>(std::move(dice.first), dice.second,
-                                                                    std::move(faceIndicesUp));
+        std::shared_ptr<DrawEvent> event = std::make_shared<DrawStoppedDiceEvent>(std::move(diceName),
+                std::move(dice.first), dice.second, std::move(upFaceIndices), isModifiedRoll);
         diceChannel().sendEvent(event);
         return env->NewStringUTF("");
     } catch (std::runtime_error &e) {
-        return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+        return env->NewStringUTF(e.what());
     }
 }
 
@@ -342,6 +384,13 @@ Java_com_quasar_cerulean_rainbowdice_Draw_tapDice(
         jfloat y) {
     auto event = std::make_shared<TapDiceEvent>(x, y);
     diceChannel().sendEvent(event);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_rerollSelected(
+        JNIEnv *env,
+        jclass jclass1) {
+    diceChannel().sendEvent(std::make_shared<RerollSelected>());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -386,6 +435,7 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
 
 void Notify::sendResult(
         std::string const &diceName,
+        bool isModified,
         std::vector<std::vector<uint32_t>> const &results,
         std::vector<std::shared_ptr<DiceDescription>> const &dice) {
     std::string totalResult;
@@ -464,21 +514,12 @@ void Notify::sendResult(
                 jrerollIndicesArray, jcolorArray, die->m_isAddOperation);
     }
 
-    if (diceName.empty()) {
-        jmethodID midSend = m_env->GetMethodID(notifyClass, "sendResults", "()V");
-        if (midSend == nullptr) {
-            throw std::runtime_error("Could not send message.");
-        }
-
-        m_env->CallVoidMethod(m_notify, midSend);
-    } else {
-        jmethodID midSend = m_env->GetMethodID(notifyClass, "sendResults", "(Ljava/lang/String;)V");
-        if (midSend == nullptr) {
-            throw std::runtime_error("Could not send message.");
-        }
-
-        m_env->CallVoidMethod(m_notify, midSend, m_env->NewStringUTF(diceName.c_str()));
+    jmethodID midSend = m_env->GetMethodID(notifyClass, "sendResults", "(Ljava/lang/String;Z)V");
+    if (midSend == nullptr) {
+        throw std::runtime_error("Could not send message.");
     }
+
+    m_env->CallVoidMethod(m_notify, midSend, m_env->NewStringUTF(diceName.c_str()), isModified);
 }
 
 void Notify::sendError(std::string const &error) {

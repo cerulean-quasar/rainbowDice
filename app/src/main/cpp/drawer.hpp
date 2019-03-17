@@ -39,7 +39,8 @@ public:
         drawStoppedDice,
         scrollSurface,
         scaleSurface,
-        tapDice
+        tapDice,
+        rerollSelected
     };
 
     // returns true if the surface needs redrawing after this event.
@@ -140,23 +141,43 @@ public:
     ~TapDiceEvent() override = default;
 };
 
+class RerollSelected : public DrawEvent {
+public:
+    RerollSelected() = default;
+
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+        diceGraphics->rerollSelected();
+        return false;
+    }
+
+    evtype type() override { return rerollSelected; }
+
+    ~RerollSelected() = default;
+};
+
 class DrawStoppedDiceEvent : public DrawEvent {
+    std::string m_name;
+    bool m_isModifiedRoll;
     std::vector<std::shared_ptr<DiceDescription>> m_dice;
     std::shared_ptr<TextureAtlas> m_texture;
-    std::vector<uint32_t> m_upFaceIndices;
+    std::vector<std::vector<uint32_t>> m_upFaceIndices;
 public:
-    DrawStoppedDiceEvent(std::vector<std::shared_ptr<DiceDescription>> inDice,
-                    std::shared_ptr<TextureAtlas> inTexture,
-                    std::vector<uint32_t> inUpFaceIndices)
-            : m_dice{std::move(inDice)},
+    DrawStoppedDiceEvent(std::string inName,
+                std::vector<std::shared_ptr<DiceDescription>> inDice,
+                std::shared_ptr<TextureAtlas> inTexture,
+                std::vector<std::vector<uint32_t>> inUpFaceIndices,
+                bool inIsModifiedRoll)
+            : m_name{std::move(inName)},
+              m_dice{std::move(inDice)},
               m_texture{std::move(inTexture)},
-              m_upFaceIndices{std::move(inUpFaceIndices)}
+              m_upFaceIndices{std::move(inUpFaceIndices)},
+              m_isModifiedRoll{inIsModifiedRoll}
     {
     }
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
         diceGraphics->setTexture(m_texture);
-        diceGraphics->setDice("", m_dice);
+        diceGraphics->setDice(m_name, m_dice, m_isModifiedRoll);
         diceGraphics->initModels();
         diceGraphics->resetToStoppedPositions(m_upFaceIndices);
 

@@ -20,10 +20,11 @@
     <string name="favorites">Favorites:</string>
     <string name="configureDice">Reorder Dice</string>
     <string name="diceMessageRolling">Rolling&#8230;</string>
-    <string name="diceMessageResult">result: %s = %s</string>
-    <string name="diceMessageResult2">result: %s</string>
+    <string name="diceMessageResult">result: %s: %s = %s</string>
+    <string name="diceMessageResult2">result: %s: %s</string>
     <string name="diceMessageToStartRolling">Shake while rolling</string>
     <string name="diceMessageReRoll">Shake while re-rolling required dice</string>
+    <string name="modifiedRoll">(modified roll)</string>
     <string name="diceConfigNbrDice"># Dice</string>
     <string name="diceConfigColor">color</string>
     <string name="diceConfigDetails">Details</string>

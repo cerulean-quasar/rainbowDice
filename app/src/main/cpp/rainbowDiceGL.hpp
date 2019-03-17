@@ -73,12 +73,17 @@ struct GLGraphics {
     using Buffer = GLuint;
 };
 
-struct DiceGL : DiceGraphics<GLGraphics> {
+class DiceGL : public DiceGraphics<GLGraphics> {
+public:
     DiceGL(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
            std::vector<float> const &color, std::shared_ptr<TextureAtlas> const &inTextureAtlas)
             : DiceGraphics{symbols, std::move(inRerollIndices), color, inTextureAtlas}
     {
         createGLResources();
+    }
+
+    void toggleSelected() {
+        m_isSelected = !m_isSelected;
     }
 
     void destroyGLResources() {
@@ -103,8 +108,6 @@ struct DiceGL : DiceGraphics<GLGraphics> {
     ~DiceGL() override {
         destroyGLResources();
     }
-
-private:
 };
 
 class RainbowDiceGL : public RainbowDiceGraphics<DiceGL> {

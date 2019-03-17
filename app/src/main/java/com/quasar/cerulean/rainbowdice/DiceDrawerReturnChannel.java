@@ -31,17 +31,20 @@ public class DiceDrawerReturnChannel {
     public static final String errorMsg = "drawerError";
     public static final String diceConfigMsg = "diceConfig";
     public static final String fileNameMsg = "diceFileName";
+    public static final String isModifiedRollMsg = "isModifiedRoll";
 
     private DiceDrawerMessage m_msgBeingBuilt;
     private ArrayList<DieConfiguration> m_dice;
     private Handler m_notify;
     private String m_diceName;
+    private boolean m_isModifiedRoll;
 
     public DiceDrawerReturnChannel(Handler inNotify) {
         m_notify = inNotify;
         m_msgBeingBuilt = null;
         m_dice = null;
         m_diceName = null;
+        m_isModifiedRoll = false;
     }
 
     public void addResult(int[] indices) {
@@ -73,8 +76,9 @@ public class DiceDrawerReturnChannel {
         }
     }
 
-    public void sendResults(String diceName) {
+    public void sendResults(String diceName, boolean inIsModifiedRoll) {
         m_diceName = diceName;
+        m_isModifiedRoll = inIsModifiedRoll;
         sendResults();
     }
 
@@ -95,6 +99,7 @@ public class DiceDrawerReturnChannel {
         if (m_diceName != null) {
             bundle.putString(fileNameMsg, m_diceName);
         }
+        bundle.putBoolean(isModifiedRollMsg, m_isModifiedRoll);
         Message msg = Message.obtain();
         msg.setData(bundle);
         m_notify.sendMessage(msg);

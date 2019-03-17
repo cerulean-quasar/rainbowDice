@@ -42,10 +42,6 @@ public:
     inline typename GraphicsType::Buffer const &indexBuffer() { return m_indexBuffer; }
     inline typename GraphicsType::Buffer const &vertexBuffer() { return m_vertexBuffer; }
 
-    virtual void toggleSelected() {
-        m_isSelected = !m_isSelected;
-    }
-
     bool needsReroll() {
         if (!m_die->isStopped()) {
             // should not happen!
@@ -132,16 +128,18 @@ public:
 
     virtual void resetPositions(std::set<int> &dice)=0;
 
-    virtual void resetToStoppedPositions(std::vector<uint32_t > const &inUpFaceIndices)=0;
+    virtual void resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &inUpFaceIndices)=0;
 
-    virtual void addRollingDice()=0;
+    virtual void addRollingDice() = 0;
 
-    virtual void cleanupThread()=0;
+    virtual void cleanupThread() = 0;
 
     virtual void setTexture(std::shared_ptr<TextureAtlas> texture) = 0;
 
     // returns true if it needs a redraw
     virtual bool tapDice(float x, float y) = 0;
+
+    virtual void rerollSelected() = 0;
 
     virtual void scale(float scaleFactor) {
         m_viewPoint.z /= scaleFactor;
@@ -156,6 +154,62 @@ public:
     }
 
     virtual void scroll(float distanceX, float distanceY) = 0;
+
+    void setView() {
+        /* glm::lookAt takes the eye position, the center position, and the up axis as parameters */
+        m_view = glm::lookAt(m_viewPoint, m_viewPointCenterPosition, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+
+    virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) {
+        /* perspective matrix: takes the perspective projection, the aspect ratio, near and far
+         * view planes.
+         */
+        m_proj = glm::perspective(glm::radians(67.0f), surfaceWidth / (float) surfaceHeight,
+                                  0.1f, 10.0f);
+    }
+
+    virtual void setDice(std::string const &inDiceName,
+            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescription,
+            bool inIsModified = false) {
+        m_diceName = inDiceName;
+        m_diceDescriptions = inDiceDescription;
+        m_isModifiedRoll = inIsModified;
+    }
+
+    std::vector<std::shared_ptr<DiceDescription>> const &getDiceDescriptions() {
+        return m_diceDescriptions;
+    }
+
+    std::string diceName() {
+        return m_diceName;
+    }
+
+    bool isModifiedRoll() { return m_isModifiedRoll; }
+
+    RainbowDice()
+            : m_viewPoint{0.0f, 0.0f, 3.0f},
+              m_viewPointCenterPosition{0.0f, 0.0f, 0.0f},
+              m_isModifiedRoll{false}
+    {}
+
+    virtual ~RainbowDice() = default;
+
+protected:
+    std::string m_diceName;
+    std::vector<std::shared_ptr<DiceDescription>> m_diceDescriptions;
+
+    glm::mat4 m_proj;
+    glm::mat4 m_view;
+
+    glm::vec3 m_viewPoint;
+    glm::vec3 m_viewPointCenterPosition;
+
+    bool m_isModifiedRoll;
+
+    static constexpr float m_maxZ = 10.0f;
+    static constexpr float m_minZ = 1.5f;
+    static constexpr float m_maxScroll = 10.0f;
+
     void scroll(float distanceX, float distanceY, uint32_t windowWidth, uint32_t windowHeight) {
         float x = distanceX/windowWidth * 2.0f;
         float y = distanceY/windowHeight * 2.0f;
@@ -184,70 +238,21 @@ public:
 
         setView();
     }
-
-    void setView() {
-        /* glm::lookAt takes the eye position, the center position, and the up axis as parameters */
-        m_view = glm::lookAt(m_viewPoint, m_viewPointCenterPosition, glm::vec3(0.0f, 1.0f, 0.0f));
-    }
-
-    virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) {
-        /* perspective matrix: takes the perspective projection, the aspect ratio, near and far
-         * view planes.
-         */
-        m_proj = glm::perspective(glm::radians(67.0f), surfaceWidth / (float) surfaceHeight,
-                                  0.1f, 10.0f);
-    }
-
-    virtual void setDice(std::string const &inDiceName, std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescription) {
-        m_diceName = inDiceName;
-        m_diceDescriptions = inDiceDescription;
-    }
-
-    std::vector<std::shared_ptr<DiceDescription>> const &getDiceDescriptions() {
-        return m_diceDescriptions;
-    }
-
-    std::string diceName() {
-        return m_diceName;
-    }
-
-    virtual ~RainbowDice() = default;
-
-    RainbowDice()
-            : m_viewPoint{0.0f, 0.0f, 3.0f},
-              m_viewPointCenterPosition{0.0f, 0.0f, 0.0f}
-    {}
-protected:
-    std::string m_diceName;
-    std::vector<std::shared_ptr<DiceDescription>> m_diceDescriptions;
-
-    glm::mat4 m_proj;
-    glm::mat4 m_view;
-
-    glm::vec3 m_viewPoint;
-    glm::vec3 m_viewPointCenterPosition;
-
-    static constexpr float m_maxZ = 10.0f;
-    static constexpr float m_minZ = 1.5f;
-    static constexpr float m_maxScroll = 10.0f;
 };
 
 template <typename DiceType>
 class RainbowDiceGraphics : public RainbowDice {
 public:
-    virtual std::shared_ptr<DiceType> createDie(std::vector<std::string> const &symbols,
-                                      std::vector<uint32_t> const &inRerollIndices,
-                                      std::vector<float> const &color) = 0;
-    virtual std::shared_ptr<DiceType> createDie(std::shared_ptr<DiceType> const &inDice) = 0;
-
     void addRollingDice() override;
 
     bool tapDice(float x, float y, uint32_t width, uint32_t height);
     bool updateUniformBuffer() override;
     std::vector<std::vector<uint32_t >> getDiceResults() override;
-    void resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) override;
+    void resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) override;
     void setDice(std::string const &inDiceName,
-            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions) override;
+            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
+            bool inIsModifiedRoll = false) override;
+    void rerollSelected() override;
 
     void loadObject(std::vector<std::string> const &symbols,
                                        std::vector<uint32_t> const &rerollIndices,
@@ -310,6 +315,10 @@ protected:
     using DiceList = std::list<std::shared_ptr<DiceType>>;
     DiceList m_dice;
 
+    virtual std::shared_ptr<DiceType> createDie(std::vector<std::string> const &symbols,
+                                                std::vector<uint32_t> const &inRerollIndices,
+                                                std::vector<float> const &color) = 0;
+    virtual std::shared_ptr<DiceType> createDie(std::shared_ptr<DiceType> const &inDice) = 0;
     virtual bool invertY() = 0;
 };
 
@@ -365,7 +374,11 @@ bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
         if (die->die()->updateModelMatrix()) {
             needsRedraw = true;
         }
-        if (die->die()->isStopped() && !die->die()->isStoppedAnimationStarted()) {
+
+        // check if the stopped animation is done and not started because if the dice are just
+        // positioned, then the stopped animation is done, but never started.
+        if (die->die()->isStopped() && !die->die()->isStoppedAnimationDone() &&
+                !die->die()->isStoppedAnimationStarted()) {
             auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
             uint32_t stoppedX = i%nbrX;
             uint32_t stoppedY = i/nbrX;
@@ -400,25 +413,40 @@ std::vector<std::vector<uint32_t >> RainbowDiceGraphics<DiceType>::getDiceResult
 }
 
 template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) {
+void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     uint32_t i = 0;
+    uint32_t k = 0;
     float width = screenWidth;
     float height = screenHeight;
-    for (auto const &die : m_dice) {
-        auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
-        uint32_t stoppedX = i%nbrX;
-        uint32_t stoppedY = i/nbrX;
-        float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-        float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+    auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+    for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
+        for (uint32_t j = 0; j < upFaceIndices[i].size(); j++) {
+            uint32_t stoppedX = k%nbrX;
+            uint32_t stoppedY = k/nbrX;
+            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
 
-        die->die()->positionDice(upFaceIndices[i++], x, y);
+            if (j == 0) {
+                diceIt->get()->die()->positionDice(upFaceIndices[i][j], x, y);
+            } else {
+                auto die = createDie(*diceIt);
+                die->die()->positionDice(upFaceIndices[i][j], x, y);
+                diceIt->get()->setIsBeingRerolled(true);
+                diceIt++;
+                m_dice.insert(diceIt, die);
+                diceIt--;
+            }
+            k++;
+        }
+        i++;
     }
 }
 
 template <typename DiceType>
 void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
-                                            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions) {
-    RainbowDice::setDice(inDiceName, inDiceDescriptions);
+                                            std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
+                                            bool inIsModifiedRoll) {
+    RainbowDice::setDice(inDiceName, inDiceDescriptions, inIsModifiedRoll);
 
     m_dice.clear();
     for (auto const &diceDescription : m_diceDescriptions) {
@@ -452,7 +480,6 @@ void RainbowDiceGraphics<DiceType>::addRollingDice() {
             continue;
         }
 
-        glm::vec3 position(0.0f, 0.0f, -1.0f);
         auto die = createDie(*diceIt);
         diceIt->get()->setIsBeingRerolled(true);
 
@@ -472,6 +499,17 @@ void RainbowDiceGraphics<DiceType>::addRollingDice() {
             die->die()->animateMove(x, y);
         }
         i++;
+    }
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::rerollSelected() {
+    for (auto const &die : m_dice) {
+        if (die->isSelected()) {
+            die->die()->resetPosition(screenWidth, screenHeight);
+            die->toggleSelected();
+            m_isModifiedRoll = true;
+        }
     }
 }
 

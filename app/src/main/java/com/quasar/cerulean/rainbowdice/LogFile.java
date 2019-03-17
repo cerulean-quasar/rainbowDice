@@ -96,7 +96,8 @@ public class LogFile {
     private class LogItemV1 extends LogItem {
         private static final String diceList_name = "diceConfigurationList";
         private static final String diceGroup_name = "diceGroup";
-        private static final String diceResult_name = "diceResults";
+        private static final String diceResults_name = "diceResults";
+        private static final String diceResult_name = "diceResult";
         private DiceGroup dice;
         private DiceResult result;
 
@@ -115,8 +116,13 @@ public class LogFile {
             } else if (obj.has(diceGroup_name)) {
                 dice = DiceGroup.fromJson(obj.getJSONObject(diceGroup_name));
             }
-            JSONArray arr2 = obj.getJSONArray(diceResult_name);
-            result = new DiceResult(arr2);
+            if (obj.has(diceResults_name)) {
+                JSONArray arr2 = obj.getJSONArray(diceResults_name);
+                result = new DiceResult(arr2);
+            } else {
+                JSONObject obj2 = obj.getJSONObject(diceResult_name);
+                result = new DiceResult(obj2);
+            }
         }
 
         public JSONObject toJSON() throws JSONException {
@@ -126,8 +132,8 @@ public class LogFile {
             obj.put(jsonDiceName, diceName);
             JSONObject diceObj = dice.toJson();
             obj.put(diceGroup_name, diceObj);
-            JSONArray resultArr = result.toJSON();
-            obj.put(diceResult_name, resultArr);
+            JSONObject resultObj = result.toJSON();
+            obj.put(diceResult_name, resultObj);
             return obj;
         }
 
@@ -140,6 +146,7 @@ public class LogFile {
         public String getRollResultsString() {
             Resources res = ctx.getResources();
             return result.generateResultsString(dice.dieConfigurations(),
+                    diceName,
                     res.getString(R.string.diceMessageResult),
                     res.getString(R.string.diceMessageResult2),
                     res.getString(R.string.addition), res.getString(R.string.subtraction));

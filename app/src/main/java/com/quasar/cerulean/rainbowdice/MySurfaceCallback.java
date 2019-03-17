@@ -42,7 +42,7 @@ public class MySurfaceCallback implements SurfaceHolder.Callback {
         app.createWorker();
         MainActivity.LogFileLoadedResult result = app.loadFromLog();
         if (result != null) {
-            app.drawStoppedDice(result.diceConfig, result.diceResult);
+            app.drawStoppedDice(result.name, result.diceConfig, result.diceResult);
         }
     }
 

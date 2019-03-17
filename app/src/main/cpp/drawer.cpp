@@ -174,6 +174,7 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                         }
                         break;
                     case DrawEvent::tapDice:
+                    case DrawEvent::rerollSelected:
                         // ignore these events while drawing
                         break;
                 }
@@ -193,7 +194,8 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                 continue;
             }
             std::vector<std::vector<uint32_t>> results = m_diceGraphics->getDiceResults();
-            m_notify->sendResult(m_diceGraphics->diceName(), results, m_diceGraphics->getDiceDescriptions());
+            m_notify->sendResult(m_diceGraphics->diceName(), m_diceGraphics->isModifiedRoll(),
+                    results, m_diceGraphics->getDiceDescriptions());
             return std::shared_ptr<DrawEvent>();
         }
     }

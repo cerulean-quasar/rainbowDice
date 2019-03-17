@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
     private Thread drawer = null;
 
     public class LogFileLoadedResult {
+        public String name = null;
         public DieConfiguration[] diceConfig = null;
         public DiceResult diceResult = null;
     }
@@ -217,49 +218,28 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
     }
 
+    public void onReroll(View view) {
+        Draw.rerollSelected();
+    }
+
+    public void onPlusReroll(View view) {
+
+    }
+
+    public void onDeleteDiceFromRoll(View view) {
+
+    }
+
+    public  void onResetView(View view) {
+
+    }
+
     public void setSurfaceReady(boolean inIsReady) {
         surfaceReady = inIsReady;
     }
 
-    public void drawStoppedDice(DieConfiguration[] diceConfig, DiceResult diceResult) {
-        ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = diceResult.getDiceResults();
-        int len = 0;
-        int i = 0;
-        for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
-            if (diceConfig[i].getNumberOfSides() == 1) {
-                // skip drawing constants...
-                i+=dieResults.size();
-                continue;
-            }
-            i += dieResults.size();
-            len += dieResults.size();
-        }
-
-        int[] indices = new int[len];
-
-        i = 0;
-        int j = 0;
-        for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
-            if (diceConfig[i].getNumberOfSides() == 1) {
-                // skip drawing constants...
-                i+=dieResults.size();
-                continue;
-            }
-            for (DiceResult.DieResult dieResult : dieResults) {
-                Integer index = dieResult.index();
-                // old dice result...
-                if (index == null) {
-                    index = diceConfig[i].getIndexForSymbol(dieResult.symbol());
-                }
-                indices[j] = index;
-                j++;
-                i++;
-            }
-        }
-
-        SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
-        SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
-        String err = Draw.startDrawingStoppedDice(diceConfig, indices);
+    public void drawStoppedDice(String name, DieConfiguration[] diceConfig, DiceResult diceResult) {
+        String err = Draw.startDrawingStoppedDice(name, diceConfig, diceResult);
         if (err != null && err.length() > 0) {
             TextView text = findViewById(R.id.rollResult);
             text.setText(err);
@@ -281,32 +261,11 @@ public class MainActivity extends AppCompatActivity {
 
         LogFileLoadedResult result = new LogFileLoadedResult();
         result.diceResult = item.getRollResults();
-        ArrayList<ArrayList<DiceResult.DieResult>> diceResultList = result.diceResult.getDiceResults();
-        int len = 0;
-        for (ArrayList<DiceResult.DieResult> dieResults : diceResultList) {
-            len += dieResults.size();
-        }
+        result.name = item.getDiceName();
+        result.diceConfig = item.getDiceConfiguration();
 
-        DieConfiguration[] configs = item.getDiceConfiguration();
-        result.diceConfig = new DieConfiguration[len];
-
-        int k = 0;
-        int l = 0;
-        int m = 0;
-        for (int j = 0; j < diceResultList.size(); j++) {
-            ArrayList<DiceResult.DieResult> dieResults = diceResultList.get(j);
-            for (int i=0; i < dieResults.size(); i++) {
-                result.diceConfig[k++] = new DieConfiguration(configs[l], 1);
-            }
-            if (m == configs[l].getNumberOfDice()-1) {
-                l++;
-                m = 0;
-            } else {
-                m++;
-            }
-        }
-
-        text.setText(result.diceResult.generateResultsString(configs,
+        text.setText(result.diceResult.generateResultsString(result.diceConfig,
+                result.name,
                 getString(R.string.diceMessageResult),
                 getString(R.string.diceMessageResult2),
                 getString(R.string.addition), getString(R.string.subtraction)));
@@ -465,17 +424,22 @@ public class MainActivity extends AppCompatActivity {
                     diceConfig[i] = (DieConfiguration)diceConfigParcels[i];
                 }
 
-                String filename = "modified roll";
+                String filename = "";
                 if (data.containsKey(DiceDrawerReturnChannel.fileNameMsg)) {
                     filename = data.getString(DiceDrawerReturnChannel.fileNameMsg);
                 }
 
-                DiceResult diceResult = new DiceResult(results, diceConfig);
+                boolean isModifiedRoll = false;
+                if (data.containsKey(DiceDrawerReturnChannel.isModifiedRollMsg)) {
+                    isModifiedRoll = data.getBoolean(DiceDrawerReturnChannel.isModifiedRollMsg);
+                }
+
+                DiceResult diceResult = new DiceResult(results, diceConfig, isModifiedRoll);
 
                 // no dice need reroll, just update the results text view with the results.
                 logFile.addRoll(filename, diceResult, diceConfig);
                 drawingStarted = false;
-                text.setText(diceResult.generateResultsString(diceConfig,
+                text.setText(diceResult.generateResultsString(diceConfig, filename,
                         getString(R.string.diceMessageResult),
                         getString(R.string.diceMessageResult2),
                         getString(R.string.addition), getString(R.string.subtraction)));

@@ -534,11 +534,14 @@ void RainbowDiceVulkan::addRollingDice() {
     initializeCommandBuffers();
 }
 
-void RainbowDiceVulkan::resetToStoppedPositions(std::vector<uint32_t> const &upFaceIndices) {
+void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     RainbowDiceGraphics::resetToStoppedPositions(upFaceIndices);
     for (auto const &die : m_dice) {
         die->updateUniformBuffer(m_projWithPreTransform, m_view);
     }
+
+    // need to initialize command buffers here in case any dice are added.
+    initializeCommandBuffers();
 }
 
 std::shared_ptr<DiceVulkan> RainbowDiceVulkan::createDie(std::vector<std::string> const &symbols,

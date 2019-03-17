@@ -194,6 +194,10 @@ void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
 }
 
 bool DicePhysicsModel::updateModelMatrix() {
+    if (animationDone) {
+        return false;
+    }
+
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - prevTime).count();
     prevTime = currentTime;
@@ -454,7 +458,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     angularVelocity.setAngularSpeed(0.0);
     angularVelocity.setSpinAxis(glm::vec3(0.0,0.0,0.0));
 
-    glm::vec3 normalVector;
+    glm::vec3 normalVector = {};
     float angle = 0;
 
     // getAngleAxis uses the model matrix... initialize here temporarily and then reinitialize
@@ -494,6 +498,8 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     m_model = translate * rotate * scale;
     stopped = true;
     animationDone = true;
+    goingToStop = true;
+    result = inUpFaceIndex;
 }
 
 void DicePhysicsModel::randomizeUpFace(float screenWidth, float screenHeight) {

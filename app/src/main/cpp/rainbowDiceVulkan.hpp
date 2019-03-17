@@ -124,8 +124,8 @@ public:
         m_uniformBufferFrag->copyRawTo(&fragmentVariables, sizeof (fragmentVariables));
     }
 
-    void toggleSelected() override {
-        DiceGraphics::toggleSelected();
+    void toggleSelected() {
+        m_isSelected = !m_isSelected;
         updateUniformBufferFragmentVariables();
     }
 
@@ -248,7 +248,7 @@ public:
 
     void recreateSwapChain(uint32_t width, uint32_t height) override;
 
-    void resetToStoppedPositions(std::vector<uint32_t> const &symbols) override;
+    void resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &symbols) override;
 
     void addRollingDice() override;
 

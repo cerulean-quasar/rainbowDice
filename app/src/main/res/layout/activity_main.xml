@@ -1,37 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
-    <LinearLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-        <LinearLayout
-            android:orientation="vertical"
-            android:layout_width="match_parent"
+    <android.support.constraint.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <Button
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toLeftOf="@id/plus_rolling_dice"
+            app:layout_constraintBottom_toTopOf="@id/delete_dice"
+            app:layout_constraintTop_toTopOf="parent"
+            android:id="@+id/rolling_dice"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@drawable/rolling_dice"
+            android:onClick="onReroll"/>
+        <Button
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintRight_toLeftOf="@id/diceListScroll"
+            app:layout_constraintLeft_toRightOf="@id/rolling_dice"
+            app:layout_constraintBottom_toTopOf="@id/delete_dice"
+            app:layout_constraintTop_toTopOf="parent"
+            android:id="@+id/plus_rolling_dice"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@drawable/plus_rolling_dice"
+            android:onClick="onPlusReroll"/>
+        <Button
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintRight_toLeftOf="@id/delete_dice"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/plus_rolling_dice"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:id="@+id/reset_view"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@drawable/drop_changes"
+            android:onClick="onResetView"/>
+        <Button
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintRight_toLeftOf="@id/diceListScroll"
+            app:layout_constraintLeft_toRightOf="@id/reset_view"
+            app:layout_constraintTop_toBottomOf="@id/plus_rolling_dice"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:id="@+id/delete_dice"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@drawable/trash"
+            android:onClick="onDeleteDiceFromRoll"/>
+        <HorizontalScrollView
+            app:layout_constraintWidth_default="percent"
+            app:layout_constraintWidth_percent="0.80"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintLeft_toRightOf="@id/plus_rolling_dice"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:id="@+id/diceListScroll"
+            android:layout_width="0dp"
             android:layout_height="wrap_content">
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-                <LinearLayout
-                    android:id="@+id/diceList"
-                    android:orientation="horizontal"
-                    android:divider="@drawable/button_divider"
-                    android:showDividers="middle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
-            </HorizontalScrollView>
-            <ImageView
-                android:src="?attr/divider"
+            <LinearLayout
+                android:id="@+id/diceList"
+                android:orientation="horizontal"
+                android:divider="@drawable/button_divider"
+                android:showDividers="middle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-            <TextView
-                android:id="@+id/rollResult"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/diceMessageToStartRolling"/>
-        </LinearLayout>
-        <com.quasar.cerulean.rainbowdice.RainbowDiceSurfaceView
+                android:layout_height="wrap_content"/>
+        </HorizontalScrollView>
+    </android.support.constraint.ConstraintLayout>
+    <ImageView
+        android:src="?attr/divider"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <TextView
+        android:id="@+id/rollResult"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/diceMessageToStartRolling"/>
+    <com.quasar.cerulean.rainbowdice.RainbowDiceSurfaceView
             android:id="@+id/drawingSurface"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-    </LinearLayout>
+</LinearLayout>
