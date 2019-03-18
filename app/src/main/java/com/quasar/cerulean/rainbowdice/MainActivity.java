@@ -231,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public  void onResetView(View view) {
-
+        Draw.resetView();
     }
 
     public void setSurfaceReady(boolean inIsReady) {

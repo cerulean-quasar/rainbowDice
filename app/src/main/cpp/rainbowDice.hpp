@@ -169,6 +169,12 @@ public:
                                   0.1f, 10.0f);
     }
 
+    virtual void resetView() {
+        m_viewPoint = startViewPoint();
+        m_viewPointCenterPosition = startViewPointCenterPosition();
+        setView();
+    }
+
     virtual void setDice(std::string const &inDiceName,
             std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescription,
             bool inIsModified = false) {
@@ -188,8 +194,8 @@ public:
     bool isModifiedRoll() { return m_isModifiedRoll; }
 
     RainbowDice()
-            : m_viewPoint{0.0f, 0.0f, 3.0f},
-              m_viewPointCenterPosition{0.0f, 0.0f, 0.0f},
+            : m_viewPoint{startViewPoint()},
+              m_viewPointCenterPosition{startViewPointCenterPosition()},
               m_isModifiedRoll{false}
     {}
 
@@ -210,6 +216,8 @@ protected:
     static constexpr float m_maxZ = 10.0f;
     static constexpr float m_minZ = 1.5f;
     static constexpr float m_maxScroll = 10.0f;
+    static glm::vec3 startViewPointCenterPosition() { return {0.0f, 0.0f, 0.0f}; }
+    static glm::vec3 startViewPoint() { return {0.0f, 0.0f, 3.0f}; };
 
     void scroll(float distanceX, float distanceY, uint32_t windowWidth, uint32_t windowHeight) {
         float x = distanceX/windowWidth * 2.0f;

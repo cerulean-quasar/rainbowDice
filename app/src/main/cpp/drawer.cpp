@@ -169,6 +169,7 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                     case DrawEvent::surfaceChanged:
                     case DrawEvent::scrollSurface:
                     case DrawEvent::scaleSurface:
+                    case DrawEvent::resetView:
                         if ((*event)(m_diceGraphics)) {
                             nbrRequireRedraw++;
                         }

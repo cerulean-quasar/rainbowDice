@@ -297,6 +297,15 @@ public:
         }
     }
 
+    void resetView() override {
+        RainbowDice::resetView();
+
+        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
+        for (auto const & die : m_dice) {
+            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        }
+    }
+
     void setTexture(std::shared_ptr<TextureAtlas> texture) override {
         std::shared_ptr<vulkan::ImageView> imgView = std::make_shared<vulkan::ImageView>(
                 createTextureImage(texture->getImageWidth(), texture->getImageHeight(),
