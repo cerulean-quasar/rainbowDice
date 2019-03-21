@@ -295,6 +295,10 @@ public class DiceResult {
         }
 
         String resultBeforeAdd = resultString.toString();
+        if (resultBeforeAdd.isEmpty()) {
+            resultBeforeAdd = "0";
+        }
+
         String resultAfterAdd = totalString.toString();
         if (resultAfterAdd.isEmpty()) {
             resultAfterAdd = "0";

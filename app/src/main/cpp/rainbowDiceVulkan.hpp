@@ -261,6 +261,12 @@ public:
         initializeCommandBuffers();
     }
 
+    bool deleteSelected() override {
+        bool ret = RainbowDiceGraphics::deleteSelected();
+        initializeCommandBuffers();
+        return ret;
+    }
+
     void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) override {
         RainbowDice::updatePerspectiveMatrix(surfaceWidth, surfaceHeight);
 
@@ -276,14 +282,22 @@ public:
 
         m_width = surfaceWidth;
         m_height = surfaceHeight;
+
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
+        }
     }
 
     void scale(float scaleFactor) override {
         RainbowDice::scale(scaleFactor);
 
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & die : m_dice) {
-            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
         }
     }
 
@@ -292,8 +306,10 @@ public:
         RainbowDice::scroll(distanceX, distanceY, ext.width, ext.height);
 
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & die : m_dice) {
-            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        for (auto const & dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
         }
     }
 
@@ -301,8 +317,10 @@ public:
         RainbowDice::resetView();
 
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & die : m_dice) {
-            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        for (auto const & dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
         }
     }
 

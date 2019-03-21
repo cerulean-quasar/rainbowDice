@@ -151,15 +151,15 @@ void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
 }
 
 void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
-    if (glm::length(m_position - other->m_position) < 2 * radius) {
+    float length = glm::length(m_position - other->m_position);
+    if (length < 2 * radius) {
         // the dice are too close, they need to bounce off of each other
 
-        if (glm::length(m_position-other->m_position) == 0) {
+        if (length == 0) {
             m_position.x += radius;
             other->m_position.x -= radius;
         }
         glm::vec3 norm = glm::normalize(m_position - other->m_position);
-        float length = glm::length(m_position - other->m_position);
         if (length < radius) {
             // they are almost at the exact same spot, just choose a direction to bounce...
             // Using radius instead of 2*radius because we don't want to hit this condition
@@ -452,6 +452,8 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     m_position.x = x;
     m_position.y = y;
     m_position.z = maxposz;
+    stoppedPositionX = x;
+    stoppedPositionY = y;
 
     velocity = { 0.0, 0.0, 0.0 };
 
@@ -492,6 +494,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
         checkQuaternion(qTotalRotated);
         checkQuaternion(q);
         qTotalRotated = glm::normalize(q*qTotalRotated);
+        stoppedAngle = 0;
     }
 
     rotate = glm::toMat4(qTotalRotated);

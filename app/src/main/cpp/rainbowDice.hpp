@@ -48,10 +48,6 @@ public:
             return false;
         }
 
-        if (m_isBeingRerolled) {
-            return false;
-        }
-
         uint32_t result = m_die->getResult();
 
         for (auto const & rerollIndex : m_rerollIndices) {
@@ -64,17 +60,14 @@ public:
     }
 
     inline std::shared_ptr<DicePhysicsModel> const &die() { return m_die; }
-    inline bool isBeingRerolled() { return m_isBeingRerolled; }
     inline std::vector<uint32_t> const &rerollIndices() { return m_rerollIndices; }
     inline bool isSelected() { return m_isSelected; }
     inline size_t nbrIndices() { return m_die->getIndices().size(); }
-    inline void setIsBeingRerolled(bool inIsBeingReRolled) { m_isBeingRerolled = inIsBeingReRolled; }
 
     DiceGraphics(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
                  std::vector<float> const &color,
                  std::shared_ptr<TextureAtlas> const &textureAtlas)
             : m_die{std::move(createDice(symbols, color))},
-              m_isBeingRerolled{false},
               m_rerollIndices{std::move(inRerollIndices)},
               m_isSelected{false},
               m_vertexBuffer{},
@@ -88,7 +81,6 @@ public:
     virtual ~DiceGraphics() = default;
 protected:
     std::shared_ptr<DicePhysicsModel> m_die;
-    bool m_isBeingRerolled;
     std::vector<uint32_t> m_rerollIndices;
     bool m_isSelected;
 
@@ -126,8 +118,6 @@ public:
 
     virtual void resetPositions()=0;
 
-    virtual void resetPositions(std::set<int> &dice)=0;
-
     virtual void resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &inUpFaceIndices)=0;
 
     virtual void addRollingDice() = 0;
@@ -141,6 +131,9 @@ public:
 
     virtual void rerollSelected() = 0;
     virtual void addRerollSelected() = 0;
+
+    // returns true if dice were deleted
+    virtual bool deleteSelected() = 0;
 
     virtual void scale(float scaleFactor) {
         m_viewPoint.z /= scaleFactor;
@@ -263,41 +256,42 @@ public:
             bool inIsModifiedRoll = false) override;
     void rerollSelected() override;
     void addRerollSelected() override;
+    bool deleteSelected() override;
 
     void loadObject(std::vector<std::string> const &symbols,
                                        std::vector<uint32_t> const &rerollIndices,
                                        std::vector<float> const &color) override {
-        m_dice.push_back(createDie(symbols, rerollIndices, color));
+        std::list<std::shared_ptr<DiceType>> dice;
+        dice.push_back(createDie(symbols, rerollIndices, color));
+        m_dice.push_back(std::move(dice));
     }
 
     void updateAcceleration(float x, float y, float z) override {
-        for (auto const &die : m_dice) {
-            die->die()->updateAcceleration(x, y, z);
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->die()->updateAcceleration(x, y, z);
+            }
         }
     }
 
     void resetPositions() override {
         float width = screenWidth;
         float height = screenHeight;
-        for (auto const &die: m_dice) {
-            die->die()->resetPosition(width, height);
-        }
-    }
-
-    void resetPositions(std::set<int> &diceIndices) override {
-        int i = 0;
-        float width = screenWidth;
-        float height = screenHeight;
-        for (auto const &die : m_dice) {
-            if (diceIndices.find(i) != diceIndices.end()) {
+        for (auto const &dice: m_dice) {
+            for (auto const &die : dice) {
                 die->die()->resetPosition(width, height);
             }
-            i++;
         }
     }
 
     bool needsReroll() override {
-        for (auto const &die : m_dice) {
+        for (auto const &dice : m_dice) {
+            // only check the last dice in the list to see if it needs to be rerolled.  The other dice
+            // in the list already got rerolled.  That is why there is a die after it.
+            if (dice.empty()) {
+                continue;
+            }
+            auto const &die = *(dice.rbegin());
             if (die->needsReroll()) {
                 return true;
             }
@@ -307,9 +301,11 @@ public:
     }
 
     bool allStopped() override {
-        for (auto &&die : m_dice) {
-            if (!die->die()->isStopped() || !die->die()->isStoppedAnimationDone()) {
-                return false;
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                if (!die->die()->isStopped() || !die->die()->isStoppedAnimationDone()) {
+                    return false;
+                }
             }
         }
         return true;
@@ -322,7 +318,7 @@ public:
 
     ~RainbowDiceGraphics() override = default;
 protected:
-    using DiceList = std::list<std::shared_ptr<DiceType>>;
+    using DiceList = std::list<std::list<std::shared_ptr<DiceType>>>;
     DiceList m_dice;
 
     virtual std::shared_ptr<DiceType> createDie(std::vector<std::string> const &symbols,
@@ -336,7 +332,6 @@ protected:
 
 template <typename DiceType>
 bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, uint32_t height) {
-    bool needsRedraw = false;
     float swidth = screenWidth;
     float sheight = screenHeight;
     float xnorm = x/width * swidth - swidth / 2.0f;
@@ -352,11 +347,17 @@ bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, ui
     glm::vec3 line =  glm::vec3{transformedP2.x, transformedP2.y, transformedP2.z}/transformedP2.w - start;
 
     line = glm::normalize(line);
-    for (auto const &die : m_dice) {
-        float distanceToLine = glm::length(glm::cross(line, die->die()->position() - start));
-        if (distanceToLine < DicePhysicsModel::stoppedRadius) {
-            die->toggleSelected();
-            needsRedraw = true;
+    bool needsRedraw = false;
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            float distanceToLine = glm::length(glm::cross(line, die->die()->position() - start));
+            if (distanceToLine < DicePhysicsModel::stoppedRadius) {
+                die->toggleSelected();
+                needsRedraw = true;
+                break;
+            }
+        }
+        if (needsRedraw) {
             break;
         }
     }
@@ -367,10 +368,30 @@ bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, ui
 template <typename DiceType>
 bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
     for (auto iti = m_dice.begin(); iti != m_dice.end(); iti++) {
-        if (!iti->get()->die()->isStopped()) {
-            for (auto itj = iti; itj != m_dice.end(); itj++) {
-                if (!itj->get()->die()->isStopped() && iti != itj) {
-                    iti->get()->die()->calculateBounce(itj->get()->die().get());
+        for (auto itdi = iti->begin(); itdi != iti->end(); itdi++) {
+            auto const &die1 = *itdi;
+            if (!die1->die()->isStopped()) {
+                // first calculate bounce for the rest of the current list of dice
+                auto itdj = itdi;
+                itdj++;
+                while (itdj != iti->end()) {
+                    auto const &die2 = *(itdj);
+                    if (!die2->die()->isStopped()) {
+                        die1->die()->calculateBounce(die2->die().get());
+                    }
+                    itdj++;
+                }
+
+                // next, calculate the bounce for the next lists of dice.
+                auto itj = iti;
+                itj++;
+                while (itj != m_dice.end()) {
+                    for (auto const &die2 : *itj) {
+                        if (!die2->die()->isStopped()) {
+                            die1->die()->calculateBounce(die2->die().get());
+                        }
+                    }
+                    itj++;
                 }
             }
         }
@@ -380,23 +401,25 @@ bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
     uint32_t i = 0;
     float width = screenWidth;
     float height = screenHeight;
-    for (auto &&die : m_dice) {
-        if (die->die()->updateModelMatrix()) {
-            needsRedraw = true;
-        }
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            if (die->die()->updateModelMatrix()) {
+                needsRedraw = true;
+            }
 
-        // check if the stopped animation is done and not started because if the dice are just
-        // positioned, then the stopped animation is done, but never started.
-        if (die->die()->isStopped() && !die->die()->isStoppedAnimationDone() &&
+            // check if the stopped animation is done and not started because if the dice are just
+            // positioned, then the stopped animation is done, but never started.
+            if (die->die()->isStopped() && !die->die()->isStoppedAnimationDone() &&
                 !die->die()->isStoppedAnimationStarted()) {
-            auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
-            uint32_t stoppedX = i%nbrX;
-            uint32_t stoppedY = i/nbrX;
-            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die()->animateMove(x, y);
+                auto nbrX = static_cast<uint32_t>(width / (2 * DicePhysicsModel::stoppedRadius));
+                uint32_t stoppedX = i % nbrX;
+                uint32_t stoppedY = i / nbrX;
+                float x = -width / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+                float y = height / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+                die->die()->animateMove(x, y);
+            }
+            i++;
         }
-        i++;
     }
 
     return needsRedraw;
@@ -405,21 +428,19 @@ bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
 template <typename DiceType>
 std::vector<std::vector<uint32_t >> RainbowDiceGraphics<DiceType>::getDiceResults() {
     std::vector<std::vector<uint32_t>> results;
-    for (auto dieIt = m_dice.begin(); dieIt != m_dice.end(); dieIt++) {
-        if (!dieIt->get()->die()->isStopped()) {
-            // Should not happen
-            throw std::runtime_error("Not all die are stopped!");
-        }
+    for (auto const &dice : m_dice) {
         std::vector<uint32_t > dieResults;
-        while (dieIt->get()->isBeingRerolled()) {
-            dieResults.push_back(dieIt->get()->die()->getResult());
-            dieIt++;
+        for (auto const &die: dice) {
+            if (!die->die()->isStopped()) {
+                // Should not happen
+                throw std::runtime_error("Not all die are stopped!");
+            }
+            dieResults.push_back(die->die()->getResult());
         }
-        dieResults.push_back(dieIt->get()->die()->getResult());
         results.push_back(dieResults);
     }
 
-    return results;
+    return std::move(results);
 }
 
 template <typename DiceType>
@@ -429,22 +450,33 @@ void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<std::vec
     float width = screenWidth;
     float height = screenHeight;
     auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
+
     for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
+        size_t size = diceIt->size();
+        while (diceIt != m_dice.end() && upFaceIndices[i].empty()) {
+            diceIt->clear();
+            i++;
+            diceIt++;
+        }
+        if (diceIt == m_dice.end()) {
+            break;
+        }
         for (uint32_t j = 0; j < upFaceIndices[i].size(); j++) {
             uint32_t stoppedX = k%nbrX;
             uint32_t stoppedY = k/nbrX;
             float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
             float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
 
-            if (j == 0) {
-                diceIt->get()->die()->positionDice(upFaceIndices[i][j], x, y);
+            if (j < size) {
+                auto diceItj = diceIt->begin();
+                for (int l = 0; l < j; l++) {
+                    diceItj++;
+                }
+                diceItj->get()->die()->positionDice(upFaceIndices[i][j], x, y);
             } else {
-                auto die = createDie(*diceIt);
+                auto die = createDie(*(diceIt->begin()));
                 die->die()->positionDice(upFaceIndices[i][j], x, y);
-                diceIt->get()->setIsBeingRerolled(true);
-                diceIt++;
-                m_dice.insert(diceIt, die);
-                diceIt--;
+                diceIt->push_back(die);
             }
             k++;
         }
@@ -471,15 +503,17 @@ template <typename DiceType>
 void RainbowDiceGraphics<DiceType>::addRollingDice() {
     float width = screenWidth;
     float height = screenHeight;
-    for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
-        // Skip dice already being rerolled or does not get rerolled.
-        if (diceIt->get()->isBeingRerolled() || diceIt->get()->rerollIndices().empty()) {
+    for (auto &dice : m_dice) {
+        if (dice.empty()) {
             continue;
         }
+        // only check the last dice in the list to see if it needs to be rerolled.  The other dice
+        // in the list already got rerolled.  That is why there is a die after it.
+        auto const &die = *(dice.rbegin());
 
-        uint32_t result = diceIt->get()->die()->getResult() % diceIt->get()->die()->getNumberOfSymbols();
+        uint32_t result = die->die()->getResult() % die->die()->getNumberOfSymbols();
         bool shouldReroll = false;
-        for (auto const &rerollIndex : diceIt->get()->rerollIndices()) {
+        for (auto const &rerollIndex : die->rerollIndices()) {
             if (result == rerollIndex) {
                 shouldReroll = true;
                 break;
@@ -490,72 +524,108 @@ void RainbowDiceGraphics<DiceType>::addRollingDice() {
             continue;
         }
 
-        auto die = createDie(*diceIt);
-        diceIt->get()->setIsBeingRerolled(true);
+        auto dieNew = createDie(die);
 
-        diceIt++;
-        m_dice.insert(diceIt, die);
-        diceIt--;
+        dice.push_back(dieNew);
     }
 
     int i=0;
-    for (auto const &die : m_dice) {
-        if (die->die()->isStopped()) {
-            auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
-            uint32_t stoppedX = i%nbrX;
-            uint32_t stoppedY = i/nbrX;
-            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die()->animateMove(x, y);
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            if (die->die()->isStopped()) {
+                auto nbrX = static_cast<uint32_t>(width / (2 * DicePhysicsModel::stoppedRadius));
+                uint32_t stoppedX = i % nbrX;
+                uint32_t stoppedY = i / nbrX;
+                float x = -width / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+                float y = height / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+                die->die()->animateMove(x, y);
+            }
+            i++;
         }
-        i++;
     }
 }
 
 template <typename DiceType>
 void RainbowDiceGraphics<DiceType>::rerollSelected() {
-    for (auto const &die : m_dice) {
-        if (die->isSelected()) {
-            die->die()->resetPosition(screenWidth, screenHeight);
-            die->toggleSelected();
-            m_isModifiedRoll = true;
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            if (die->isSelected()) {
+                die->die()->resetPosition(screenWidth, screenHeight);
+                die->toggleSelected();
+                m_isModifiedRoll = true;
+            }
         }
     }
 }
 
 template <typename DiceType>
 void RainbowDiceGraphics<DiceType>::addRerollSelected() {
-    for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
-        if (diceIt->get()->isSelected()) {
-            m_isModifiedRoll = true;
+    for (auto &dice : m_dice) {
+        for (auto diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
+            if (diceIt->get()->isSelected()) {
+                m_isModifiedRoll = true;
 
-            auto die = createDie(*diceIt);
-            diceIt->get()->toggleSelected();
+                auto die = createDie(*diceIt);
+                diceIt->get()->toggleSelected();
 
-            if (diceIt->get()->isBeingRerolled()) {
-                die->setIsBeingRerolled(true);
-            } else {
-                diceIt->get()->setIsBeingRerolled(true);
+                diceIt++;
+                dice.insert(diceIt, die);
+                diceIt--;
             }
-
-            diceIt++;
-            m_dice.insert(diceIt, die);
-            diceIt--;
         }
     }
 
     int i=0;
-    for (auto const &die : m_dice) {
-        if (die->die()->isStopped()) {
-            auto nbrX = static_cast<uint32_t>(screenWidth/(2*DicePhysicsModel::stoppedRadius));
-            uint32_t stoppedX = i%nbrX;
-            uint32_t stoppedY = i/nbrX;
-            float x = -screenWidth/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = screenHeight/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die()->animateMove(x, y);
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            if (die->die()->isStopped()) {
+                auto nbrX = static_cast<uint32_t>(screenWidth /
+                                                  (2 * DicePhysicsModel::stoppedRadius));
+                uint32_t stoppedX = i % nbrX;
+                uint32_t stoppedY = i / nbrX;
+                float x = -screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+                float y = screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+                die->die()->animateMove(x, y);
+            }
+            i++;
         }
-        i++;
     }
+}
+
+template <typename DiceType>
+bool RainbowDiceGraphics<DiceType>::deleteSelected() {
+    bool diceDeleted = false;
+    for (auto &dice : m_dice) {
+        for (auto diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
+            if (diceIt->get()->isSelected()) {
+                m_isModifiedRoll = true;
+                diceDeleted = true;
+                dice.erase(diceIt);
+            }
+        }
+    }
+
+    if (diceDeleted) {
+        int i = 0;
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                if (die->die()->isStopped()) {
+                    auto nbrX = static_cast<uint32_t>(screenWidth /
+                                                      (2 * DicePhysicsModel::stoppedRadius));
+                    uint32_t stoppedX = i % nbrX;
+                    uint32_t stoppedY = i / nbrX;
+                    float x =
+                            -screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+                    float y =
+                            screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+                    die->die()->animateMove(x, y);
+                }
+                i++;
+            }
+        }
+    }
+
+    return diceDeleted;
 }
 
 #endif // RAINBOWDICE_HPP

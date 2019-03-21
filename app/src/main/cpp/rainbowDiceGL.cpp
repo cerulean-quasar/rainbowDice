@@ -176,183 +176,185 @@ void RainbowDiceGL::drawFrame() {
     GLint viewPos = glGetUniformLocation(programID, "viewPosition");
     glUniform3fv(viewPos, 1, &m_viewPoint[0]);
 
-    for (auto const &die : m_dice) {
-        // Send our transformation to the currently bound shader, in the "MVP"
-        // uniform. This is done in the main loop since each model will have a
-        // different MVP matrix (At least for the M part)
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            // Send our transformation to the currently bound shader, in the "MVP"
+            // uniform. This is done in the main loop since each model will have a
+            // different MVP matrix (At least for the M part)
 
-        // the projection matrix
-        GLint MatrixID = glGetUniformLocation(programID, "proj");
-        glm::mat4 matrix = die->die()->alterPerspective(m_proj);
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+            // the projection matrix
+            GLint MatrixID = glGetUniformLocation(programID, "proj");
+            glm::mat4 matrix = die->die()->alterPerspective(m_proj);
+            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
-        // view matrix
-        MatrixID = glGetUniformLocation(programID, "view");
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_view[0][0]);
+            // view matrix
+            MatrixID = glGetUniformLocation(programID, "view");
+            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_view[0][0]);
 
-        // model matrix
-        MatrixID = glGetUniformLocation(programID, "model");
-        glm::mat4 model = die->die()->model();
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &model[0][0]);
+            // model matrix
+            MatrixID = glGetUniformLocation(programID, "model");
+            glm::mat4 model = die->die()->model();
+            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &model[0][0]);
 
-        // the model matrix for the normal vector
-        MatrixID = glGetUniformLocation(programID, "normalMatrix");
-        matrix = glm::transpose(glm::inverse(model));
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+            // the model matrix for the normal vector
+            MatrixID = glGetUniformLocation(programID, "normalMatrix");
+            matrix = glm::transpose(glm::inverse(model));
+            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
-        // whether the die is selected
-        GLint var = glGetUniformLocation(programID, "isSelected");
-        glUniform1i(var, die->isSelected()?1:0);
+            // whether the die is selected
+            GLint var = glGetUniformLocation(programID, "isSelected");
+            glUniform1i(var, die->isSelected() ? 1 : 0);
 
-        // 1st attribute buffer : colors
-        GLint colorID = glGetAttribLocation(programID, "inColor");
-        glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer());
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer());
-        glVertexAttribPointer(
-                colorID,                          // The position of the attribute in the shader.
-                4,                                // size
-                GL_FLOAT,                         // type
-                GL_FALSE,                         // normalized?
-                sizeof(Vertex),                   // stride
-                (void *) (offsetof(Vertex, color))// array buffer offset
-        );
-        glEnableVertexAttribArray(colorID);
+            // 1st attribute buffer : colors
+            GLint colorID = glGetAttribLocation(programID, "inColor");
+            glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer());
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer());
+            glVertexAttribPointer(
+                    colorID,                          // The position of the attribute in the shader.
+                    4,                                // size
+                    GL_FLOAT,                         // type
+                    GL_FALSE,                         // normalized?
+                    sizeof(Vertex),                   // stride
+                    (void *) (offsetof(Vertex, color))// array buffer offset
+            );
+            glEnableVertexAttribArray(colorID);
 
-        // attribute buffer : vertices for die
-        GLint position = glGetAttribLocation(programID, "inPosition");
-        glVertexAttribPointer(
-                position,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, pos)) // array buffer offset
-        );
-        glEnableVertexAttribArray(position);
+            // attribute buffer : vertices for die
+            GLint position = glGetAttribLocation(programID, "inPosition");
+            glVertexAttribPointer(
+                    position,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, pos)) // array buffer offset
+            );
+            glEnableVertexAttribArray(position);
 
-        // Send in the texture coordinates
-        GLint texCoordID = glGetAttribLocation(programID, "inTexCoord");
-        glVertexAttribPointer(
-            texCoordID,                       // The position of the attribute in the shader
-            2,                                // size
-            GL_FLOAT,                         // type
-            GL_FALSE,                         // normalized?
-            sizeof (Vertex),                  // stride
-            (void*) offsetof (Vertex, texCoord)  // array buffer offset
-        );
-        glEnableVertexAttribArray(texCoordID);
+            // Send in the texture coordinates
+            GLint texCoordID = glGetAttribLocation(programID, "inTexCoord");
+            glVertexAttribPointer(
+                    texCoordID,                       // The position of the attribute in the shader
+                    2,                                // size
+                    GL_FLOAT,                         // type
+                    GL_FALSE,                         // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) offsetof (Vertex, texCoord)  // array buffer offset
+            );
+            glEnableVertexAttribArray(texCoordID);
 
-        // attribute buffer : normal vector to the face
-        GLint normalID = glGetAttribLocation(programID, "inNormal");
-        glVertexAttribPointer(
-                normalID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, normal)) // array buffer offset
-        );
-        glEnableVertexAttribArray(normalID);
+            // attribute buffer : normal vector to the face
+            GLint normalID = glGetAttribLocation(programID, "inNormal");
+            glVertexAttribPointer(
+                    normalID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, normal)) // array buffer offset
+            );
+            glEnableVertexAttribArray(normalID);
 
-        // attribute buffer : normal vector to the corner
-        GLint cornerNormalID = glGetAttribLocation(programID, "inCornerNormal");
-        glVertexAttribPointer(
-                cornerNormalID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, cornerNormal)) // array buffer offset
-        );
-        glEnableVertexAttribArray(cornerNormalID);
+            // attribute buffer : normal vector to the corner
+            GLint cornerNormalID = glGetAttribLocation(programID, "inCornerNormal");
+            glVertexAttribPointer(
+                    cornerNormalID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, cornerNormal)) // array buffer offset
+            );
+            glEnableVertexAttribArray(cornerNormalID);
 
-        // attribute buffer : vertices for die
-        GLint corner1ID = glGetAttribLocation(programID, "inCorner1");
-        glVertexAttribPointer(
-                corner1ID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, corner1)) // array buffer offset
-        );
-        glEnableVertexAttribArray(corner1ID);
+            // attribute buffer : vertices for die
+            GLint corner1ID = glGetAttribLocation(programID, "inCorner1");
+            glVertexAttribPointer(
+                    corner1ID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, corner1)) // array buffer offset
+            );
+            glEnableVertexAttribArray(corner1ID);
 
-        // attribute buffer : vertices for die
-        GLint corner2ID = glGetAttribLocation(programID, "inCorner2");
-        glVertexAttribPointer(
-                corner2ID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, corner2)) // array buffer offset
-        );
-        glEnableVertexAttribArray(corner2ID);
+            // attribute buffer : vertices for die
+            GLint corner2ID = glGetAttribLocation(programID, "inCorner2");
+            glVertexAttribPointer(
+                    corner2ID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, corner2)) // array buffer offset
+            );
+            glEnableVertexAttribArray(corner2ID);
 
-        // attribute buffer : vertices for die
-        GLint corner3ID = glGetAttribLocation(programID, "inCorner3");
-        glVertexAttribPointer(
-                corner3ID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, corner3)) // array buffer offset
-        );
-        glEnableVertexAttribArray(corner3ID);
+            // attribute buffer : vertices for die
+            GLint corner3ID = glGetAttribLocation(programID, "inCorner3");
+            glVertexAttribPointer(
+                    corner3ID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, corner3)) // array buffer offset
+            );
+            glEnableVertexAttribArray(corner3ID);
 
-        // attribute buffer : vertices for die
-        GLint corner4ID = glGetAttribLocation(programID, "inCorner4");
-        glVertexAttribPointer(
-                corner4ID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, corner4)) // array buffer offset
-        );
-        glEnableVertexAttribArray(corner4ID);
+            // attribute buffer : vertices for die
+            GLint corner4ID = glGetAttribLocation(programID, "inCorner4");
+            glVertexAttribPointer(
+                    corner4ID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, corner4)) // array buffer offset
+            );
+            glEnableVertexAttribArray(corner4ID);
 
-        // attribute buffer : vertices for die
-        GLint corner5ID = glGetAttribLocation(programID, "inCorner5");
-        glVertexAttribPointer(
-                corner5ID,                        // The position of the attribute in the shader.
-                3,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, corner5)) // array buffer offset
-        );
-        glEnableVertexAttribArray(corner5ID);
+            // attribute buffer : vertices for die
+            GLint corner5ID = glGetAttribLocation(programID, "inCorner5");
+            glVertexAttribPointer(
+                    corner5ID,                        // The position of the attribute in the shader.
+                    3,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, corner5)) // array buffer offset
+            );
+            glEnableVertexAttribArray(corner5ID);
 
-        // attribute buffer : mode for the way the nearness to edges is detected.
-        GLint modeID = glGetAttribLocation(programID, "inMode");
-        glVertexAttribPointer(
-                modeID,                          // The position of the attribute in the shader.
-                1,                               // size
-                GL_FLOAT,                        // type
-                GL_FALSE,                        // normalized?
-                sizeof(Vertex),                  // stride
-                (void *) (offsetof(Vertex, mode)) // array buffer offset
-        );
-        glEnableVertexAttribArray(modeID);
+            // attribute buffer : mode for the way the nearness to edges is detected.
+            GLint modeID = glGetAttribLocation(programID, "inMode");
+            glVertexAttribPointer(
+                    modeID,                          // The position of the attribute in the shader.
+                    1,                               // size
+                    GL_FLOAT,                        // type
+                    GL_FALSE,                        // normalized?
+                    sizeof(Vertex),                  // stride
+                    (void *) (offsetof(Vertex, mode)) // array buffer offset
+            );
+            glEnableVertexAttribArray(modeID);
 
-        // Draw the triangles !
-        //glDrawArrays(GL_TRIANGLES, 0, dice[0].die->vertices.size() /* total number of vertices*/);
-        glDrawElements(GL_TRIANGLES, die->die()->getIndices().size(), GL_UNSIGNED_INT, 0);
+            // Draw the triangles !
+            //glDrawArrays(GL_TRIANGLES, 0, dice[0].die->vertices.size() /* total number of vertices*/);
+            glDrawElements(GL_TRIANGLES, die->die()->getIndices().size(), GL_UNSIGNED_INT, 0);
 
-        glDisableVertexAttribArray(position);
-        glDisableVertexAttribArray(colorID);
-        glDisableVertexAttribArray(texCoordID);
-        glDisableVertexAttribArray(normalID);
-        glDisableVertexAttribArray(cornerNormalID);
-        glDisableVertexAttribArray(corner1ID);
-        glDisableVertexAttribArray(corner2ID);
-        glDisableVertexAttribArray(corner3ID);
-        glDisableVertexAttribArray(corner4ID);
-        glDisableVertexAttribArray(corner5ID);
-        glDisableVertexAttribArray(modeID);
+            glDisableVertexAttribArray(position);
+            glDisableVertexAttribArray(colorID);
+            glDisableVertexAttribArray(texCoordID);
+            glDisableVertexAttribArray(normalID);
+            glDisableVertexAttribArray(cornerNormalID);
+            glDisableVertexAttribArray(corner1ID);
+            glDisableVertexAttribArray(corner2ID);
+            glDisableVertexAttribArray(corner3ID);
+            glDisableVertexAttribArray(corner4ID);
+            glDisableVertexAttribArray(corner5ID);
+            glDisableVertexAttribArray(modeID);
+        }
     }
     eglSwapBuffers(m_surface->display(), m_surface->surface());
 }
@@ -443,14 +445,18 @@ GLuint RainbowDiceGL::loadShaders(std::string const &vertexShaderFile, std::stri
 }
 
 void RainbowDiceGL::recreateModels() {
-    for (auto const &die : m_dice) {
-        die->createGLResources();
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            die->createGLResources();
+        }
     }
 }
 
 void RainbowDiceGL::destroyModelGLResources() {
-    for (auto const &die : m_dice) {
-        die->destroyGLResources();
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            die->destroyGLResources();
+        }
     }
 }
 

@@ -279,8 +279,10 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
         updatePerspectiveMatrix(width, height);
     }
 
-    for (auto const &die : m_dice) {
-        die->updateUniformBuffer(m_projWithPreTransform, m_view);
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        }
     }
 
     initializeCommandBuffers();
@@ -346,34 +348,38 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->pipeline().get());
 
         VkDeviceSize offsets[1] = {0};
-        for (auto const &die : m_dice) {
-            VkBuffer vertexBuffer = die->vertexBuffer()->buffer().get();
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, die->indexBuffer()->buffer().get(), 0, VK_INDEX_TYPE_UINT32);
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                VkBuffer vertexBuffer = die->vertexBuffer()->buffer().get();
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+                vkCmdBindIndexBuffer(commandBuffer, die->indexBuffer()->buffer().get(), 0,
+                                     VK_INDEX_TYPE_UINT32);
 
-            /* The MVP matrix and texture samplers */
-            VkDescriptorSet descriptorSet = die->descriptorSet()->descriptorSet().get();
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_graphicsPipeline->layout().get(), 0, 1, &descriptorSet, 0, nullptr);
+                /* The MVP matrix and texture samplers */
+                VkDescriptorSet descriptorSet = die->descriptorSet()->descriptorSet().get();
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        m_graphicsPipeline->layout().get(), 0, 1, &descriptorSet, 0,
+                                        nullptr);
 
-            /* draw command:
-             * parameter 1 - Command buffer for the draw command
-             * parameter 2 - the vertex count
-             * parameter 3 - the instance count, use 1 because we are not using instanced rendering
-             * parameter 4 - offset into the vertex buffer
-             * parameter 5 - offset for instance rendering
-             */
-            //vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+                /* draw command:
+                 * parameter 1 - Command buffer for the draw command
+                 * parameter 2 - the vertex count
+                 * parameter 3 - the instance count, use 1 because we are not using instanced rendering
+                 * parameter 4 - offset into the vertex buffer
+                 * parameter 5 - offset for instance rendering
+                 */
+                //vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
-            /* indexed draw command:
-             * parameter 1 - Command buffer for the draw command
-             * parameter 2 - the number of indices (the vertex count)
-             * parameter 3 - the instance count, use 1 because we are not using instanced rendering
-             * parameter 4 - offset into the index buffer
-             * parameter 5 - offset to add to the indices in the index buffer
-             * parameter 6 - offset for instance rendering
-             */
-            vkCmdDrawIndexed(commandBuffer, die->nbrIndices(), 1, 0, 0, 0);
+                /* indexed draw command:
+                 * parameter 1 - Command buffer for the draw command
+                 * parameter 2 - the number of indices (the vertex count)
+                 * parameter 3 - the instance count, use 1 because we are not using instanced rendering
+                 * parameter 4 - offset into the index buffer
+                 * parameter 5 - offset to add to the indices in the index buffer
+                 * parameter 6 - offset for instance rendering
+                 */
+                vkCmdDrawIndexed(commandBuffer, die->nbrIndices(), 1, 0, 0, 0);
+            }
         }
 
         vkCmdEndRenderPass(commandBuffer);
@@ -522,8 +528,10 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t te
 
 bool RainbowDiceVulkan::updateUniformBuffer() {
     bool needsRedraw = RainbowDiceGraphics::updateUniformBuffer();
-    for (auto const &die : m_dice) {
-        die->updateUniformBuffer(m_projWithPreTransform, m_view);
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        }
     }
 
     return needsRedraw;
@@ -536,8 +544,10 @@ void RainbowDiceVulkan::addRollingDice() {
 
 void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     RainbowDiceGraphics::resetToStoppedPositions(upFaceIndices);
-    for (auto const &die : m_dice) {
-        die->updateUniformBuffer(m_projWithPreTransform, m_view);
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+        }
     }
 
     // need to initialize command buffers here in case any dice are added.

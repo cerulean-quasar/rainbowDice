@@ -227,7 +227,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onDeleteDiceFromRoll(View view) {
-
+        Draw.deleteSelected();
     }
 
     public  void onResetView(View view) {

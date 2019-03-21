@@ -353,5 +353,7 @@ public class Draw {
 
     public static native void addRerollSelected();
 
+    public static native void deleteSelected();
+
     public static native void resetView();
 }

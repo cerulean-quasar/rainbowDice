@@ -401,6 +401,13 @@ Java_com_quasar_cerulean_rainbowdice_Draw_addRerollSelected(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_quasar_cerulean_rainbowdice_Draw_deleteSelected(
+        JNIEnv *env,
+        jclass jclass1) {
+    diceChannel().sendEvent(std::make_shared<DeleteSelected>());
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_Draw_resetView(
         JNIEnv *env,
         jclass jclass1) {

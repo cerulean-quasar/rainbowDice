@@ -42,11 +42,13 @@ public:
         tapDice,
         rerollSelected,
         addRerollSelected,
+        deleteSelected,
         resetView
     };
 
     // returns true if the surface needs redrawing after this event.
-    virtual bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) = 0;
+    virtual bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+            std::unique_ptr<Notify> &notify) = 0;
 
     virtual evtype type() = 0;
     virtual ~DrawEvent() = default;
@@ -54,7 +56,8 @@ public:
 
 class StopDrawingEvent : public DrawEvent {
 public:
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         return false;
     }
 
@@ -71,7 +74,8 @@ public:
         : m_width(width),
         m_height(height) {
     }
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->recreateSwapChain(m_width, m_height);
 
         // redraw the frame right away and then return false because this event means that we
@@ -96,7 +100,8 @@ public:
           m_distanceY{inDistanceY} {
     }
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->scroll(m_distanceX, m_distanceY);
         return true;
     }
@@ -114,7 +119,8 @@ public:
             : m_scaleFactor{inScaleFactor} {
     }
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->scale(m_scaleFactor);
         return true;
     }
@@ -134,7 +140,8 @@ public:
               m_y{inY} {
     }
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         return diceGraphics->tapDice(m_x, m_y);
     }
 
@@ -147,7 +154,8 @@ class RerollSelected : public DrawEvent {
 public:
     RerollSelected() = default;
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->rerollSelected();
         return false;
     }
@@ -161,7 +169,8 @@ class AddRerollSelected : public DrawEvent {
 public:
     AddRerollSelected() = default;
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->addRerollSelected();
         return false;
     }
@@ -171,11 +180,31 @@ public:
     ~AddRerollSelected() override = default;
 };
 
+class DeleteSelected : public DrawEvent {
+public:
+    DeleteSelected() = default;
+
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
+        if (diceGraphics->deleteSelected()) {
+            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
+            notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
+                                 results, diceGraphics->getDiceDescriptions());
+        }
+        return true;
+    }
+
+    evtype type() override { return deleteSelected; }
+
+    ~DeleteSelected() override = default;
+};
+
 class ResetView : public DrawEvent {
 public:
     ResetView() = default;
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->resetView();
         return true;
     }
@@ -205,7 +234,8 @@ public:
     {
     }
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->setTexture(m_texture);
         diceGraphics->setDice(m_name, m_dice, m_isModifiedRoll);
         diceGraphics->initModels();
@@ -236,7 +266,8 @@ public:
     {
     }
 
-    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics) override {
+    bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
+                     std::unique_ptr<Notify> &notify) override {
         diceGraphics->setTexture(m_texture);
         diceGraphics->setDice(m_diceName, m_dice);
         diceGraphics->initModels();

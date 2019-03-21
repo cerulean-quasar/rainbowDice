@@ -112,7 +112,7 @@ void DiceWorker::waitingLoop() {
         std::shared_ptr<DrawEvent> event = diceChannel().getEvent();
         if (event->type() == DrawEvent::stopDrawing) {
             return;
-        } else if ((*event)(m_diceGraphics)) {
+        } else if ((*event)(m_diceGraphics, m_notify)) {
             nbrRequireRedraw++;
         }
 
@@ -122,7 +122,7 @@ void DiceWorker::waitingLoop() {
                 break;
             } else  if (event->type() == DrawEvent::stopDrawing) {
                 return;
-            } else if ((*event)(m_diceGraphics)) {
+            } else if ((*event)(m_diceGraphics, m_notify)) {
                 nbrRequireRedraw++;
             }
         }
@@ -137,7 +137,7 @@ void DiceWorker::waitingLoop() {
                 if (eventDrawing->type() == DrawEvent::stopDrawing) {
                     return;
                 } else {
-                    (*eventDrawing)(m_diceGraphics);
+                    (*eventDrawing)(m_diceGraphics, m_notify);
                 }
             }
         }
@@ -165,18 +165,22 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                     case DrawEvent::stopDrawing:
                     case DrawEvent::diceChange:
                     case DrawEvent::drawStoppedDice:
+                        // let the waiting loop handle these.  Just return the event - this signals
+                        // that the waiting loop needs to handle these events.
                         return event;
                     case DrawEvent::surfaceChanged:
                     case DrawEvent::scrollSurface:
                     case DrawEvent::scaleSurface:
                     case DrawEvent::resetView:
-                        if ((*event)(m_diceGraphics)) {
+                        // process the event.
+                        if ((*event)(m_diceGraphics, m_notify)) {
                             nbrRequireRedraw++;
                         }
                         break;
                     case DrawEvent::tapDice:
                     case DrawEvent::rerollSelected:
                     case DrawEvent::addRerollSelected:
+                    case DrawEvent::deleteSelected:
                         // ignore these events while drawing
                         break;
                 }
