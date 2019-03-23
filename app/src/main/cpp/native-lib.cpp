@@ -414,7 +414,7 @@ Java_com_quasar_cerulean_rainbowdice_Draw_resetView(
     diceChannel().sendEvent(std::make_shared<ResetView>());
 }
 
-extern "C" JNIEXPORT jstring JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         JNIEnv *env,
         jobject jthis,
@@ -422,12 +422,20 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         jobject jmanager,
         jobject jnotify) {
 
+    std::unique_ptr<Notify> notify;
+    try {
+        notify = std::make_unique<Notify>(env, jnotify);
+    } catch (...) {
+        return;
+    }
+
     try {
         setAssetManager(AAssetManager_fromJava(env, jmanager));
 
         ANativeWindow *window = ANativeWindow_fromSurface(env, jsurface);
         if (window == nullptr) {
-            return env->NewStringUTF("Unable to acquire window from surface.");
+            notify->sendError("Unable to acquire window from surface.");
+            return;
         }
 
         auto deleter = [](WindowType *windowRaw) {
@@ -436,21 +444,21 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
                 ANativeWindow_release(windowRaw);
             }
         };
-
         std::shared_ptr<WindowType> surface(window, deleter);
 
-        std::unique_ptr<Notify> notify(new Notify(env, jnotify));
+        diceChannel().clearQueue();
         DiceWorker worker(surface, notify);
         surface.reset();
 
         worker.waitingLoop();
-        return env->NewStringUTF("");
     } catch (std::runtime_error &e) {
         if (strlen(e.what()) > 0) {
-            return env->NewStringUTF((std::string("error: ") + e.what()).c_str());
+            notify->sendError(e.what());
         } else {
-            return env->NewStringUTF("error: Error in initializing graphics.");
+            notify->sendError("Error in initializing graphics.");
         }
+    } catch (...) {
+        notify->sendError("Error in initializing graphics.");
     }
 }
 
@@ -544,6 +552,10 @@ void Notify::sendResult(
 }
 
 void Notify::sendError(std::string const &error) {
+    sendError(error.c_str());
+}
+
+void Notify::sendError(char const *error) {
     jclass notifyClass = m_env->GetObjectClass(m_notify);
 
     jmethodID midSend = m_env->GetMethodID(notifyClass, "sendError", "(Ljava/lang/String;)V");
@@ -551,6 +563,6 @@ void Notify::sendError(std::string const &error) {
         throw std::runtime_error("Could not send error message.");
     }
 
-    jstring jerror = m_env->NewStringUTF(error.c_str());
+    jstring jerror = m_env->NewStringUTF(error);
     m_env->CallVoidMethod(m_notify, midSend, jerror);
 }

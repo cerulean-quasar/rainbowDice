@@ -84,6 +84,15 @@ void DiceChannel::sendStopDrawingEvent() {
     m_eventConditionVariable.notify_one();
 }
 
+void DiceChannel::clearQueue() {
+    std::unique_lock<std::mutex> lock(m_eventLock);
+    m_stopDrawing = false;
+
+    while (!m_drawEventQueue.empty()) {
+        m_drawEventQueue.pop();
+    }
+}
+
 DiceChannel &diceChannel() {
     static DiceChannel g_diceChannel{};
 

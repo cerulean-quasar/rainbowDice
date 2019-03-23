@@ -37,13 +37,8 @@ public class DiceWorker implements Runnable {
     }
 
     public void run() {
-        String error = startWorker(m_surfaceHolder.getSurface(), m_assetManager, m_notify);
-        if (error == null || error.length() == 0) {
-            // we are done with no error occurring.
-            return;
-        }
-        m_notify.sendError(error);
+        startWorker(m_surfaceHolder.getSurface(), m_assetManager, m_notify);
     }
 
-    private native String startWorker(Surface jsurface, AssetManager jmanager, DiceDrawerReturnChannel jnotify);
+    private native void startWorker(Surface jsurface, AssetManager jmanager, DiceDrawerReturnChannel jnotify);
 }

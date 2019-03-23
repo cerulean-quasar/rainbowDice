@@ -120,6 +120,8 @@ namespace graphicsGL {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         glViewport(0, 0, m_width, m_height);
+
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     }
 
     void Surface::destroySurface() {

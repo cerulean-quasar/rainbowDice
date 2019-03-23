@@ -293,7 +293,6 @@ private:
     std::mutex m_eventLock;
     std::condition_variable m_eventConditionVariable;
 
-    std::shared_ptr<WindowType> m_nextSurface;
     std::queue<std::shared_ptr<DrawEvent>> m_drawEventQueue;
     bool m_stopDrawing;
 
@@ -308,6 +307,7 @@ public:
     // blocks on sending event
     void sendEvent(std::shared_ptr<DrawEvent> const &event);
     void sendStopDrawingEvent();
+    void clearQueue();
 };
 
 DiceChannel &diceChannel();

@@ -143,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        joinDrawer();
         logFile.writeFile();
     }
 

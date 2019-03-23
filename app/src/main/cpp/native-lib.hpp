@@ -40,5 +40,6 @@ public:
             std::vector<std::vector<uint32_t>> const &results,
             std::vector<std::shared_ptr<DiceDescription>> const &dice);
     void sendError(std::string const &error);
+    void sendError(char const *error);
 };
 #endif // RAINBOWDICE_NATIVELIB_HPP
