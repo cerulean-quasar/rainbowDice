@@ -51,13 +51,16 @@
     <string name="diceConfigStringRepresentation">%dD%d</string>
     <string name="constantConfigStringRepresentation">%s</string>
     <string name="rerollText">re-roll on: %s</string>
-    <string name="themeTextDisplay">Text for this theme</string>
-    <string name="selectTheme">Choose a Theme:  </string>
-    <string name="selectThemeMenuItem">Choose a Theme</string>
+    <string name="settingsMenuItem">Settings</string>
     <string name="openLogFile">Open Log File</string>
     <string name="recipes">Recipes</string>
     <string name="add">add</string>
     <string name="replace">replace</string>
+    <string name="selectTheme">Theme:</string>
+    <string name="graphicsAPIName">Graphics API:</string>
+    <string name="graphicsAPIVersion">Graphics API version:</string>
+    <string name="graphicsDeviceName">Graphics Device Name:</string>
+    <string name="unknown">Unknown</string>
 
     <string-array name="themeArray">
         <item>Space</item>

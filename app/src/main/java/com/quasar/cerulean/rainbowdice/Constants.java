@@ -29,6 +29,10 @@ public class Constants {
 
     public static final int DICE_THEME_SELECTION_ACTIVITY = 3;
     public static final String themeNameConfigValue = "ThemeName";
+    public static final String GRAPHICS_API_NAME = "graphics_api_name";
+    public static final String GRAPHICS_API_VERSION = "graphics_api_version";
+    public static final String GRAPHICS_DEVICE_NAME = "graphics_device_name";
+    public static final String GRAPHICS_IS_VULKAN = "graphics_is_vulkan";
 
     public static final int DICE_LOG_FILE_ACTIVITY = 4;
 

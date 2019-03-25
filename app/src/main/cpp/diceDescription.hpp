@@ -49,4 +49,12 @@ struct DiceDescription {
               m_rerollOnIndices{std::move(inRerollOnIndices)},
               m_isAddOperation{inIsAddOperation} {}
 };
+
+struct GraphicsDescription {
+    bool m_isVulkan;
+    std::string m_graphicsName;
+    std::string m_version;
+    std::string m_deviceName;
+};
+
 #endif // RAINBOWDICE_DICEDESCRIPTION_HPP

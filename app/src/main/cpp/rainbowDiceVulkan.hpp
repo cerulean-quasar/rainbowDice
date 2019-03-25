@@ -252,6 +252,16 @@ public:
 
     void addRollingDice() override;
 
+    GraphicsDescription graphicsDescription() override {
+        vulkan::Device::DeviceProperties properties = m_device->properties();
+        GraphicsDescription description;
+        description.m_isVulkan = true;
+        description.m_graphicsName = "Vulkan";
+        description.m_deviceName = properties.m_name;
+        description.m_version = properties.m_vulkanAPIVersion;
+        return std::move(description);
+    }
+
     bool tapDice(float x, float y) override {
         return RainbowDiceGraphics::tapDice(x, y, m_width, m_height);
     }

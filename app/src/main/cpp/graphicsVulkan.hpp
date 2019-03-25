@@ -135,6 +135,17 @@ namespace vulkan {
             std::vector<VkPresentModeKHR> presentModes;
         };
 
+        struct DeviceProperties {
+            std::string m_name;
+            std::string m_vulkanAPIVersion;
+            DeviceProperties(std::string inName, uint32_t version)
+                :m_name{std::move(inName)},
+                 m_vulkanAPIVersion{std::to_string(VK_VERSION_MAJOR(version)) + "." +
+                                    std::to_string(VK_VERSION_MINOR(version)) + "." +
+                                    std::to_string(VK_VERSION_PATCH(version))} {
+            }
+        };
+
         Device(std::shared_ptr<Instance> const &inInstance)
                 : m_instance (inInstance),
                   m_physicalDevice{},
@@ -162,6 +173,8 @@ namespace vulkan {
         inline SwapChainSupportDetails querySwapChainSupport() {
             return querySwapChainSupport(m_physicalDevice);
         }
+
+        DeviceProperties properties();
 
         VkFormat depthFormat() { return m_depthFormat; }
 

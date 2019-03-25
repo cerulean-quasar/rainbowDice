@@ -98,6 +98,8 @@ public:
 
     virtual void initThread()=0;
 
+    virtual GraphicsDescription graphicsDescription()=0;
+
     virtual void drawFrame()=0;
 
     virtual bool updateUniformBuffer()=0;

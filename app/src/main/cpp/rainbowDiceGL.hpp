@@ -134,6 +134,14 @@ public:
 
     void recreateSwapChain(uint32_t width, uint32_t height) override;
 
+    GraphicsDescription graphicsDescription() override {
+        GraphicsDescription description;
+        description.m_isVulkan = false;
+        description.m_graphicsName = "OpenGL ES";
+
+        return std::move(description);
+    }
+
     bool tapDice(float x, float y) override {
         return RainbowDiceGraphics::tapDice(x, y, m_surface->width(), m_surface->height());
     }

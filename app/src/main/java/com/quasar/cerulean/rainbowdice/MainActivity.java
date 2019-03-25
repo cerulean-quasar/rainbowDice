@@ -75,6 +75,22 @@ public class MainActivity extends AppCompatActivity {
         public DiceResult diceResult = null;
     }
 
+    private class GraphicsDescription {
+        public boolean isVulkan;
+        public String apiName;
+        public String apiVersion;
+        public String deviceName;
+
+        public GraphicsDescription() {
+            isVulkan = false;
+            apiName = null;
+            apiVersion = null;
+            deviceName = null;
+        }
+    }
+
+    private GraphicsDescription graphicsDescription = null;
+
     private DiceConfigurationManager configurationFile = null;
     private LogFile logFile = null;
     private boolean drawingStarted = false;
@@ -96,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
         assetManager = getAssets();
         createDefaults();
         logFile = new LogFile(this);
+
         initGui();
     }
 
@@ -143,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        joinDrawer();
+        //joinDrawer();
         logFile.writeFile();
     }
 
@@ -211,6 +228,16 @@ public class MainActivity extends AppCompatActivity {
 
     public void onSelectTheme(MenuItem item) {
         Intent intent = new Intent(this, ActivityThemeSelector.class);
+        if (graphicsDescription != null) {
+            intent.putExtra(Constants.GRAPHICS_API_NAME, graphicsDescription.apiName);
+            intent.putExtra(Constants.GRAPHICS_IS_VULKAN, graphicsDescription.isVulkan);
+            if (graphicsDescription.apiVersion != null) {
+                intent.putExtra(Constants.GRAPHICS_API_VERSION, graphicsDescription.apiVersion);
+            }
+            if (graphicsDescription.deviceName != null) {
+                intent.putExtra(Constants.GRAPHICS_DEVICE_NAME, graphicsDescription.deviceName);
+            }
+        }
         startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
     }
 
@@ -413,6 +440,19 @@ public class MainActivity extends AppCompatActivity {
                 // the result is an error message.  Print the error message to the text view
                 text.setText(serror);
                 return true;
+            } else if (data.containsKey(DiceDrawerReturnChannel.isVulkan)) {
+                if (graphicsDescription == null) {
+                    graphicsDescription = new GraphicsDescription();
+                }
+
+                graphicsDescription.isVulkan = data.getBoolean(DiceDrawerReturnChannel.isVulkan);
+                graphicsDescription.apiName = data.getString(DiceDrawerReturnChannel.apiName);
+                if (data.containsKey(DiceDrawerReturnChannel.apiVersion)) {
+                    graphicsDescription.apiVersion = data.getString(DiceDrawerReturnChannel.apiVersion);
+                }
+                if (data.containsKey(DiceDrawerReturnChannel.deviceName)) {
+                    graphicsDescription.deviceName = data.getString(DiceDrawerReturnChannel.deviceName);
+                }
             } else if (data.containsKey(DiceDrawerReturnChannel.resultsMsg) &&
                     data.containsKey(DiceDrawerReturnChannel.diceConfigMsg)) {
 

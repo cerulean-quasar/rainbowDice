@@ -446,10 +446,10 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         };
         std::shared_ptr<WindowType> surface(window, deleter);
 
-        diceChannel().clearQueue();
+        //diceChannel().clearQueue();
         DiceWorker worker(surface, notify);
         surface.reset();
-
+        worker.notifyAboutGraphicsDescription();
         worker.waitingLoop();
     } catch (std::runtime_error &e) {
         if (strlen(e.what()) > 0) {
@@ -560,9 +560,25 @@ void Notify::sendError(char const *error) {
 
     jmethodID midSend = m_env->GetMethodID(notifyClass, "sendError", "(Ljava/lang/String;)V");
     if (midSend == nullptr) {
-        throw std::runtime_error("Could not send error message.");
+        // do not throw because we could already be in a section catching exceptions
+        return;
     }
 
     jstring jerror = m_env->NewStringUTF(error);
     m_env->CallVoidMethod(m_notify, midSend, jerror);
+}
+
+void Notify::sendGraphicsDescription(GraphicsDescription const &description) {
+    jclass notifyClass = m_env->GetObjectClass(m_notify);
+
+    jmethodID midSend = m_env->GetMethodID(notifyClass, "sendGraphicsDescription",
+            "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    if (midSend == nullptr) {
+        throw std::runtime_error("Could not send graphics description message.");
+    }
+
+    jstring jgraphics = m_env->NewStringUTF(description.m_graphicsName.c_str());
+    jstring jversion = m_env->NewStringUTF(description.m_version.c_str());
+    jstring jdeviceName = m_env->NewStringUTF(description.m_deviceName.c_str());
+    m_env->CallVoidMethod(m_notify, midSend, description.m_isVulkan, jgraphics, jversion, jdeviceName);
 }

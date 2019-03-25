@@ -36,16 +36,18 @@ import android.widget.TextView;
 
 public class ActivityThemeSelector extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     ConfigurationFile configurationFile;
+    String graphicsAPIName;
+    String graphicsAPIVersion;
+    String graphicsDeviceName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         configurationFile = new ConfigurationFile(this);
-        int currentThemeId = getApplicationInfo().theme;
         String themeName = configurationFile.getTheme();
         if (themeName == null || themeName.isEmpty()) {
             themeName = "Space";
         }
-        currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
+        int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
         setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
@@ -54,6 +56,23 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
             TypedValue value = new TypedValue();
             getTheme().resolveAttribute(R.attr.background_landscape, value, true);
             getWindow().setBackgroundDrawableResource(value.resourceId);
+        }
+
+        Intent intent = getIntent();
+        if (intent.hasExtra(Constants.GRAPHICS_API_NAME)) {
+            graphicsAPIName = intent.getStringExtra(Constants.GRAPHICS_API_NAME);
+        } else {
+            graphicsAPIName = null;
+        }
+        if (intent.hasExtra(Constants.GRAPHICS_API_VERSION)) {
+            graphicsAPIVersion = intent.getStringExtra(Constants.GRAPHICS_API_VERSION);
+        } else {
+            graphicsAPIVersion = null;
+        }
+        if (intent.hasExtra(Constants.GRAPHICS_DEVICE_NAME)) {
+            graphicsDeviceName = intent.getStringExtra(Constants.GRAPHICS_DEVICE_NAME);
+        } else {
+            graphicsDeviceName = null;
         }
 
         initializeGui(true);
@@ -89,6 +108,21 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         themeSelector.setAdapter(spinAdapter);
         themeSelector.setSelection(pos);
         themeSelector.setOnItemSelectedListener(this);
+
+        if (graphicsAPIName != null) {
+            TextView view = findViewById(R.id.graphicsAPIName);
+            view.setText(graphicsAPIName);
+        }
+
+        if (graphicsAPIVersion != null) {
+            TextView view = findViewById(R.id.graphicsAPIVersion);
+            view.setText(graphicsAPIVersion);
+        }
+
+        if (graphicsDeviceName != null) {
+            TextView view = findViewById(R.id.graphicsDeviceName);
+            view.setText(graphicsDeviceName);
+        }
     }
 
     @Override

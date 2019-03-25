@@ -346,17 +346,16 @@ namespace vulkan {
             }
         }
 
-        // debug
-        for (const auto &device : devices) {
-            VkPhysicalDeviceProperties deviceProperties;
-            vkGetPhysicalDeviceProperties(device, &deviceProperties);
-
-            std::cout << "Device name: " << deviceProperties.deviceName << "\n";
-        }
-
         if (m_physicalDevice == VK_NULL_HANDLE) {
             throw std::runtime_error("failed to find a suitable GPU!");
         }
+    }
+
+    Device::DeviceProperties Device::properties() {
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(m_physicalDevice, &deviceProperties);
+
+        return DeviceProperties(deviceProperties.deviceName, deviceProperties.apiVersion);
     }
 
     void Device::createLogicalDevice() {

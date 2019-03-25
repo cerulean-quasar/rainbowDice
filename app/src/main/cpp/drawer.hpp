@@ -313,15 +313,10 @@ public:
 DiceChannel &diceChannel();
 
 class DiceWorker {
-    static constexpr uint32_t m_maxEventsBeforeRedraw = 128;
-
-    bool m_tryVulkan;
-    std::unique_ptr<RainbowDice> m_diceGraphics;
-    std::unique_ptr<Notify> m_notify;
 public:
     DiceWorker(std::shared_ptr<WindowType> &inSurface,
                std::unique_ptr<Notify> &inNotify)
-            : m_tryVulkan{true},
+            : m_tryVulkan{false},
               m_diceGraphics{},
               m_notify{std::move(inNotify)}
      {
@@ -331,9 +326,19 @@ public:
         initDiceGraphics(inSurface);
     }
 
-    void initDiceGraphics(std::shared_ptr<WindowType> &surface);
     void waitingLoop();
+    void notifyAboutGraphicsDescription() {
+        m_notify->sendGraphicsDescription(m_diceGraphics->graphicsDescription());
+    }
+private:
+    static constexpr uint32_t m_maxEventsBeforeRedraw = 128;
+
+    bool m_tryVulkan;
+    std::unique_ptr<RainbowDice> m_diceGraphics;
+    std::unique_ptr<Notify> m_notify;
+
     std::shared_ptr<DrawEvent> drawingLoop();
+    void initDiceGraphics(std::shared_ptr<WindowType> &surface);
 };
 
 #endif // RAINBOWDICE_DRAWER_HPP

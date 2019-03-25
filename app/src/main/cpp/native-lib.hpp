@@ -41,5 +41,6 @@ public:
             std::vector<std::shared_ptr<DiceDescription>> const &dice);
     void sendError(std::string const &error);
     void sendError(char const *error);
+    void sendGraphicsDescription(GraphicsDescription const &description);
 };
 #endif // RAINBOWDICE_NATIVELIB_HPP

@@ -27,11 +27,17 @@ import android.os.Message;
 import java.util.ArrayList;
 
 public class DiceDrawerReturnChannel {
-    public static final String resultsMsg = "diceResults";
     public static final String errorMsg = "drawerError";
+
+    public static final String resultsMsg = "diceResults";
     public static final String diceConfigMsg = "diceConfig";
     public static final String fileNameMsg = "diceFileName";
     public static final String isModifiedRollMsg = "isModifiedRoll";
+
+    public static final String deviceName = "deviceName";
+    public static final String apiVersion = "apiVersion";
+    public static final String apiName = "apiName";
+    public static final String isVulkan = "isVulkan";
 
     private DiceDrawerMessage m_msgBeingBuilt;
     private ArrayList<DieConfiguration> m_dice;
@@ -118,5 +124,22 @@ public class DiceDrawerReturnChannel {
         m_notify.sendMessage(msg);
 
         m_msgBeingBuilt = null;
+    }
+
+    public void sendGraphicsDescription(boolean isVulkanAPI, String graphicsName, String version,
+                                        String graphicsDeviceName) {
+        // tell the main thread, a result has occurred.
+        Bundle bundle = new Bundle();
+        bundle.putBoolean(isVulkan, isVulkanAPI);
+        bundle.putString(apiName, graphicsName);
+        if (!version.isEmpty()) {
+            bundle.putString(apiVersion, version);
+        }
+        if (!graphicsDeviceName.isEmpty()) {
+            bundle.putString(deviceName, graphicsDeviceName);
+        }
+        Message msg = Message.obtain();
+        msg.setData(bundle);
+        m_notify.sendMessage(msg);
     }
 }
