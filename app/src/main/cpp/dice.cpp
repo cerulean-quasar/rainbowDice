@@ -43,9 +43,9 @@ const float Vertex::MODE_CENTER_DISTANCE = 1.0f;
 float const DicePhysicsModel::errorVal = 0.15f;
 float const DicePhysicsModel::viscosity = 2.0f;
 float const DicePhysicsModel::radius = 0.2f;
-float const DicePhysicsModel::maxposx = 1.0f;
-float const DicePhysicsModel::maxposy = 1.0f;
-float const DicePhysicsModel::maxposz = 1.0f;
+float DicePhysicsModel::M_maxposx = 1.0f;
+float DicePhysicsModel::M_maxposy = 1.0f;
+float DicePhysicsModel::M_maxposz = 1.0f;
 
 // Time for the stopped animation to complete
 float const DicePhysicsModel::stoppedAnimationTime = 0.5f; // seconds
@@ -116,7 +116,7 @@ std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &sym
     return die;
 }
 
-void DicePhysicsModel::resetPosition(float screenWidth, float screenHeight) {
+void DicePhysicsModel::resetPosition() {
     prevTime = std::chrono::high_resolution_clock::now();
     stopped = false;
     goingToStop = false;
@@ -136,7 +136,7 @@ void DicePhysicsModel::resetPosition(float screenWidth, float screenHeight) {
     angularVelocity.setAngularSpeed(0);
     angularVelocity.setSpinAxis(glm::vec3(0.0f, 0.0f, 1.0f));
 
-    randomizeUpFace(screenWidth, screenHeight);
+    randomizeUpFace();
     checkQuaternion(qTotalRotated);
 
     glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
@@ -217,7 +217,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             animationDone = true;
             m_position.x = doneX;
             m_position.y = doneY;
-            m_position.z = maxposz;
+            m_position.z = M_maxposz;
             glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
             if (stoppedAngle != 0) {
                 glm::quat q = glm::angleAxis(stoppedAngle, stoppedRotationAxis);
@@ -240,7 +240,7 @@ bool DicePhysicsModel::updateModelMatrix() {
                          stoppedPositionX;
             m_position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
                          stoppedPositionY;
-            m_position.z = maxposz;
+            m_position.z = M_maxposz;
             glm::mat4 rotate;
             if (stoppedAngle != 0) {
                 glm::quat q = glm::angleAxis(stoppedAngle/stoppedAnimationTime*animationTime,
@@ -303,27 +303,27 @@ bool DicePhysicsModel::updateModelMatrix() {
     }
 
     // reset the position in the case that it got stuck outside the boundary
-    if (m_position.x < -maxposx) {
-        m_position.x = -maxposx;
-    } else if (m_position.x > maxposx) {
-        m_position.x = maxposx;
+    if (m_position.x < -M_maxposx) {
+        m_position.x = -M_maxposx;
+    } else if (m_position.x > M_maxposx) {
+        m_position.x = M_maxposx;
     }
-    if (m_position.y < -maxposy) {
-        m_position.y = -maxposy;
-    } else if (m_position.y > maxposy) {
-        m_position.y = maxposy;
+    if (m_position.y < -M_maxposy) {
+        m_position.y = -M_maxposy;
+    } else if (m_position.y > M_maxposy) {
+        m_position.y = M_maxposy;
     }
-    if (m_position.z < -maxposz) {
-        m_position.z = -maxposz;
-    } else if (m_position.z > maxposz) {
-        m_position.z = maxposz;
+    if (m_position.z < -M_maxposz) {
+        m_position.z = -M_maxposz;
+    } else if (m_position.z > M_maxposz) {
+        m_position.z = M_maxposz;
     }
 
     float speed = glm::length(velocity);
 
     if (speed != 0) {
         m_position += velocity*time;
-        if (m_position.x > maxposx || m_position.x < -maxposx) {
+        if (m_position.x > M_maxposx || m_position.x < -M_maxposx) {
             /* the die will start to spin when it hits the wall */
             glm::vec3 spinAxisAdded = glm::cross(velocity,glm::vec3(1.0f, 0.0f, 0.0f));
             glm::vec3 spinAxis = angularVelocity.spinAxis() + spinAxisAdded;
@@ -337,7 +337,7 @@ bool DicePhysicsModel::updateModelMatrix() {
 
             velocity.x *= -1;
         }
-        if (m_position.y > maxposy || m_position.y < -maxposy) {
+        if (m_position.y > M_maxposy || m_position.y < -M_maxposy) {
             /* the die will start to spin when it hits the wall */
             glm::vec3 spinAxisAdded = glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), velocity);
             glm::vec3 spinAxis = angularVelocity.spinAxis() + spinAxisAdded;
@@ -351,7 +351,7 @@ bool DicePhysicsModel::updateModelMatrix() {
 
             velocity.y *= -1;
         }
-        if (m_position.z > maxposz || m_position.z < -maxposz) {
+        if (m_position.z > M_maxposz || m_position.z < -M_maxposz) {
             /* the die will start to spin when it hits the wall */
             glm::vec3 spinAxisAdded = glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), velocity);
             glm::vec3 spinAxis = angularVelocity.spinAxis() + spinAxisAdded;
@@ -370,7 +370,7 @@ bool DicePhysicsModel::updateModelMatrix() {
 
     velocity += acceleration * time;
 
-    if ((m_position.z > maxposz || maxposz - m_position.z < errorVal) && fabs(velocity.z) < errorVal) {
+    if ((m_position.z > M_maxposz || M_maxposz - m_position.z < errorVal) && fabs(velocity.z) < errorVal) {
         goingToStop = true;
 
         upFace = calculateUpFace();
@@ -385,7 +385,7 @@ bool DicePhysicsModel::updateModelMatrix() {
         velocity = {0.0f, 0.0f, 0.0f};
         stoppedPositionX = m_position.x;
         stoppedPositionY = m_position.y;
-        m_position.z = maxposz;
+        m_position.z = M_maxposz;
     }
 
     if (angularVelocity.speed() != 0 && glm::length(angularVelocity.spinAxis()) > 0) {
@@ -446,12 +446,18 @@ uint32_t DicePhysicsModel::calculateUpFace() {
 }
 
 void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
+    // get rid of any previous rotation on the die.  When the dice are initialized, they are set
+    // to have a random face up and a random rotation around the z axis (resetPositions() is called.
+    // This is done so that if the dice are rolling, they will be fair.  We don't need that here.
+    // They are being placed, not rolling.
+    qTotalRotated = glm::quat{};
+
     uint32_t faceIndex = getFaceIndexForSymbol(inUpFaceIndex);
     glm::vec3 zaxis = glm::vec3(0.0, 0.0, 1.0);
 
     m_position.x = x;
     m_position.y = y;
-    m_position.z = maxposz;
+    m_position.z = M_maxposz;
     stoppedPositionX = x;
     stoppedPositionY = y;
 
@@ -471,7 +477,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     getAngleAxis(faceIndex, angle, normalVector);
 
     glm::vec3 cross = glm::cross(normalVector, zaxis);
-    // if the cross product is zero, the normalVector must be along the z-axis. rotate along the
+    // if the cross product is zero, the normalVector must be along the z-axis. rotate around the
     // y-axis.
     if (glm::length(cross) == 0.0f) {
         cross = {0.0f, 1.0f, 0.0f};
@@ -505,7 +511,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     result = inUpFaceIndex;
 }
 
-void DicePhysicsModel::randomizeUpFace(float screenWidth, float screenHeight) {
+void DicePhysicsModel::randomizeUpFace() {
     Random random;
     uint32_t upFace = random.getUInt(0, numberFaces-1);
 
@@ -532,9 +538,9 @@ void DicePhysicsModel::randomizeUpFace(float screenWidth, float screenHeight) {
         checkQuaternion(qTotalRotated);
     }
 
-    m_position.x = random.getFloat(-screenWidth/2, screenWidth/2);
-    m_position.y = random.getFloat(-screenHeight/2, screenHeight/2);
-    m_position.z = -maxposz;
+    m_position.x = random.getFloat(-M_maxposx, M_maxposx);
+    m_position.y = random.getFloat(-M_maxposy, M_maxposy);
+    m_position.z = -M_maxposz;
 
     float factor = 10;
     velocity.x = random.getFloat(-factor, factor);

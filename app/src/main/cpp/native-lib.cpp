@@ -422,9 +422,9 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         jobject jmanager,
         jobject jnotify) {
 
-    std::unique_ptr<Notify> notify;
+    std::shared_ptr<Notify> notify;
     try {
-        notify = std::make_unique<Notify>(env, jnotify);
+        notify = std::make_shared<Notify>(env, jnotify);
     } catch (...) {
         return;
     }

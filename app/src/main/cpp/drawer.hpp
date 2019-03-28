@@ -48,7 +48,7 @@ public:
 
     // returns true if the surface needs redrawing after this event.
     virtual bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-            std::unique_ptr<Notify> &notify) = 0;
+            std::shared_ptr<Notify> &notify) = 0;
 
     virtual evtype type() = 0;
     virtual ~DrawEvent() = default;
@@ -57,7 +57,7 @@ public:
 class StopDrawingEvent : public DrawEvent {
 public:
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         return false;
     }
 
@@ -75,8 +75,11 @@ public:
         m_height(height) {
     }
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->recreateSwapChain(m_width, m_height);
+
+        // move dice to the new position on the screen according to the new screen size.
+        diceGraphics->animateMoveStoppedDice();
 
         // redraw the frame right away and then return false because this event means that we
         // should redraw immediately and not wait for some number of events to come up before we
@@ -101,7 +104,7 @@ public:
     }
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->scroll(m_distanceX, m_distanceY);
         return true;
     }
@@ -120,7 +123,7 @@ public:
     }
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->scale(m_scaleFactor);
         return true;
     }
@@ -141,7 +144,7 @@ public:
     }
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         return diceGraphics->tapDice(m_x, m_y);
     }
 
@@ -155,7 +158,7 @@ public:
     RerollSelected() = default;
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->rerollSelected();
         return false;
     }
@@ -170,7 +173,7 @@ public:
     AddRerollSelected() = default;
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->addRerollSelected();
         return false;
     }
@@ -185,7 +188,7 @@ public:
     DeleteSelected() = default;
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         if (diceGraphics->deleteSelected()) {
             std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
             notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
@@ -204,7 +207,7 @@ public:
     ResetView() = default;
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->resetView();
         return true;
     }
@@ -235,7 +238,7 @@ public:
     }
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->setTexture(m_texture);
         diceGraphics->setDice(m_name, m_dice, m_isModifiedRoll);
         diceGraphics->initModels();
@@ -267,7 +270,7 @@ public:
     }
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
-                     std::unique_ptr<Notify> &notify) override {
+                     std::shared_ptr<Notify> &notify) override {
         diceGraphics->setTexture(m_texture);
         diceGraphics->setDice(m_diceName, m_dice);
         diceGraphics->initModels();
@@ -314,16 +317,16 @@ DiceChannel &diceChannel();
 
 class DiceWorker {
 public:
-    DiceWorker(std::shared_ptr<WindowType> &inSurface,
-               std::unique_ptr<Notify> &inNotify)
-            : m_tryVulkan{false},
+    DiceWorker(std::shared_ptr<WindowType> inSurface,
+               std::shared_ptr<Notify> inNotify)
+            : m_tryVulkan{true},
               m_diceGraphics{},
               m_notify{std::move(inNotify)}
      {
 #ifndef CQ_ENABLE_VULKAN
         m_tryVulkan = false;
 #endif
-        initDiceGraphics(inSurface);
+        initDiceGraphics(std::move(inSurface));
     }
 
     void waitingLoop();
@@ -335,10 +338,10 @@ private:
 
     bool m_tryVulkan;
     std::unique_ptr<RainbowDice> m_diceGraphics;
-    std::unique_ptr<Notify> m_notify;
+    std::shared_ptr<Notify> m_notify;
 
     std::shared_ptr<DrawEvent> drawingLoop();
-    void initDiceGraphics(std::shared_ptr<WindowType> &surface);
+    void initDiceGraphics(std::shared_ptr<WindowType> surface);
 };
 
 #endif // RAINBOWDICE_DRAWER_HPP

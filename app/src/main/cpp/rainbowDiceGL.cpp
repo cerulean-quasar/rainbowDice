@@ -157,6 +157,11 @@ namespace graphicsGL {
 std::string const SHADER_VERT_FILE("shaderGL.vert");
 std::string const SHADER_FRAG_FILE("shaderGL.frag");
 
+template <>
+bool DiceGraphics<GLGraphics>::isGL() {
+    return true;
+}
+
 void RainbowDiceGL::init() {
     programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
 

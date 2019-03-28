@@ -17,7 +17,8 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#ifndef RAINBOWDICE_GL_HPP
+#define RAINBOWDICE_GL_HPP
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <list>
@@ -72,6 +73,9 @@ namespace graphicsGL {
 struct GLGraphics {
     using Buffer = GLuint;
 };
+
+template <>
+bool DiceGraphics<GLGraphics>::isGL();
 
 class DiceGL : public DiceGraphics<GLGraphics> {
 public:
@@ -178,3 +182,5 @@ private:
     GLuint loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile);
     void init();
 };
+
+#endif // RAINBOWDICE_GL_HPP

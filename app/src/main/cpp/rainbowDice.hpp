@@ -63,11 +63,12 @@ public:
     inline std::vector<uint32_t> const &rerollIndices() { return m_rerollIndices; }
     inline bool isSelected() { return m_isSelected; }
     inline size_t nbrIndices() { return m_die->getIndices().size(); }
+    inline bool isGL() { return false; }
 
     DiceGraphics(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
                  std::vector<float> const &color,
                  std::shared_ptr<TextureAtlas> const &textureAtlas)
-            : m_die{std::move(createDice(symbols, color))},
+            : m_die{std::move(createDice(symbols, color, isGL()))},
               m_rerollIndices{std::move(inRerollIndices)},
               m_isSelected{false},
               m_vertexBuffer{},
@@ -75,7 +76,7 @@ public:
 
     {
         m_die->loadModel(textureAtlas);
-        m_die->resetPosition(screenWidth, screenHeight);
+        m_die->resetPosition();
     }
 
     virtual ~DiceGraphics() = default;
@@ -109,6 +110,8 @@ public:
     virtual std::vector<std::vector<uint32_t>> getDiceResults()=0;
 
     virtual bool needsReroll()=0;
+
+    virtual void animateMoveStoppedDice()=0;
 
     virtual void loadObject(std::vector<std::string> const &symbols,
                             std::vector<uint32_t> const &rerollSymbol,
@@ -162,6 +165,8 @@ public:
          */
         m_proj = glm::perspective(glm::radians(67.0f), surfaceWidth / (float) surfaceHeight,
                                   0.1f, 10.0f);
+        getScreenCoordinatesInWorldSpace();
+        DicePhysicsModel::setMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, 1.0f);
     }
 
     virtual void resetView() {
@@ -189,7 +194,9 @@ public:
     bool isModifiedRoll() { return m_isModifiedRoll; }
 
     RainbowDice()
-            : m_viewPoint{startViewPoint()},
+            : m_screenWidth{2.0f},
+              m_screenHeight{2.0f},
+              m_viewPoint{startViewPoint()},
               m_viewPointCenterPosition{startViewPointCenterPosition()},
               m_isModifiedRoll{false}
     {}
@@ -197,6 +204,9 @@ public:
     virtual ~RainbowDice() = default;
 
 protected:
+    float m_screenWidth;
+    float m_screenHeight;
+
     std::string m_diceName;
     std::vector<std::shared_ptr<DiceDescription>> m_diceDescriptions;
 
@@ -213,6 +223,18 @@ protected:
     static constexpr float m_maxScroll = 10.0f;
     static glm::vec3 startViewPointCenterPosition() { return {0.0f, 0.0f, 0.0f}; }
     static glm::vec3 startViewPoint() { return {0.0f, 0.0f, 3.0f}; };
+
+    void getScreenCoordinatesInWorldSpace() {
+        glm::mat4 view = glm::lookAt(startViewPoint(), startViewPointCenterPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::vec4 worldZ{0.0f, 0.0f, 1.0f+DicePhysicsModel::stoppedRadius, 1.0f};
+        glm::vec4 z = m_proj * view * worldZ;
+
+        glm::vec4 plus = glm::vec4{z.w, z.w, z.z, z.w};
+        glm::vec4 worldPlus = glm::inverse(view) * glm::inverse(m_proj) * plus;
+
+        m_screenWidth = worldPlus.x/worldPlus.w * 2;
+        m_screenHeight = worldPlus.y/worldPlus.w * 2;
+    }
 
     void scroll(float distanceX, float distanceY, uint32_t windowWidth, uint32_t windowHeight) {
         float x = distanceX/windowWidth * 2.0f;
@@ -259,6 +281,7 @@ public:
     void rerollSelected() override;
     void addRerollSelected() override;
     bool deleteSelected() override;
+    void animateMoveStoppedDice() override;
 
     void loadObject(std::vector<std::string> const &symbols,
                                        std::vector<uint32_t> const &rerollIndices,
@@ -277,11 +300,9 @@ public:
     }
 
     void resetPositions() override {
-        float width = screenWidth;
-        float height = screenHeight;
         for (auto const &dice: m_dice) {
             for (auto const &die : dice) {
-                die->die()->resetPosition(width, height);
+                die->die()->resetPosition();
             }
         }
     }
@@ -334,8 +355,8 @@ protected:
 
 template <typename DiceType>
 bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, uint32_t height) {
-    float swidth = screenWidth;
-    float sheight = screenHeight;
+    float swidth = 2.0;
+    float sheight = 2.0;
     float xnorm = x/width * swidth - swidth / 2.0f;
     float ynorm = invertY() ? -y/height * sheight + sheight / 2.0f
                             : y/height * sheight - sheight / 2.0f;
@@ -401,8 +422,8 @@ bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
 
     bool needsRedraw = false;
     uint32_t i = 0;
-    float width = screenWidth;
-    float height = screenHeight;
+    float width = m_screenWidth;
+    float height = m_screenHeight;
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->die()->updateModelMatrix()) {
@@ -449,8 +470,8 @@ template <typename DiceType>
 void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     uint32_t i = 0;
     uint32_t k = 0;
-    float width = screenWidth;
-    float height = screenHeight;
+    float width = m_screenWidth;
+    float height = m_screenHeight;
     auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
 
     for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
@@ -503,8 +524,8 @@ void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
 
 template <typename DiceType>
 void RainbowDiceGraphics<DiceType>::addRollingDice() {
-    float width = screenWidth;
-    float height = screenHeight;
+    float width = m_screenWidth;
+    float height = m_screenHeight;
     for (auto &dice : m_dice) {
         if (dice.empty()) {
             continue;
@@ -531,15 +552,20 @@ void RainbowDiceGraphics<DiceType>::addRollingDice() {
         dice.push_back(dieNew);
     }
 
+    animateMoveStoppedDice();
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::animateMoveStoppedDice() {
     int i=0;
+    auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->die()->isStopped()) {
-                auto nbrX = static_cast<uint32_t>(width / (2 * DicePhysicsModel::stoppedRadius));
                 uint32_t stoppedX = i % nbrX;
                 uint32_t stoppedY = i / nbrX;
-                float x = -width / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-                float y = height / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+                float x = -m_screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+                float y = m_screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
                 die->die()->animateMove(x, y);
             }
             i++;
@@ -552,7 +578,7 @@ void RainbowDiceGraphics<DiceType>::rerollSelected() {
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->isSelected()) {
-                die->die()->resetPosition(screenWidth, screenHeight);
+                die->die()->resetPosition();
                 die->toggleSelected();
                 m_isModifiedRoll = true;
             }
@@ -577,21 +603,7 @@ void RainbowDiceGraphics<DiceType>::addRerollSelected() {
         }
     }
 
-    int i=0;
-    for (auto const &dice : m_dice) {
-        for (auto const &die : dice) {
-            if (die->die()->isStopped()) {
-                auto nbrX = static_cast<uint32_t>(screenWidth /
-                                                  (2 * DicePhysicsModel::stoppedRadius));
-                uint32_t stoppedX = i % nbrX;
-                uint32_t stoppedY = i / nbrX;
-                float x = -screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-                float y = screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-                die->die()->animateMove(x, y);
-            }
-            i++;
-        }
-    }
+    animateMoveStoppedDice();
 }
 
 template <typename DiceType>
@@ -608,23 +620,7 @@ bool RainbowDiceGraphics<DiceType>::deleteSelected() {
     }
 
     if (diceDeleted) {
-        int i = 0;
-        for (auto const &dice : m_dice) {
-            for (auto const &die : dice) {
-                if (die->die()->isStopped()) {
-                    auto nbrX = static_cast<uint32_t>(screenWidth /
-                                                      (2 * DicePhysicsModel::stoppedRadius));
-                    uint32_t stoppedX = i % nbrX;
-                    uint32_t stoppedY = i / nbrX;
-                    float x =
-                            -screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-                    float y =
-                            screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-                    die->die()->animateMove(x, y);
-                }
-                i++;
-            }
-        }
+        animateMoveStoppedDice();
     }
 
     return diceDeleted;

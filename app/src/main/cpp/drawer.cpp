@@ -99,11 +99,11 @@ DiceChannel &diceChannel() {
     return g_diceChannel;
 }
 
-void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> &surface) {
+void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface) {
 #ifdef CQ_ENABLE_VULKAN
     if (m_tryVulkan) {
         try {
-            m_diceGraphics.reset(new RainbowDiceVulkan(surface));
+            m_diceGraphics.reset(new RainbowDiceVulkan(std::move(surface)));
         } catch (std::runtime_error &e) {
             m_tryVulkan = false;
         }

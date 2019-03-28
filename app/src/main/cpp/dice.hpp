@@ -232,9 +232,6 @@ protected:
 private:
     static const std::vector<glm::vec3> colors;
 
-    static float const maxposx;
-    static float const maxposy;
-    static float const maxposz;
     static float const gravity;
     static float const viscosity;
     static float const errorVal;
@@ -246,6 +243,11 @@ private:
 
     /* for the accelerometer data.  These data are saved between dice creation and deletion. */
     static Filter filter;
+
+    /* maximum position for x and y.  Set according to the screen size and what the projection matrix is. */
+    static float M_maxposz;
+    static float M_maxposx;
+    static float M_maxposy;
 
     std::chrono::high_resolution_clock::time_point prevTime;
 
@@ -327,9 +329,11 @@ public:
             stoppedAngle = 0.0f;
         }
 
-        // if the dice is to be moved, then set animationDone to false and animationTime to 0.
+        // if the die is to be moved, then set animationDone to false and animationTime to 0.
         // otherwise just return so no animation is done.
-        if (doneX != x || doneY != y) {
+        glm::vec2 start{x, y};
+        glm::vec2 end{stoppedPositionX, stoppedPositionY};
+        if (glm::length(end - start) > 0.001f) {
             doneX = x;
             doneY = y;
             animationDone = false;
@@ -341,10 +345,10 @@ public:
     bool isStoppedAnimationDone() { return animationDone; }
     bool isStoppedAnimationStarted() { return doneY != 0.0f; }
     uint32_t getResult() { return result; }
-    void resetPosition(float screenWidth, float screenHeight);
+    void resetPosition();
     virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) = 0;
     uint32_t calculateUpFace();
-    void randomizeUpFace(float screenWidth, float screenHeight);
+    void randomizeUpFace();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
     virtual uint32_t getFaceIndexForSymbol(uint32_t symbolIndex) { return symbolIndex; }
     virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
@@ -361,6 +365,15 @@ public:
     virtual void yAlign(uint32_t faceIndex) = 0;
 
     std::vector<float> const &dieColor() { return m_color; }
+
+    /* sets the maximum x, y, and z in world space. x and y are set for what fits on the screen at
+     * depth z.
+     */
+    static void setMaxXYZ(float x, float y, float z) {
+        M_maxposx = x;
+        M_maxposy = y;
+        M_maxposz = z;
+    }
 };
 
 class DiceModelCube : public DicePhysicsModel {
