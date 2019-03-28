@@ -76,6 +76,10 @@ public:
     }
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
+        // giggle the device so that when the swapchain is recreated, it gets the correct width and
+        // height.
+        diceGraphics->drawFrame();
+
         diceGraphics->recreateSwapChain(m_width, m_height);
 
         // move dice to the new position on the screen according to the new screen size.

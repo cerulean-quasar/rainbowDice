@@ -458,13 +458,13 @@ namespace vulkan {
     /**
      * create the swap chain.
      */
-    void SwapChain::createSwapChain() {
+    void SwapChain::createSwapChain(uint32_t width, uint32_t height) {
         /* chose details of the swap chain and get information about what is supported */
         Device::SwapChainSupportDetails swapChainSupport = m_device->querySwapChainSupport();
 
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, width, height);
 
         /* Decide on the number of images in the swap chain.  The implementation specifies the
          * minimum amount, but we try to have more than that to implement triple buffering
@@ -613,7 +613,14 @@ namespace vulkan {
      * Choose the resolution of the swap images in the frame buffer.  Just return
      * the current extent (same resolution as the window).
      */
-    VkExtent2D SwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
+    VkExtent2D SwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, uint32_t width, uint32_t height) {
+        if (width != 0 && height != 0) {
+            if (capabilities.minImageExtent.height < height && capabilities.maxImageExtent.height > height &&
+                capabilities.minImageExtent.width < width && capabilities.maxImageExtent.width > width) {
+                VkExtent2D extent = { width, height};
+                return extent;
+            }
+        }
         return capabilities.currentExtent;
     }
 

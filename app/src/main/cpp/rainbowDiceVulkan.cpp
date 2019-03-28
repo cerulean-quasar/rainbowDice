@@ -257,7 +257,7 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
 
     cleanupSwapChain();
 
-    m_swapChain.reset(new vulkan::SwapChain{m_device});
+    m_swapChain.reset(new vulkan::SwapChain{m_device, width, height});
 
     m_depthImageView.reset(new vulkan::ImageView{vulkan::ImageFactory::createDepthImage(m_swapChain),
                                                  m_device->depthFormat(), VK_IMAGE_ASPECT_DEPTH_BIT});

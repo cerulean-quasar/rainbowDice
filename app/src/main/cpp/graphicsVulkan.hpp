@@ -223,12 +223,12 @@ namespace vulkan {
 
     class SwapChain {
     public:
-        SwapChain(std::shared_ptr<Device> inDevice)
+        SwapChain(std::shared_ptr<Device> inDevice, uint32_t width = 0, uint32_t height = 0)
                 : m_device(inDevice),
                   m_swapChain{VK_NULL_HANDLE},
                   m_imageFormat{},
                   m_extent{} {
-            createSwapChain();
+            createSwapChain(width, height);
         }
 
         inline std::shared_ptr<Device> const &device() { return m_device; }
@@ -243,7 +243,7 @@ namespace vulkan {
         VkExtent2D m_extent;
         VkSurfaceTransformFlagBitsKHR m_preTransform;
 
-        void createSwapChain();
+        void createSwapChain(uint32_t width, uint32_t height);
 
         VkSurfaceFormatKHR
         chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
@@ -251,7 +251,7 @@ namespace vulkan {
         VkPresentModeKHR
         chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
 
-        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, uint32_t width, uint32_t height);
     };
 
     class RenderPass {
