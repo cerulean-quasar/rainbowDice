@@ -100,12 +100,19 @@ private:
         float dt;
     };
     std::deque<high_pass_samples> highPassAcceleration;
+    bool m_useGravity;
 
 public:
     Filter()
-        :highPassAccelerationPrevTime(std::chrono::high_resolution_clock::now()) {
-
+        : highPassAccelerationPrevTime{std::chrono::high_resolution_clock::now()},
+          m_useGravity{true}
+    {
     }
+
+    void setUseGravity(bool inUseGravity) {
+        m_useGravity = inUseGravity;
+    }
+
     glm::vec3 acceleration(glm::vec3 const &sensorInputs) {
         float RC = 3.0f;
         auto currentTime = std::chrono::high_resolution_clock::now();
@@ -116,7 +123,11 @@ public:
         unsigned long size = highPassAcceleration.size();
         glm::vec3 acceleration(0.0f, 0.0f, 0.0f);
 
-        if (size == 0) {
+        if (dt > 1) {
+            // the time diff is too long.  This is not good data. Just return the sensor inputs and
+            // save the time difference for next call through.
+            acceleration = sensorInputs;
+        } else if (size == 0) {
             high_pass_samples sample;
             acceleration = sample.output = sample.input = sensorInputs;
             sample.dt = dt;
@@ -144,7 +155,11 @@ public:
             if (size < 100) {
                 acceleration = sample.output;
             } else {
-                acceleration = 20.0f * sample.output + sensorInputs - sample.output;
+                if (m_useGravity) {
+                    acceleration = 20.0f * sample.output + sensorInputs - sample.output;
+                } else {
+                    acceleration = 20.0f * sample.output + glm::vec3{0.0f, 0.0f, 9.8f};
+                }
             }
         }
         return acceleration;
@@ -340,6 +355,7 @@ public:
             animationTime = 0.0f;
         }
     }
+    void positionDice(float x, float y, bool randomizeUpFace);
     void positionDice(uint32_t inFaceIndex, float x, float y);
     bool isStopped() { return stopped; }
     bool isStoppedAnimationDone() { return animationDone; }
@@ -373,6 +389,10 @@ public:
         M_maxposx = x;
         M_maxposy = y;
         M_maxposz = z;
+    }
+
+    static void setUseGravity(bool inUseGravity) {
+        filter.setUseGravity(inUseGravity);
     }
 };
 

@@ -109,9 +109,6 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     protected void onCreate(Bundle savedInstanceState) {
         ConfigurationFile configurationFile = new ConfigurationFile(this);
         String themeName = configurationFile.getTheme();
-        if (themeName == null || themeName.isEmpty()) {
-            themeName = "Space";
-        }
         int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
         setTheme(currentThemeId);
 

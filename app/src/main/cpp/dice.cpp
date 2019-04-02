@@ -445,6 +445,17 @@ uint32_t DicePhysicsModel::calculateUpFace() {
     return upFace;
 }
 
+void DicePhysicsModel::positionDice(float x, float y, bool randomizeUpFace) {
+    if (randomizeUpFace) {
+        Random random;
+        uint32_t upFace = random.getUInt(0, numberFaces - 1);
+        positionDice(upFace, x, y);
+    } else {
+        uint32_t upFace = calculateUpFace();
+        positionDice(upFace, x, y);
+    }
+}
+
 void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
     // get rid of any previous rotation on the die.  When the dice are initialized, they are set
     // to have a random face up and a random rotation around the z axis (resetPositions() is called.

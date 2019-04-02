@@ -163,8 +163,15 @@ public:
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
-        diceGraphics->rerollSelected();
-        return false;
+        bool hasResult = diceGraphics->rerollSelected();
+        if (hasResult) {
+            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
+            notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
+                               results, diceGraphics->getDiceDescriptions());
+            return true;
+        } else {
+            return false;
+        }
     }
 
     evtype type() override { return rerollSelected; }
@@ -178,8 +185,15 @@ public:
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
-        diceGraphics->addRerollSelected();
-        return false;
+        bool hasResult = diceGraphics->addRerollSelected();
+        if (hasResult) {
+            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
+            notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
+                               results, diceGraphics->getDiceDescriptions());
+            return true;
+        } else {
+            return false;
+        }
     }
 
     evtype type() override { return addRerollSelected; }
@@ -197,8 +211,10 @@ public:
             std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
             notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
                                  results, diceGraphics->getDiceDescriptions());
+            return true;
+        } else {
+            return false;
         }
-        return true;
     }
 
     evtype type() override { return deleteSelected; }
@@ -275,17 +291,22 @@ public:
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
-        diceGraphics->setTexture(m_texture);
-        diceGraphics->setDice(m_diceName, m_dice);
-        diceGraphics->initModels();
-        diceGraphics->resetPositions();
-        diceGraphics->updateUniformBuffer();
-
-        // return false here because we will enter the drawing loop and then the dice will get
-        // redrawn.  If we return true here, then the dice will display, but then there will be
-        // a longish pause (about half a second) as the sensors get initialized at the top of the
-        // drawing loop.
-        return false;
+        bool hasResult = diceGraphics->changeDice(m_diceName, m_dice, m_texture);
+        if (hasResult) {
+            // The rolling dice are not animated, they are just moved to stopped positions.
+            // Return the results to the GUI.
+            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
+            notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
+                                 results, diceGraphics->getDiceDescriptions());
+            return true;
+        } else {
+            // We don't have a result for the dice here because these are rolling dice.
+            // Return false here because we will enter the drawing loop and then the dice will get
+            // redrawn.  If we return true here, then the dice will display, but then there will be
+            // a longish pause (about half a second) as the sensors get initialized at the top of the
+            // drawing loop.
+            return false;
+        }
     }
 
     evtype type() override { return diceChange; }
@@ -322,15 +343,18 @@ DiceChannel &diceChannel();
 class DiceWorker {
 public:
     DiceWorker(std::shared_ptr<WindowType> inSurface,
-               std::shared_ptr<Notify> inNotify)
-            : m_tryVulkan{true},
+               std::shared_ptr<Notify> inNotify,
+               bool inUseGravity,
+               bool inDrawRollingDice,
+               bool inUseLegacy)
+            : m_tryVulkan{!inUseLegacy},
               m_diceGraphics{},
               m_notify{std::move(inNotify)}
-     {
+    {
 #ifndef CQ_ENABLE_VULKAN
         m_tryVulkan = false;
 #endif
-        initDiceGraphics(std::move(inSurface));
+        initDiceGraphics(std::move(inSurface), inUseGravity, inDrawRollingDice);
     }
 
     void waitingLoop();
@@ -345,7 +369,8 @@ private:
     std::shared_ptr<Notify> m_notify;
 
     std::shared_ptr<DrawEvent> drawingLoop();
-    void initDiceGraphics(std::shared_ptr<WindowType> surface);
+    void initDiceGraphics(std::shared_ptr<WindowType> surface,
+                          bool inUseGravity, bool inDrawRollingDice);
 };
 
 #endif // RAINBOWDICE_DRAWER_HPP

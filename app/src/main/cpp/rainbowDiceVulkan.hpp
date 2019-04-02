@@ -206,8 +206,9 @@ private:
 
 class RainbowDiceVulkan : public RainbowDiceGraphics<DiceVulkan> {
 public:
-    explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window)
-            : RainbowDiceGraphics{},
+    explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window, bool inUseGravity,
+            bool inDrawRollingDice)
+            : RainbowDiceGraphics{inUseGravity, inDrawRollingDice},
               m_instance{new vulkan::Instance{std::move(window)}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
@@ -250,7 +251,24 @@ public:
 
     void resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &symbols) override;
 
-    void addRollingDice() override;
+    bool changeDice(std::string const &inDiceName,
+                    std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
+                    std::shared_ptr<TextureAtlas> inTexture) override {
+        bool hasResult = RainbowDiceGraphics<DiceVulkan>::changeDice(inDiceName, inDiceDescriptions, inTexture);
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
+        }
+        initializeCommandBuffers();
+        return hasResult;
+    }
+
+    void addRollingDice() override {
+        RainbowDiceGraphics::addRollingDice();
+        initializeCommandBuffers();
+    }
+
 
     GraphicsDescription graphicsDescription() override {
         vulkan::Device::DeviceProperties properties = m_device->properties();
@@ -266,14 +284,37 @@ public:
         return RainbowDiceGraphics::tapDice(x, y, m_width, m_height);
     }
 
-    void addRerollSelected() override {
-        RainbowDiceGraphics::addRerollSelected();
+    bool rerollSelected() override {
+        bool hasResult = RainbowDiceGraphics::rerollSelected();
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
+        }
+        return hasResult;
+    }
+
+    bool addRerollSelected() override {
+        bool hasResult = RainbowDiceGraphics::addRerollSelected();
         initializeCommandBuffers();
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
+        }
+        return hasResult;
     }
 
     bool deleteSelected() override {
         bool ret = RainbowDiceGraphics::deleteSelected();
-        initializeCommandBuffers();
+        if (ret) {
+            initializeCommandBuffers();
+            for (auto const &dice : m_dice) {
+                for (auto const &die : dice) {
+                    die->updateUniformBuffer(m_projWithPreTransform, m_view);
+                }
+            }
+        }
         return ret;
     }
 

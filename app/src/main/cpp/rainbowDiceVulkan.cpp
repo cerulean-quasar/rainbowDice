@@ -537,11 +537,6 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
     return needsRedraw;
 }
 
-void RainbowDiceVulkan::addRollingDice() {
-    RainbowDiceGraphics::addRollingDice();
-    initializeCommandBuffers();
-}
-
 void RainbowDiceVulkan::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     RainbowDiceGraphics::resetToStoppedPositions(upFaceIndices);
     for (auto const &dice : m_dice) {

@@ -99,11 +99,13 @@ DiceChannel &diceChannel() {
     return g_diceChannel;
 }
 
-void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface) {
+void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface,
+        bool inUseGravity, bool inDrawRollingDice) {
 #ifdef CQ_ENABLE_VULKAN
     if (m_tryVulkan) {
         try {
-            m_diceGraphics.reset(new RainbowDiceVulkan(std::move(surface)));
+            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(std::move(surface), inUseGravity,
+                    inDrawRollingDice);
         } catch (std::runtime_error &e) {
             m_tryVulkan = false;
         }
@@ -111,7 +113,7 @@ void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface) {
 #endif
 
     if (!m_tryVulkan) {
-        m_diceGraphics.reset(new RainbowDiceGL(surface));
+        m_diceGraphics = std::make_unique<RainbowDiceGL>(std::move(surface), inUseGravity, inDrawRollingDice);
     }
 }
 

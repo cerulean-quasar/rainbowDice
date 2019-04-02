@@ -420,7 +420,10 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         jobject jthis,
         jobject jsurface,
         jobject jmanager,
-        jobject jnotify) {
+        jobject jnotify,
+        jboolean juseGravity,
+        jboolean jdrawRollingDice,
+        jboolean juseLegacy) {
 
     std::shared_ptr<Notify> notify;
     try {
@@ -447,7 +450,7 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         std::shared_ptr<WindowType> surface(window, deleter);
 
         //diceChannel().clearQueue();
-        DiceWorker worker(surface, notify);
+        DiceWorker worker(surface, notify, juseGravity, jdrawRollingDice, juseLegacy);
         surface.reset();
         worker.notifyAboutGraphicsDescription();
         worker.waitingLoop();

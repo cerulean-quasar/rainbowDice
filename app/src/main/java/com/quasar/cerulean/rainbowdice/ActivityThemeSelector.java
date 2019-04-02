@@ -31,6 +31,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -44,9 +45,6 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
     protected void onCreate(Bundle savedInstanceState) {
         configurationFile = new ConfigurationFile(this);
         String themeName = configurationFile.getTheme();
-        if (themeName == null || themeName.isEmpty()) {
-            themeName = "Space";
-        }
         int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
         setTheme(currentThemeId);
 
@@ -109,6 +107,15 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         themeSelector.setSelection(pos);
         themeSelector.setOnItemSelectedListener(this);
 
+        CheckBox ck = findViewById(R.id.useLegacy);
+        ck.setChecked(configurationFile.useLegacy());
+
+        ck = findViewById(R.id.useGravity);
+        ck.setChecked(configurationFile.useGravity());
+
+        ck = findViewById(R.id.drawRollingDice);
+        ck.setChecked(configurationFile.drawRollingDice());
+
         if (graphicsAPIName != null) {
             TextView view = findViewById(R.id.graphicsAPIName);
             view.setText(graphicsAPIName);
@@ -165,6 +172,22 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         initializeGui(false);
     }
 
+    public void onCheckboxClicked(View view) {
+        boolean checked = ((CheckBox) view).isChecked();
+
+        switch (view.getId()) {
+            case R.id.useGravity:
+                configurationFile.setUseGravity(checked);
+                break;
+            case R.id.drawRollingDice:
+                configurationFile.setDrawRollingDice(checked);
+                break;
+            case R.id.useLegacy:
+                configurationFile.setUseLegacy(checked);
+                break;
+        }
+    }
+
     public void onNothingSelected(AdapterView<?> parent) {
         // do nothing
     }
@@ -178,21 +201,18 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
     public void onSaveThemeSelection(MenuItem item) {
         Spinner spinner = findViewById(R.id.themeSelector);
         TextView text = (TextView)spinner.getSelectedView();
+        String theme = configurationFile.getTheme();
         if (text != null) {
-            String theme = text.getText().toString();
+            theme = text.getText().toString();
             configurationFile.setThemeName(theme);
-            configurationFile.writeFile();
-
-            Intent intent = new Intent();
-            intent.putExtra(Constants.themeNameConfigValue, theme);
-
-            setResult(RESULT_OK, intent);
-            finish();
-        } else {
-            setResult(RESULT_CANCELED);
-            finish();
         }
+
+        configurationFile.writeFile();
+
+        Intent intent = new Intent();
+        intent.putExtra(Constants.themeNameConfigValue, theme);
+
+        setResult(RESULT_OK, intent);
+        finish();
     }
-
 }
-

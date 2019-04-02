@@ -91,32 +91,28 @@ public class MainActivity extends AppCompatActivity {
 
     private GraphicsDescription graphicsDescription = null;
 
-    private DiceConfigurationManager configurationFile = null;
     private LogFile logFile = null;
     private boolean drawingStarted = false;
     private AssetManager assetManager = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        configurationFile = new DiceConfigurationManager(this);
+        DiceConfigurationManager configurationFile = new DiceConfigurationManager(this);
 
         String themeName = configurationFile.getTheme();
-        if (themeName == null || themeName.isEmpty()) {
-            themeName = "Space";
-        }
         int currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
         setTheme(currentThemeId);
 
         super.onCreate(savedInstanceState);
 
         assetManager = getAssets();
-        createDefaults();
+        createDefaults(configurationFile);
         logFile = new LogFile(this);
 
-        initGui();
+        initGui(configurationFile);
     }
 
-    void initGui() {
+    void initGui(DiceConfigurationManager configurationFile) {
         setContentView(R.layout.activity_main);
 
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
@@ -125,11 +121,10 @@ public class MainActivity extends AppCompatActivity {
         drawSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
         drawSurfaceHolder.addCallback(new MySurfaceCallback(this));
 
-        resetDiceList();
+        resetDiceList(configurationFile);
     }
 
-    void resetDiceList() {
-        configurationFile = new DiceConfigurationManager(this);
+    void resetDiceList(DiceConfigurationManager configurationFile) {
         LinkedList<String> diceList = configurationFile.getDiceList();
         LinearLayout layout = findViewById(R.id.diceList);
         layout.removeAllViews();
@@ -189,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
-            resetDiceList();
+            resetDiceList(new DiceConfigurationManager(this));
         } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
             if (resultCode != RESULT_OK) {
                 // The user cancelled theme selection
@@ -199,13 +194,13 @@ public class MainActivity extends AppCompatActivity {
             if (themeName != null && !themeName.isEmpty()) {
                 int resID = getResources().getIdentifier(themeName, "style", getPackageName());
                 setTheme(resID);
-                initGui();
+                initGui(new DiceConfigurationManager(this));
                 TypedValue value = new TypedValue();
                 getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
                 getWindow().setBackgroundDrawableResource(value.resourceId);
             }
         } else if (requestCode == DICE_CUSTOMIZATION_ACTIVITY) {
-            resetDiceList();
+            resetDiceList(new DiceConfigurationManager(this));
         }
     }
 
@@ -320,7 +315,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void createDefaults() {
+    private void createDefaults(DiceConfigurationManager configurationFile) {
         int count = configurationFile.getDiceList().size();
 
         if (count == 0) {
@@ -383,11 +378,14 @@ public class MainActivity extends AppCompatActivity {
         if (drawer != null) {
             return;
         }
+        ConfigurationFile configurationFile = new ConfigurationFile(this);
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         TextView resultView = findViewById(R.id.rollResult);
         Handler notify = new Handler(new ResultHandler(resultView));
-        drawer = new Thread(new DiceWorker(notify, drawSurfaceHolder, assetManager));
+        drawer = new Thread(new DiceWorker(notify, drawSurfaceHolder, assetManager,
+                configurationFile.useGravity(), configurationFile.drawRollingDice(),
+                configurationFile.useLegacy()));
         drawer.start();
     }
 

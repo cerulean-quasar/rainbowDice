@@ -76,7 +76,7 @@ public:
 
     {
         m_die->loadModel(textureAtlas);
-        m_die->resetPosition();
+        //m_die->resetPosition();
     }
 
     virtual ~DiceGraphics() = default;
@@ -134,8 +134,12 @@ public:
     // returns true if it needs a redraw
     virtual bool tapDice(float x, float y) = 0;
 
-    virtual void rerollSelected() = 0;
-    virtual void addRerollSelected() = 0;
+    virtual bool changeDice(std::string const &inDiceName,
+                    std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
+                    std::shared_ptr<TextureAtlas> inTexture) = 0;
+
+    virtual bool rerollSelected() = 0;
+    virtual bool addRerollSelected() = 0;
 
     // returns true if dice were deleted
     virtual bool deleteSelected() = 0;
@@ -177,7 +181,7 @@ public:
 
     virtual void setDice(std::string const &inDiceName,
             std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescription,
-            bool inIsModified = false) {
+            bool inIsModified) {
         m_diceName = inDiceName;
         m_diceDescriptions = inDiceDescription;
         m_isModifiedRoll = inIsModified;
@@ -270,16 +274,18 @@ template <typename DiceType>
 class RainbowDiceGraphics : public RainbowDice {
 public:
     void addRollingDice() override;
-
     bool tapDice(float x, float y, uint32_t width, uint32_t height);
     bool updateUniformBuffer() override;
     std::vector<std::vector<uint32_t >> getDiceResults() override;
     void resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) override;
     void setDice(std::string const &inDiceName,
             std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
-            bool inIsModifiedRoll = false) override;
-    void rerollSelected() override;
-    void addRerollSelected() override;
+            bool inIsModifiedRoll) override;
+    bool changeDice(std::string const &inDiceName,
+                    std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
+                    std::shared_ptr<TextureAtlas> inTexture) override;
+    bool rerollSelected() override;
+    bool addRerollSelected() override;
     bool deleteSelected() override;
     void animateMoveStoppedDice() override;
 
@@ -334,13 +340,17 @@ public:
         return true;
     }
 
-    RainbowDiceGraphics()
+    RainbowDiceGraphics(bool inUseGravity, bool inDrawRollingDice)
       : RainbowDice{},
+        m_drawRollingDice{inDrawRollingDice},
         m_dice{}
-    {}
+    {
+        DicePhysicsModel::setUseGravity(inUseGravity);
+    }
 
     ~RainbowDiceGraphics() override = default;
 protected:
+    bool m_drawRollingDice;
     using DiceList = std::list<std::list<std::shared_ptr<DiceType>>>;
     DiceList m_dice;
 
@@ -349,9 +359,38 @@ protected:
                                                 std::vector<float> const &color) = 0;
     virtual std::shared_ptr<DiceType> createDie(std::shared_ptr<DiceType> const &inDice) = 0;
     virtual bool invertY() = 0;
+private:
+    void addRerollDice(bool resetPosition);
+    void moveDiceToStoppedPositions();
+    void moveDiceToStoppedRandomUpface();
 };
 
 // Template class functions
+
+// returns true if we already have a result.
+template <typename DiceType>
+bool RainbowDiceGraphics<DiceType>::changeDice(std::string const &inDiceName,
+                std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
+                std::shared_ptr<TextureAtlas> inTexture) {
+    setTexture(std::move(inTexture));
+    setDice(inDiceName, inDiceDescriptions, false);
+    initModels();
+    if (m_drawRollingDice) {
+        // display rolling dice
+        resetPositions();
+        updateUniformBuffer();
+        return false;
+    } else {
+        // Do not animate the roll, just display the result.
+        resetPositions();
+        moveDiceToStoppedPositions();
+        while (needsReroll()) {
+            addRerollDice(true);
+            moveDiceToStoppedPositions();
+        }
+        return true;
+    }
+}
 
 template <typename DiceType>
 bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, uint32_t height) {
@@ -523,9 +562,7 @@ void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
 }
 
 template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::addRollingDice() {
-    float width = m_screenWidth;
-    float height = m_screenHeight;
+void RainbowDiceGraphics<DiceType>::addRerollDice(bool resetPosition) {
     for (auto &dice : m_dice) {
         if (dice.empty()) {
             continue;
@@ -548,11 +585,50 @@ void RainbowDiceGraphics<DiceType>::addRollingDice() {
         }
 
         auto dieNew = createDie(die);
+        if (resetPosition) {
+            dieNew->die()->resetPosition();
+        }
 
         dice.push_back(dieNew);
     }
+}
 
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::addRollingDice() {
+    addRerollDice(true);
     animateMoveStoppedDice();
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::moveDiceToStoppedRandomUpface() {
+    int i=0;
+    auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            uint32_t stoppedX = i % nbrX;
+            uint32_t stoppedY = i / nbrX;
+            float x = -m_screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = m_screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die()->positionDice(x, y, true);
+            i++;
+        }
+    }
+}
+
+template <typename DiceType>
+void RainbowDiceGraphics<DiceType>::moveDiceToStoppedPositions() {
+    int i=0;
+    auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
+    for (auto const &dice : m_dice) {
+        for (auto const &die : dice) {
+            uint32_t stoppedX = i % nbrX;
+            uint32_t stoppedY = i / nbrX;
+            float x = -m_screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+            float y = m_screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+            die->die()->positionDice(x, y, false);
+            i++;
+        }
+    }
 }
 
 template <typename DiceType>
@@ -573,8 +649,9 @@ void RainbowDiceGraphics<DiceType>::animateMoveStoppedDice() {
     }
 }
 
+// returns true if a result is ready, false otherwise
 template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::rerollSelected() {
+bool RainbowDiceGraphics<DiceType>::rerollSelected() {
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->isSelected()) {
@@ -584,16 +661,24 @@ void RainbowDiceGraphics<DiceType>::rerollSelected() {
             }
         }
     }
+    if (!m_drawRollingDice) {
+        moveDiceToStoppedPositions();
+        return true;
+    } else {
+        return false;
+    }
 }
 
+// returns true if a result is ready, false otherwise
 template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::addRerollSelected() {
+bool RainbowDiceGraphics<DiceType>::addRerollSelected() {
     for (auto &dice : m_dice) {
         for (auto diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
             if (diceIt->get()->isSelected()) {
                 m_isModifiedRoll = true;
 
                 auto die = createDie(*diceIt);
+                die->die()->resetPosition();
                 diceIt->get()->toggleSelected();
 
                 diceIt++;
@@ -603,24 +688,39 @@ void RainbowDiceGraphics<DiceType>::addRerollSelected() {
         }
     }
 
-    animateMoveStoppedDice();
+    if (m_drawRollingDice) {
+        // animate the rolling dice
+        animateMoveStoppedDice();
+        return false;
+    } else {
+        // just display the result
+        moveDiceToStoppedPositions();
+        return true;
+    }
 }
 
+// returns true if a redraw is needed, and false otherwise.
 template <typename DiceType>
 bool RainbowDiceGraphics<DiceType>::deleteSelected() {
     bool diceDeleted = false;
     for (auto &dice : m_dice) {
-        for (auto diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
+        for (auto diceIt = dice.begin(); diceIt != dice.end();) {
             if (diceIt->get()->isSelected()) {
                 m_isModifiedRoll = true;
                 diceDeleted = true;
-                dice.erase(diceIt);
+                diceIt = dice.erase(diceIt);
+            } else {
+                diceIt++;
             }
         }
     }
 
     if (diceDeleted) {
-        animateMoveStoppedDice();
+        if (m_drawRollingDice) {
+            animateMoveStoppedDice();
+        } else {
+            moveDiceToStoppedPositions();
+        }
     }
 
     return diceDeleted;

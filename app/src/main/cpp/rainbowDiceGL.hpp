@@ -116,8 +116,9 @@ public:
 
 class RainbowDiceGL : public RainbowDiceGraphics<DiceGL> {
 public:
-    explicit RainbowDiceGL(std::shared_ptr<WindowType> window)
-            : RainbowDiceGraphics{},
+    explicit RainbowDiceGL(std::shared_ptr<WindowType> window, bool inUseGravity,
+                           bool inDrawRollingDice)
+            : RainbowDiceGraphics{inUseGravity, inDrawRollingDice},
               m_surface{std::make_shared<graphicsGL::Surface>(std::move(window))},
               programID{0}
     {

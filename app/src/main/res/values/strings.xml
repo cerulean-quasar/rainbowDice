@@ -61,6 +61,9 @@
     <string name="graphicsAPIVersion">Graphics API version:</string>
     <string name="graphicsDeviceName">Graphics Device Name:</string>
     <string name="unknown">Unknown</string>
+    <string name="useLegacy">Use Legacy</string>
+    <string name="useGravity">Use gravity</string>
+    <string name="drawRollingDice">Draw dice rolling</string>
 
     <string-array name="themeArray">
         <item>Space</item>

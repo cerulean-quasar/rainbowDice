@@ -30,6 +30,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 
 public class ConfigurationFile {
@@ -44,32 +45,41 @@ public class ConfigurationFile {
     // for version 1
     private static final String diceList = "diceList";
     private static final String theme = "theme";
+    // for version 1, but not present in older code
+    private static final String useLegacy = "useLegacy";
+    private static final String useGravity = "useGravity";
+    private static final String drawRollingDice = "drawRollingDice";
 
     private LinkedList<String> diceConfigList;
     private String themeName;
+    private boolean m_useLegacy;
+    private boolean m_useGravity;
+    private boolean m_drawRollingDice;
 
     private Context ctx;
 
     public ConfigurationFile(Context inCtx) {
         ctx = inCtx;
         diceConfigList = new LinkedList<>();
-        StringBuffer json = new StringBuffer();
+        themeName = "Space";
+        m_useGravity = true;
+        m_useLegacy = false;
+        m_drawRollingDice = true;
 
+        StringBuilder json = new StringBuilder();
         try {
             byte[] bytes = new byte[1024];
             int len;
             FileInputStream inputStream = ctx.openFileInput(configFile);
             while ((len = inputStream.read(bytes)) >= 0) {
                 if (len > 0) {
-                    json.append(new String(bytes, 0, len, "UTF-8"));
+                    json.append(new String(bytes, 0, len, StandardCharsets.UTF_8));
                 }
             }
             inputStream.close();
         } catch (FileNotFoundException e) {
-            System.out.println("Could not find file on opening: " + configFile + " message: " + e.getMessage());
             return;
         } catch (IOException e) {
-            System.out.println("Exception on reading from file: " + configFile + " message: " + e.getMessage());
             return;
         }
 
@@ -89,8 +99,6 @@ public class ConfigurationFile {
                 loadVersion1(obj);
             }
         } catch (JSONException e) {
-            System.out.println("Exception on reading JSON from file: " + configFile + " message: " + e.getMessage());
-            return;
         }
     }
 
@@ -111,7 +119,25 @@ public class ConfigurationFile {
             String dice = arr.getString(i);
             diceConfigList.add(dice);
         }
-        themeName = obj.getString(theme);
+
+        if (obj.has(theme)) {
+            String tmp = obj.getString(theme);
+            if (!tmp.isEmpty()) {
+                themeName = tmp;
+            }
+        }
+
+        if (obj.has(useLegacy)) {
+            m_useLegacy = obj.getBoolean(useLegacy);
+        }
+
+        if (obj.has(useGravity)) {
+            m_useGravity = obj.getBoolean(useGravity);
+        }
+
+        if (obj.has(drawRollingDice)) {
+            m_drawRollingDice = obj.getBoolean(drawRollingDice);
+        }
     }
 
     public void writeFile() {
@@ -127,10 +153,10 @@ public class ConfigurationFile {
             }
 
             obj.put(diceList, arr);
-
-            if (themeName != null) {
-                obj.put(theme, themeName);
-            }
+            obj.put(theme, themeName);
+            obj.put(useLegacy, m_useLegacy);
+            obj.put(useGravity, m_useGravity);
+            obj.put(drawRollingDice, m_drawRollingDice);
 
             json = obj.toString();
         } catch (JSONException e) {
@@ -188,7 +214,31 @@ public class ConfigurationFile {
         return themeName;
     }
 
+    public boolean useLegacy() {
+        return m_useLegacy;
+    }
+
+    public boolean useGravity() {
+        return m_useGravity;
+    }
+
+    public boolean drawRollingDice() {
+        return m_drawRollingDice;
+    }
+
     public void setThemeName(String in) {
         themeName = in;
+    }
+
+    public void setUseLegacy(boolean in) {
+        m_useLegacy = in;
+    }
+
+    public void setUseGravity(boolean in) {
+        m_useGravity = in;
+    }
+
+    public void setDrawRollingDice(boolean in) {
+        m_drawRollingDice = in;
     }
 }
