@@ -447,9 +447,13 @@ public class MainActivity extends AppCompatActivity {
                 graphicsDescription.apiName = data.getString(DiceDrawerReturnChannel.apiName);
                 if (data.containsKey(DiceDrawerReturnChannel.apiVersion)) {
                     graphicsDescription.apiVersion = data.getString(DiceDrawerReturnChannel.apiVersion);
+                } else {
+                    graphicsDescription.apiVersion = getString(R.string.unknown);
                 }
                 if (data.containsKey(DiceDrawerReturnChannel.deviceName)) {
                     graphicsDescription.deviceName = data.getString(DiceDrawerReturnChannel.deviceName);
+                } else {
+                    graphicsDescription.deviceName = getString(R.string.unknown);
                 }
             } else if (data.containsKey(DiceDrawerReturnChannel.resultsMsg) &&
                     data.containsKey(DiceDrawerReturnChannel.diceConfigMsg)) {

@@ -279,13 +279,23 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
         updatePerspectiveMatrix(width, height);
     }
 
+    initializeCommandBuffers();
+
+    // move dice to the new position on the screen according to the new screen size.
+    if (m_drawRollingDice) {
+        animateMoveStoppedDice();
+    } else {
+        // This will move the dice to stopped positions without animation.  We do not animate any
+        // moving if the dice are not rolling dice.
+        moveDiceToStoppedPositions();
+    }
+
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
+            die->die()->updateModelMatrix();
             die->updateUniformBuffer(m_projWithPreTransform, m_view);
         }
     }
-
-    initializeCommandBuffers();
 }
 
 void RainbowDiceVulkan::cleanupSwapChain() {
@@ -528,9 +538,11 @@ std::shared_ptr<vulkan::Image> RainbowDiceVulkan::createTextureImage(uint32_t te
 
 bool RainbowDiceVulkan::updateUniformBuffer() {
     bool needsRedraw = RainbowDiceGraphics::updateUniformBuffer();
-    for (auto const &dice : m_dice) {
-        for (auto const &die : dice) {
-            die->updateUniformBuffer(m_projWithPreTransform, m_view);
+    if (needsRedraw) {
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
         }
     }
 

@@ -89,83 +89,6 @@ private:
     glm::vec3 _spinAxis;
 };
 
-/* for applying a high pass filter on the acceleration sample data */
-class Filter {
-private:
-    std::chrono::high_resolution_clock::time_point highPassAccelerationPrevTime;
-    static const unsigned long highPassAccelerationMaxSize;
-    struct high_pass_samples {
-        glm::vec3 output;
-        glm::vec3 input;
-        float dt;
-    };
-    std::deque<high_pass_samples> highPassAcceleration;
-    bool m_useGravity;
-
-public:
-    Filter()
-        : highPassAccelerationPrevTime{std::chrono::high_resolution_clock::now()},
-          m_useGravity{true}
-    {
-    }
-
-    void setUseGravity(bool inUseGravity) {
-        m_useGravity = inUseGravity;
-    }
-
-    glm::vec3 acceleration(glm::vec3 const &sensorInputs) {
-        float RC = 3.0f;
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
-
-        highPassAccelerationPrevTime = currentTime;
-
-        unsigned long size = highPassAcceleration.size();
-        glm::vec3 acceleration(0.0f, 0.0f, 0.0f);
-
-        if (dt > 1) {
-            // the time diff is too long.  This is not good data. Just return the sensor inputs and
-            // save the time difference for next call through.
-            acceleration = sensorInputs;
-        } else if (size == 0) {
-            high_pass_samples sample;
-            acceleration = sample.output = sample.input = sensorInputs;
-            sample.dt = dt;
-            highPassAcceleration.push_back(sample);
-        } else {
-            glm::vec3 nextOut;
-            for (unsigned long i=1; i < size; i++) {
-                high_pass_samples &sample = highPassAcceleration[i];
-                high_pass_samples &prev = highPassAcceleration[i-1];
-                float alpha = RC/(RC+sample.dt);
-                sample.output = alpha*(prev.output + sample.input - prev.input);
-
-            }
-            high_pass_samples sample;
-            float alpha = RC/(RC+dt);
-            high_pass_samples &prev = highPassAcceleration.back();
-            sample.output = alpha*(prev.output + sensorInputs - prev.input);
-            sample.input = sensorInputs;
-            sample.dt = dt;
-            highPassAcceleration.push_back(sample);
-            if (size + 1 > highPassAccelerationMaxSize) {
-                highPassAcceleration.pop_front();
-            }
-
-            if (size < 100) {
-                acceleration = sample.output;
-            } else {
-                if (m_useGravity) {
-                    acceleration = 20.0f * sample.output + sensorInputs - sample.output;
-                } else {
-                    acceleration = 20.0f * sample.output + glm::vec3{0.0f, 0.0f, 9.8f};
-                }
-            }
-        }
-        return acceleration;
-    }
-};
-
 class DiceModel {
 protected:
     std::vector<std::string> symbols;
@@ -256,9 +179,6 @@ private:
     static float const goingToStopAnimationTime;
     static float const waitAfterDoneTime;
 
-    /* for the accelerometer data.  These data are saved between dice creation and deletion. */
-    static Filter filter;
-
     /* maximum position for x and y.  Set according to the screen size and what the projection matrix is. */
     static float M_maxposz;
     static float M_maxposx;
@@ -270,7 +190,7 @@ private:
     AngularVelocity angularVelocity;
 
     /* position */
-    glm::vec3 acceleration;
+    static glm::vec3 acceleration;
     glm::vec3 velocity;
     glm::vec3 m_position;
     glm::vec3 prevPosition;
@@ -330,7 +250,10 @@ public:
         return m_position;
     }
 
-    void updateAcceleration(float x, float y, float z);
+    static void updateAcceleration(glm::vec3 const &inAcceleration) {
+        acceleration = inAcceleration;
+    }
+
     bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
     void animateMove(float x, float y) {
@@ -389,10 +312,6 @@ public:
         M_maxposx = x;
         M_maxposy = y;
         M_maxposz = z;
-    }
-
-    static void setUseGravity(bool inUseGravity) {
-        filter.setUseGravity(inUseGravity);
     }
 };
 

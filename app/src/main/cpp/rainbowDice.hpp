@@ -36,6 +36,73 @@
 #include "dice.hpp"
 #include "text.hpp"
 
+/* for applying a high pass filter on the acceleration sample data */
+class Filter {
+private:
+    std::chrono::high_resolution_clock::time_point highPassAccelerationPrevTime;
+    static constexpr unsigned long highPassAccelerationMaxSize = 512;
+    struct high_pass_samples {
+        glm::vec3 output;
+        glm::vec3 input;
+        float dt;
+    };
+    std::deque<high_pass_samples> highPassAcceleration;
+
+public:
+    Filter()
+            : highPassAccelerationPrevTime{std::chrono::high_resolution_clock::now()}
+    {
+    }
+
+    glm::vec3 acceleration(glm::vec3 const &sensorInputs) {
+        float RC = 3.0f;
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
+
+        highPassAccelerationPrevTime = currentTime;
+
+        unsigned long size = highPassAcceleration.size();
+        glm::vec3 acceleration(0.0f, 0.0f, 0.0f);
+
+        if (dt > 1) {
+            // the time diff is too long.  This is not good data. Just return the sensor inputs and
+            // save the time difference for next call through.
+            acceleration = sensorInputs;
+        } else if (size == 0) {
+            high_pass_samples sample;
+            acceleration = sample.output = sample.input = sensorInputs;
+            sample.dt = dt;
+            highPassAcceleration.push_back(sample);
+        } else {
+            glm::vec3 nextOut;
+            for (unsigned long i=1; i < size; i++) {
+                high_pass_samples &sample = highPassAcceleration[i];
+                high_pass_samples &prev = highPassAcceleration[i-1];
+                float alpha = RC/(RC+sample.dt);
+                sample.output = alpha*(prev.output + sample.input - prev.input);
+
+            }
+            high_pass_samples sample;
+            float alpha = RC/(RC+dt);
+            high_pass_samples &prev = highPassAcceleration.back();
+            sample.output = alpha*(prev.output + sensorInputs - prev.input);
+            sample.input = sensorInputs;
+            sample.dt = dt;
+            highPassAcceleration.push_back(sample);
+            if (size + 1 > highPassAccelerationMaxSize) {
+                highPassAcceleration.pop_front();
+            }
+
+            if (size < 100) {
+                acceleration = sample.output;
+            } else {
+                acceleration = 20.0f * sample.output + sensorInputs - sample.output;
+            }
+        }
+        return acceleration;
+    }
+};
+
 template <typename GraphicsType>
 class DiceGraphics {
 public:
@@ -95,6 +162,12 @@ protected:
 
 class RainbowDice {
 public:
+    enum AccelerationEventType {
+        LINEAR_ACCELERATION_EVENT,
+        GRAVITY_EVENT,
+        ACCELEROMETER
+    };
+
     virtual void initModels()=0;
 
     virtual void initThread()=0;
@@ -118,8 +191,6 @@ public:
                             std::vector<float> const &color)=0;
 
     virtual void recreateSwapChain(uint32_t width, uint32_t height)=0;
-
-    virtual void updateAcceleration(float x, float y, float z)=0;
 
     virtual void resetPositions()=0;
 
@@ -187,6 +258,22 @@ public:
         m_isModifiedRoll = inIsModified;
     }
 
+    void updateAcceleration(AccelerationEventType type, float x, float y, float z) {
+        switch (type) {
+            case AccelerationEventType::LINEAR_ACCELERATION_EVENT:
+                m_linearAcceleration = 20.0f * glm::vec3{x, y, z};
+                DicePhysicsModel::updateAcceleration(m_gravity+m_linearAcceleration);
+                return;
+            case AccelerationEventType::GRAVITY_EVENT:
+                m_gravity = {x, y, z};
+                DicePhysicsModel::updateAcceleration(m_gravity+m_linearAcceleration);
+                return;
+            case AccelerationEventType::ACCELEROMETER:
+                DicePhysicsModel::updateAcceleration(m_filter.acceleration(glm::vec3{x, y, z}));
+                return;
+        }
+    }
+
     std::vector<std::shared_ptr<DiceDescription>> const &getDiceDescriptions() {
         return m_diceDescriptions;
     }
@@ -202,7 +289,10 @@ public:
               m_screenHeight{2.0f},
               m_viewPoint{startViewPoint()},
               m_viewPointCenterPosition{startViewPointCenterPosition()},
-              m_isModifiedRoll{false}
+              m_isModifiedRoll{false},
+              m_linearAcceleration{},
+              m_gravity{0.0f, 0.0f, 9.8f},
+              m_filter{}
     {}
 
     virtual ~RainbowDice() = default;
@@ -268,6 +358,13 @@ protected:
 
         setView();
     }
+
+private:
+    glm::vec3 m_linearAcceleration;
+    glm::vec3 m_gravity;
+
+    /* for the accelerometer data.  These data are saved between dice creation and deletion. */
+    Filter m_filter;
 };
 
 template <typename DiceType>
@@ -295,14 +392,6 @@ public:
         std::list<std::shared_ptr<DiceType>> dice;
         dice.push_back(createDie(symbols, rerollIndices, color));
         m_dice.push_back(std::move(dice));
-    }
-
-    void updateAcceleration(float x, float y, float z) override {
-        for (auto const &dice : m_dice) {
-            for (auto const &die : dice) {
-                die->die()->updateAcceleration(x, y, z);
-            }
-        }
     }
 
     void resetPositions() override {
@@ -340,12 +429,11 @@ public:
         return true;
     }
 
-    RainbowDiceGraphics(bool inUseGravity, bool inDrawRollingDice)
+    explicit RainbowDiceGraphics(bool inDrawRollingDice)
       : RainbowDice{},
         m_drawRollingDice{inDrawRollingDice},
         m_dice{}
     {
-        DicePhysicsModel::setUseGravity(inUseGravity);
     }
 
     ~RainbowDiceGraphics() override = default;
@@ -359,9 +447,9 @@ protected:
                                                 std::vector<float> const &color) = 0;
     virtual std::shared_ptr<DiceType> createDie(std::shared_ptr<DiceType> const &inDice) = 0;
     virtual bool invertY() = 0;
+    void moveDiceToStoppedPositions();
 private:
     void addRerollDice(bool resetPosition);
-    void moveDiceToStoppedPositions();
     void moveDiceToStoppedRandomUpface();
 };
 

@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -25,25 +25,110 @@
 #include <asset_manager_jni.h>
 #include <memory>
 #include <streambuf>
+#include <bitset>
 #include <sensor.h>
 
 class Sensors {
 public:
+    static constexpr uint32_t LINEAR_ACCELERATION_SENSOR = 0;
+    static constexpr uint32_t GRAVITY_SENSOR = 1;
+    static constexpr uint32_t ACCELEROMETER_SENSOR = 2;
+
     struct AccelerationEvent {
         float x;
         float y;
         float z;
     };
 
-    Sensors() {
-        initSensors();
+    static std::bitset<3> hasWhichSensors() {
+        std::bitset<3> result{};
+        ASensorManager *sensorManager = ASensorManager_getInstance();
+        ASensor const *sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_LINEAR_ACCELERATION);
+        if (sensor != nullptr) {
+            result.set(LINEAR_ACCELERATION_SENSOR);
+        }
+
+        sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_GRAVITY);
+        if (sensor != nullptr) {
+            result.set(GRAVITY_SENSOR);
+        }
+
+        sensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_ACCELEROMETER);
+        if (sensor != nullptr) {
+            result.set(ACCELEROMETER_SENSOR);
+        }
+
+        return result;
     }
 
-    inline bool hasEvents() {
+    inline bool hasLinearAccerationEvents() {
+        return hasEvents(m_eventQueueLinearAcceleration);
+    }
+
+    inline bool hasGravityEvents() {
+        return hasEvents(m_eventQueueGravity);
+    }
+
+    inline bool hasAccelerometerEvents() {
+        return hasEvents(m_eventQueueAccelerometer);
+    }
+
+    inline std::vector<AccelerationEvent> getLinearAccelerationEvents() {
+        return std::move(getEvents(m_eventQueueLinearAcceleration));
+    }
+
+    inline std::vector<AccelerationEvent> getGravityEvents() {
+        return std::move(getEvents(m_eventQueueGravity));
+    }
+
+    inline std::vector<AccelerationEvent> getAccelerometerEvents() {
+        return std::move(getEvents(m_eventQueueAccelerometer));
+    }
+
+    ~Sensors() {
+        destroyResources();
+    }
+
+    explicit Sensors(std::bitset<3> inWhichSensors)
+    : m_sensorManager{nullptr},
+      m_sensorLinearAcceleration{nullptr},
+      m_sensorGravity{nullptr},
+      m_sensorAccelerometer{nullptr},
+      m_eventQueueLinearAcceleration{nullptr},
+      m_eventQueueGravity{nullptr},
+      m_eventQueueAccelerometer{nullptr},
+      m_looper{nullptr}
+    {
+        initSensors(inWhichSensors);
+    }
+
+private:
+    // microseconds
+    static constexpr int MAX_EVENT_REPORT_TIME = 20000;
+
+// event identifier for identifying an event that occurs during a poll.  It doesn't matter what this
+// value is, it just has to be unique among all the other sensors the program receives events for.
+    static constexpr int EVENT_TYPE_LINEAR_ACCELERATION = 460;
+    static constexpr int EVENT_TYPE_GRAVITY = 461;
+    static constexpr int EVENT_TYPE_ACCELEROMETER = 462;
+
+    ASensorManager *m_sensorManager;
+    ASensor const *m_sensorLinearAcceleration;
+    ASensor const *m_sensorGravity;
+    ASensor const *m_sensorAccelerometer;
+    ASensorEventQueue *m_eventQueueLinearAcceleration;
+    ASensorEventQueue *m_eventQueueGravity;
+    ASensorEventQueue *m_eventQueueAccelerometer;
+    ALooper *m_looper;
+
+    void initSensors(std::bitset<3> inWhichSensors);
+    ASensorEventQueue *initializeSensor(ASensor const *sensor, int eventType);
+
+    inline bool hasEvents(ASensorEventQueue *eventQueue) {
         return ASensorEventQueue_hasEvents(eventQueue) > 0;
     }
 
-    inline std::vector<AccelerationEvent> getEvents() {
+    inline std::vector<AccelerationEvent> getEvents(ASensorEventQueue *eventQueue) {
         std::vector<ASensorEvent> events;
         events.resize(100);
         ssize_t nbrEvents = ASensorEventQueue_getEvents(eventQueue, events.data(), events.size());
@@ -64,24 +149,26 @@ public:
         return avector;
     }
 
-    ~Sensors(){
-        ASensorEventQueue_disableSensor(eventQueue, sensor);
-        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
+    void destroyResources() {
+        if (m_sensorLinearAcceleration != nullptr && m_eventQueueLinearAcceleration != nullptr) {
+            ASensorEventQueue_disableSensor(m_eventQueueLinearAcceleration, m_sensorLinearAcceleration);
+            ASensorManager_destroyEventQueue(m_sensorManager, m_eventQueueLinearAcceleration);
+            m_eventQueueLinearAcceleration = nullptr;
+            m_sensorLinearAcceleration = nullptr;
+        }
+        if (m_sensorGravity != nullptr && m_eventQueueGravity != nullptr) {
+            ASensorEventQueue_disableSensor(m_eventQueueGravity, m_sensorGravity);
+            ASensorManager_destroyEventQueue(m_sensorManager, m_eventQueueGravity);
+            m_eventQueueGravity = nullptr;
+            m_sensorGravity = nullptr;
+        }
+        if (m_sensorAccelerometer != nullptr && m_eventQueueAccelerometer) {
+            ASensorEventQueue_disableSensor(m_eventQueueAccelerometer, m_sensorAccelerometer);
+            ASensorManager_destroyEventQueue(m_sensorManager, m_eventQueueAccelerometer);
+            m_eventQueueAccelerometer = nullptr;
+            m_sensorAccelerometer = nullptr;
+        }
     }
-private:
-// microseconds
-    static int const MAX_EVENT_REPORT_TIME;
-
-// event identifier for identifying an event that occurs during a poll.  It doesn't matter what this
-// value is, it just has to be unique among all the other sensors the program receives events for.
-    static int const EVENT_TYPE_ACCELEROMETER;
-
-    ASensorManager *sensorManager = nullptr;
-    ASensor const *sensor = nullptr;
-    ASensorEventQueue *eventQueue = nullptr;
-    ALooper *looper = nullptr;
-
-    void initSensors();
 };
 
 typedef ANativeWindow WindowType;
@@ -101,16 +188,16 @@ private:
     char buffer[4096];
 public:
     explicit AssetStreambuf(std::unique_ptr<AAsset> &&inAsset) : asset(std::move(inAsset)) {}
-    int underflow();
-    std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode which);
-    std::streampos seekpos(std::streampos pos, std::ios_base::openmode which);
+    int underflow() override;
+    std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode which) override;
+    std::streampos seekpos(std::streampos pos, std::ios_base::openmode which) override;
 };
 
 class AssetManagerWrapper {
 private:
     AAssetManager *manager;
 public:
-    AssetManagerWrapper(AAssetManager *inManager) : manager(inManager) {}
+    explicit AssetManagerWrapper(AAssetManager *inManager) : manager(inManager) {}
     std::unique_ptr<AAsset> getAsset(std::string const &file);
 };
 

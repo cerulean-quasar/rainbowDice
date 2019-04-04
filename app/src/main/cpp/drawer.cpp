@@ -104,8 +104,7 @@ void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface,
 #ifdef CQ_ENABLE_VULKAN
     if (m_tryVulkan) {
         try {
-            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(std::move(surface), inUseGravity,
-                    inDrawRollingDice);
+            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(std::move(surface), inDrawRollingDice);
         } catch (std::runtime_error &e) {
             m_tryVulkan = false;
         }
@@ -113,14 +112,14 @@ void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface,
 #endif
 
     if (!m_tryVulkan) {
-        m_diceGraphics = std::make_unique<RainbowDiceGL>(std::move(surface), inUseGravity, inDrawRollingDice);
+        m_diceGraphics = std::make_unique<RainbowDiceGL>(std::move(surface), inDrawRollingDice);
     }
 }
 
 void DiceWorker::waitingLoop() {
     while (true) {
         uint32_t nbrRequireRedraw = 0;
-        std::shared_ptr<DrawEvent> event = diceChannel().getEvent();
+        auto event = diceChannel().getEvent();
         if (event->type() == DrawEvent::stopDrawing) {
             return;
         } else if ((*event)(m_diceGraphics, m_notify)) {
@@ -128,7 +127,7 @@ void DiceWorker::waitingLoop() {
         }
 
         while (nbrRequireRedraw < m_maxEventsBeforeRedraw) {
-            auto event = diceChannel().getEventNoWait();
+            event = diceChannel().getEventNoWait();
             if (event == nullptr) {
                 break;
             } else  if (event->type() == DrawEvent::stopDrawing) {
@@ -156,13 +155,32 @@ void DiceWorker::waitingLoop() {
 }
 
 std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
-    Sensors sensor;
+    Sensors sensor{m_whichSensors};
 
     while (true) {
-        if (sensor.hasEvents()) {
-            std::vector<Sensors::AccelerationEvent> events = sensor.getEvents();
+        if (m_whichSensors.test(Sensors::LINEAR_ACCELERATION_SENSOR) && sensor.hasLinearAccerationEvents()) {
+            std::vector<Sensors::AccelerationEvent> events = sensor.getLinearAccelerationEvents();
             for (auto const &event : events) {
-                m_diceGraphics->updateAcceleration(event.x, event.y, event.z);
+                m_diceGraphics->updateAcceleration(RainbowDice::AccelerationEventType::LINEAR_ACCELERATION_EVENT,
+                        event.x, event.y, event.z);
+            }
+
+        }
+
+        if (m_whichSensors.test(Sensors::GRAVITY_SENSOR) && sensor.hasGravityEvents()) {
+            std::vector<Sensors::AccelerationEvent> events = sensor.getGravityEvents();
+            for (auto const &event : events) {
+                m_diceGraphics->updateAcceleration(RainbowDice::AccelerationEventType::GRAVITY_EVENT,
+                        event.x, event.y, event.z);
+            }
+
+        }
+
+        if (m_whichSensors.test(Sensors::ACCELEROMETER_SENSOR) && sensor.hasAccelerometerEvents()) {
+            std::vector<Sensors::AccelerationEvent> events = sensor.getLinearAccelerationEvents();
+            for (auto const &event : events) {
+                m_diceGraphics->updateAcceleration(RainbowDice::AccelerationEventType::ACCELEROMETER,
+                        event.x, event.y, event.z);
             }
 
         }

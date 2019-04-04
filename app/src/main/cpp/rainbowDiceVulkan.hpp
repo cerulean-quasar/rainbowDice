@@ -206,9 +206,8 @@ private:
 
 class RainbowDiceVulkan : public RainbowDiceGraphics<DiceVulkan> {
 public:
-    explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window, bool inUseGravity,
-            bool inDrawRollingDice)
-            : RainbowDiceGraphics{inUseGravity, inDrawRollingDice},
+    explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window, bool inDrawRollingDice)
+            : RainbowDiceGraphics{inDrawRollingDice},
               m_instance{new vulkan::Instance{std::move(window)}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
@@ -333,12 +332,6 @@ public:
 
         m_width = surfaceWidth;
         m_height = surfaceHeight;
-
-        for (auto const &dice : m_dice) {
-            for (auto const &die : dice) {
-                die->updateUniformBuffer(m_projWithPreTransform, m_view);
-            }
-        }
     }
 
     void scale(float scaleFactor) override {

@@ -73,11 +73,10 @@ std::vector<glm::vec3> const DicePhysicsModel::colors = {
 const float DiceModelHedron::rotateThreshold = 0.9f;
 const float DiceModelRhombicTriacontahedron::rotateThreshold = 0.9f;
 
-unsigned long const Filter::highPassAccelerationMaxSize = 512;
 float const DicePhysicsModel::angularSpeedScaleFactor = 5.0f;
 float const AngularVelocity::maxAngularSpeed = 10.0f;
-Filter DicePhysicsModel::filter;
 const float pi = glm::acos(-1.0f);
+glm::vec3 DicePhysicsModel::acceleration{0.0f, 0.0f, 9.8f};
 
 void checkQuaternion(glm::quat &q) {
     if (glm::length(q) == 0) {
@@ -143,11 +142,6 @@ void DicePhysicsModel::resetPosition() {
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(glm::mat4(1.0f), m_position);
     m_model = translate * rotate * scale;
-}
-
-void DicePhysicsModel::updateAcceleration(float x, float y, float z) {
-    glm::vec3 a = {x,y,z};
-    acceleration = filter.acceleration(a);
 }
 
 void DicePhysicsModel::calculateBounce(DicePhysicsModel *other) {
@@ -319,6 +313,17 @@ bool DicePhysicsModel::updateModelMatrix() {
         m_position.z = M_maxposz;
     }
 
+    if (time > 0.5) {
+        // the time that passed is too great, just not down the currentTime and move next time
+        // through.
+        glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
+        checkQuaternion(qTotalRotated);
+        glm::mat4 rotate = glm::toMat4(qTotalRotated);
+        glm::mat4 translate = glm::translate(m_position);
+        m_model = translate * rotate * scale;
+        return true;
+    }
+
     float speed = glm::length(velocity);
 
     if (speed != 0) {
@@ -396,23 +401,28 @@ bool DicePhysicsModel::updateModelMatrix() {
         angularVelocity.setAngularSpeed(angularSpeed);
     }
 
+    bool needsRedraw = true;
+    if (!goingToStop) {
+        float difference = glm::length(m_position - prevPosition);
+        if (difference < 0.01f) {
+            needsRedraw = false;
+        } else if (difference > 0.5f) {
+            // the difference in position is too much.  To avoid jumping, just set the position to
+            // previous position and hopefully, next time it won't move so far.
+            m_position = prevPosition;
+            needsRedraw = false;
+        } else {
+            prevPosition = m_position;
+        }
+    }
+
     glm::mat4 scale = glm::scale(glm::vec3(radius, radius, radius));
     checkQuaternion(qTotalRotated);
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(m_position);
     m_model = translate * rotate * scale;
 
-    if (goingToStop) {
-        return true;
-    }
-
-    float difference = glm::length(m_position - prevPosition);
-    if (difference < 0.01) {
-        return false;
-    } else {
-        prevPosition = m_position;
-        return true;
-    }
+    return needsRedraw;
 }
 
 uint32_t DicePhysicsModel::calculateUpFace() {
@@ -552,6 +562,8 @@ void DicePhysicsModel::randomizeUpFace() {
     m_position.x = random.getFloat(-M_maxposx, M_maxposx);
     m_position.y = random.getFloat(-M_maxposy, M_maxposy);
     m_position.z = -M_maxposz;
+
+    prevPosition = m_position;
 
     float factor = 10;
     velocity.x = random.getFloat(-factor, factor);

@@ -24,6 +24,7 @@
 #include <mutex>
 #include <queue>
 #include <vector>
+#include <bitset>
 #include "dice.hpp"
 #include "rainbowDice.hpp"
 #include "text.hpp"
@@ -78,12 +79,10 @@ public:
                      std::shared_ptr<Notify> &notify) override {
         // giggle the device so that when the swapchain is recreated, it gets the correct width and
         // height.
+        diceGraphics->updateUniformBuffer();
         diceGraphics->drawFrame();
 
         diceGraphics->recreateSwapChain(m_width, m_height);
-
-        // move dice to the new position on the screen according to the new screen size.
-        diceGraphics->animateMoveStoppedDice();
 
         // redraw the frame right away and then return false because this event means that we
         // should redraw immediately and not wait for some number of events to come up before we
@@ -122,7 +121,7 @@ class ScaleEvent : public DrawEvent {
 private:
     float m_scaleFactor;
 public:
-    ScaleEvent(float inScaleFactor)
+    explicit ScaleEvent(float inScaleFactor)
             : m_scaleFactor{inScaleFactor} {
     }
 
@@ -347,10 +346,42 @@ public:
                bool inUseGravity,
                bool inDrawRollingDice,
                bool inUseLegacy)
-            : m_tryVulkan{!inUseLegacy},
+            : m_whichSensors{},
+              m_tryVulkan{!inUseLegacy},
               m_diceGraphics{},
               m_notify{std::move(inNotify)}
     {
+        std::bitset<3> whichSensors = Sensors::hasWhichSensors();
+        if (inDrawRollingDice) {
+            if (!inUseGravity) {
+                // The user selected to not use gravity.  We need the Linear Acceleration Sensor
+                // for this feature.
+                if (!whichSensors.test(Sensors::LINEAR_ACCELERATION_SENSOR)) {
+                    inUseGravity = true;
+                } else {
+                    m_whichSensors.set(Sensors::LINEAR_ACCELERATION_SENSOR);
+                }
+            }
+
+            if (inUseGravity) {
+                // prefer using the Linear Acceleration sensor and Gravity sensor.  If these aren't
+                // there then use the Accelerometer.  This is because the accelerometer does not
+                // sense shaking enough and we end up needing a high pass filter to separate out the
+                // shaking and gravity then add the shaking back in at a higher factor.  Might as
+                // well let android do this work.
+                if (whichSensors.test(Sensors::LINEAR_ACCELERATION_SENSOR) &&
+                    whichSensors.test(Sensors::GRAVITY_SENSOR)) {
+                    m_whichSensors.set(Sensors::LINEAR_ACCELERATION_SENSOR);
+                    m_whichSensors.set(Sensors::GRAVITY_SENSOR);
+                } else if (whichSensors.test(Sensors::ACCELEROMETER_SENSOR)) {
+                    m_whichSensors.set(Sensors::ACCELEROMETER_SENSOR);
+                } else {
+                    // give up, we can't draw rolling dice.
+                    // TODO: use flick gesture instead?
+                    inDrawRollingDice = false;
+                }
+            }
+        }
 #ifndef CQ_ENABLE_VULKAN
         m_tryVulkan = false;
 #endif
@@ -364,6 +395,7 @@ public:
 private:
     static constexpr uint32_t m_maxEventsBeforeRedraw = 128;
 
+    std::bitset<3> m_whichSensors;
     bool m_tryVulkan;
     std::unique_ptr<RainbowDice> m_diceGraphics;
     std::shared_ptr<Notify> m_notify;

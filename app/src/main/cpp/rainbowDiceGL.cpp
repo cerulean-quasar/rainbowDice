@@ -481,6 +481,15 @@ void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
     recreateModels();
     m_texture->initGLResources();
     updatePerspectiveMatrix(m_surface->width(), m_surface->height());
+
+    // move dice to the new position on the screen according to the new screen size.
+    if (m_drawRollingDice) {
+        animateMoveStoppedDice();
+    } else {
+        // This will move the dice to stopped positions without animation.  We do not animate any
+        // moving if the dice are not rolling dice.
+        moveDiceToStoppedPositions();
+    }
 }
 
 std::shared_ptr<DiceGL> RainbowDiceGL::createDie(std::vector<std::string> const &symbols,
