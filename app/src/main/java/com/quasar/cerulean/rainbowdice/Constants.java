@@ -43,4 +43,14 @@ public class Constants {
     public static final int DICE_SIDES_ACTIVITY = 5;
     public static final String DICE_SIDE_CONFIGURATION = "DiceSideConfiguration";
     public static final String DICE_SIDES_JSON = "DiceSidesJson";
+
+    // Dice colors
+    public static final float[] RED = new float[]{1.0f, 0.0f, 0.0f, 1.0f};
+    public static final float[] ORANGE = new float[]{1.0f, 0.5f, 0.0f, 1.0f};
+    public static final float[] YELLOW = new float[]{1.0f, 1.0f, 0.0f, 1.0f};
+    public static final float[] GREEN = new float[]{0.0f, 1.0f, 0.0f, 1.0f};
+    public static final float[] BLUE = new float[]{0.0f, 0.0f, 1.0f, 1.0f};
+    public static final float[] PURPLE = new float[]{1.0f, 0.0f, 1.0f, 1.0f};
+    public static final float[] WHITE = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
+    public static final float[] BLACK = new float[]{0.2f, 0.2f, 0.2f, 1.0f};
 }

@@ -375,9 +375,9 @@ public class MainActivity extends AppCompatActivity {
             int[] rerollOn = new int[1];
             rerollOn[0] = 6;
             dice[0] = new DieConfiguration(1, 6, 1, 1, rerollOn,
-                    true, null);
+                    true, Constants.WHITE);
             dice[1] = new DieConfiguration(1, 6, 1, 1, rerollOn,
-                    false, null);
+                    false, Constants.BLACK);
             diceGroup = new DiceGroup(dice);
             filename = "d6-d6(reroll 6's)";
             configurationFile.addDice(filename, diceGroup);

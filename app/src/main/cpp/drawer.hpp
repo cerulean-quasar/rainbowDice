@@ -79,15 +79,19 @@ public:
                      std::shared_ptr<Notify> &notify) override {
         // giggle the device so that when the swapchain is recreated, it gets the correct width and
         // height.
-        diceGraphics->updateUniformBuffer();
-        diceGraphics->drawFrame();
+        if (diceGraphics->hasDice()) {
+            diceGraphics->updateUniformBuffer();
+            diceGraphics->drawFrame();
+        }
 
         diceGraphics->recreateSwapChain(m_width, m_height);
 
         // redraw the frame right away and then return false because this event means that we
         // should redraw immediately and not wait for some number of events to come up before we
         // do the redraw.
-        diceGraphics->drawFrame();
+        if (diceGraphics->hasDice()) {
+            diceGraphics->drawFrame();
+        }
         return false;
     }
 

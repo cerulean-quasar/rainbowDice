@@ -10,15 +10,6 @@ import android.widget.BaseAdapter;
 import android.widget.TextView;
 
 public class ColorArrayAdapter extends BaseAdapter {
-    private static final float[] RED = new float[]{1.0f, 0.0f, 0.0f, 1.0f};
-    private static final float[] ORANGE = new float[]{1.0f, 0.5f, 0.0f, 1.0f};
-    private static final float[] YELLOW = new float[]{1.0f, 1.0f, 0.0f, 1.0f};
-    private static final float[] GREEN = new float[]{0.0f, 1.0f, 0.0f, 1.0f};
-    private static final float[] BLUE = new float[]{0.0f, 0.0f, 1.0f, 1.0f};
-    private static final float[] PURPLE = new float[]{1.0f, 0.0f, 1.0f, 1.0f};
-    private static final float[] WHITE = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
-    private static final float[] BLACK = new float[]{0.2f, 0.2f, 0.2f, 1.0f};
-
     private String[] strings;
     private Context ctx;
     private int layout;
@@ -78,21 +69,21 @@ public class ColorArrayAdapter extends BaseAdapter {
         Resources resources = ctx.getResources();
 
         if (selected.equals(resources.getString(R.string.red))) {
-            return RED;
+            return Constants.RED;
         } else if (selected.equals(resources.getString(R.string.orange))) {
-            return ORANGE;
+            return Constants.ORANGE;
         } else if (selected.equals(resources.getString(R.string.yellow))) {
-            return YELLOW;
+            return Constants.YELLOW;
         } else if (selected.equals(resources.getString(R.string.green))) {
-            return GREEN;
+            return Constants.GREEN;
         } else if (selected.equals(resources.getString(R.string.blue))) {
-            return BLUE;
+            return Constants.BLUE;
         } else if (selected.equals(resources.getString(R.string.purple))) {
-            return PURPLE;
+            return Constants.PURPLE;
         } else if (selected.equals(resources.getString(R.string.black))) {
-            return BLACK;
+            return Constants.BLACK;
         } else if (selected.equals(resources.getString(R.string.white))) {
-            return WHITE;
+            return Constants.WHITE;
         } else {
             // rainbow
             return  null;
@@ -104,21 +95,21 @@ public class ColorArrayAdapter extends BaseAdapter {
 
         if (color == null) {
             return getPosition(resources.getString(R.string.rainbow));
-        } else if (compareColor(color, RED)) {
+        } else if (compareColor(color, Constants.RED)) {
             return getPosition(resources.getString(R.string.red));
-        } else if (compareColor(color, ORANGE)) {
+        } else if (compareColor(color, Constants.ORANGE)) {
             return getPosition(resources.getString(R.string.orange));
-        } else if (compareColor(color, YELLOW)) {
+        } else if (compareColor(color, Constants.YELLOW)) {
             return getPosition(resources.getString(R.string.yellow));
-        } else if (compareColor(color, GREEN)) {
+        } else if (compareColor(color, Constants.GREEN)) {
             return getPosition(resources.getString(R.string.green));
-        } else if (compareColor(color, BLUE)) {
+        } else if (compareColor(color, Constants.BLUE)) {
             return getPosition(resources.getString(R.string.blue));
-        } else if (compareColor(color, PURPLE)) {
+        } else if (compareColor(color, Constants.PURPLE)) {
             return getPosition(resources.getString(R.string.purple));
-        } else if (compareColor(color, WHITE)) {
+        } else if (compareColor(color, Constants.WHITE)) {
             return getPosition(resources.getString(R.string.white));
-        } else if (compareColor(color, BLACK)) {
+        } else if (compareColor(color, Constants.BLACK)) {
             return getPosition(resources.getString(R.string.black));
         } else {
             // should not happen

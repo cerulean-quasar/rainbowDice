@@ -261,6 +261,10 @@ public:
         m_isModifiedRoll = inIsModified;
     }
 
+    bool hasDice() {
+        return !m_diceName.empty();
+    }
+
     void updateAcceleration(AccelerationEventType type, float x, float y, float z) {
         switch (type) {
             case AccelerationEventType::LINEAR_ACCELERATION_EVENT:
