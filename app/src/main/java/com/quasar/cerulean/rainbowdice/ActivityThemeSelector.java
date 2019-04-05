@@ -40,6 +40,9 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
     String graphicsAPIName;
     String graphicsAPIVersion;
     String graphicsDeviceName;
+    boolean hasLinearAcceleration;
+    boolean hasGravity;
+    boolean hasAccelerometer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +75,9 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         } else {
             graphicsDeviceName = null;
         }
+        hasLinearAcceleration = intent.getBooleanExtra(Constants.SENSOR_HAS_LINEAR_ACCELERATION, false);
+        hasGravity = intent.getBooleanExtra(Constants.SENSOR_HAS_GRAVITY, false);
+        hasAccelerometer = intent.getBooleanExtra(Constants.SENSOR_HAS_ACCELEROMETER, false);
 
         initializeGui(true);
     }
@@ -111,9 +117,20 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         ck.setChecked(configurationFile.useLegacy());
 
         ck = findViewById(R.id.useGravity);
+        if (hasAccelerometer && !hasLinearAcceleration) {
+            configurationFile.setUseGravity(true);
+            ck.setEnabled(false);
+        } else if (!hasAccelerometer && (!hasGravity || !hasLinearAcceleration)) {
+            configurationFile.setUseGravity(false);
+            ck.setEnabled(false);
+        }
         ck.setChecked(configurationFile.useGravity());
 
         ck = findViewById(R.id.drawRollingDice);
+        if (!hasAccelerometer && (!hasGravity || !hasLinearAcceleration)) {
+            configurationFile.setDrawRollingDice(false);
+            ck.setEnabled(false);
+        }
         ck.setChecked(configurationFile.drawRollingDice());
 
         if (graphicsAPIName != null) {

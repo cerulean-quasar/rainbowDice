@@ -413,12 +413,13 @@ public:
         m_tryVulkan = false;
 #endif
         initDiceGraphics(std::move(inSurface), inUseGravity, inDrawRollingDice);
+        m_notify->sendGraphicsDescription(m_diceGraphics->graphicsDescription(),
+                                          whichSensors.test(Sensors::LINEAR_ACCELERATION_SENSOR),
+                                          whichSensors.test(Sensors::GRAVITY_SENSOR),
+                                          whichSensors.test(Sensors::ACCELEROMETER_SENSOR));
     }
 
     void waitingLoop();
-    void notifyAboutGraphicsDescription() {
-        m_notify->sendGraphicsDescription(m_diceGraphics->graphicsDescription());
-    }
 private:
     static constexpr uint32_t m_maxEventsBeforeRedraw = 128;
 

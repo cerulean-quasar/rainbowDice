@@ -41,7 +41,8 @@ public:
             std::vector<std::shared_ptr<DiceDescription>> const &dice);
     void sendError(std::string const &error);
     void sendError(char const *error);
-    void sendGraphicsDescription(GraphicsDescription const &description);
+    void sendGraphicsDescription(GraphicsDescription const &description,
+            bool hasLinearAcceleration, bool hasGravity, bool hasAccelerometer);
     void sendSelected(bool diceSelected);
 };
 #endif // RAINBOWDICE_NATIVELIB_HPP

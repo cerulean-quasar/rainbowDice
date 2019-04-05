@@ -452,7 +452,6 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         //diceChannel().clearQueue();
         DiceWorker worker(surface, notify, juseGravity, jdrawRollingDice, juseLegacy);
         surface.reset();
-        worker.notifyAboutGraphicsDescription();
         worker.waitingLoop();
     } catch (std::runtime_error &e) {
         if (strlen(e.what()) > 0) {
@@ -571,11 +570,13 @@ void Notify::sendError(char const *error) {
     m_env->CallVoidMethod(m_notify, midSend, jerror);
 }
 
-void Notify::sendGraphicsDescription(GraphicsDescription const &description) {
+void Notify::sendGraphicsDescription(GraphicsDescription const &description,
+                                     bool hasLinearAcceleration, bool hasGravity,
+                                     bool hasAccelerometer) {
     jclass notifyClass = m_env->GetObjectClass(m_notify);
 
     jmethodID midSend = m_env->GetMethodID(notifyClass, "sendGraphicsDescription",
-            "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+            "(ZZZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     if (midSend == nullptr) {
         throw std::runtime_error("Could not send graphics description message.");
     }
@@ -583,7 +584,8 @@ void Notify::sendGraphicsDescription(GraphicsDescription const &description) {
     jstring jgraphics = m_env->NewStringUTF(description.m_graphicsName.c_str());
     jstring jversion = m_env->NewStringUTF(description.m_version.c_str());
     jstring jdeviceName = m_env->NewStringUTF(description.m_deviceName.c_str());
-    m_env->CallVoidMethod(m_notify, midSend, description.m_isVulkan, jgraphics, jversion, jdeviceName);
+    m_env->CallVoidMethod(m_notify, midSend, hasLinearAcceleration, hasGravity, hasAccelerometer,
+            description.m_isVulkan, jgraphics, jversion, jdeviceName);
 }
 
 void Notify::sendSelected(bool diceSelected) {

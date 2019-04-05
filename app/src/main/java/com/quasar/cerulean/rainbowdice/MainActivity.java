@@ -76,12 +76,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class GraphicsDescription {
+        public boolean hasLinearAccelerationSensor;
+        public boolean hasGravitySensor;
+        public boolean hasAccelerometer;
         public boolean isVulkan;
         public String apiName;
         public String apiVersion;
         public String deviceName;
 
         public GraphicsDescription() {
+            hasLinearAccelerationSensor = false;
+            hasGravitySensor = false;
+            hasAccelerometer = false;
             isVulkan = false;
             apiName = null;
             apiVersion = null;
@@ -224,6 +230,9 @@ public class MainActivity extends AppCompatActivity {
     public void onSelectTheme(MenuItem item) {
         Intent intent = new Intent(this, ActivityThemeSelector.class);
         if (graphicsDescription != null) {
+            intent.putExtra(Constants.SENSOR_HAS_LINEAR_ACCELERATION, graphicsDescription.hasLinearAccelerationSensor);
+            intent.putExtra(Constants.SENSOR_HAS_GRAVITY, graphicsDescription.hasGravitySensor);
+            intent.putExtra(Constants.SENSOR_HAS_ACCELEROMETER, graphicsDescription.hasAccelerometer);
             intent.putExtra(Constants.GRAPHICS_API_NAME, graphicsDescription.apiName);
             intent.putExtra(Constants.GRAPHICS_IS_VULKAN, graphicsDescription.isVulkan);
             if (graphicsDescription.apiVersion != null) {
@@ -467,6 +476,12 @@ public class MainActivity extends AppCompatActivity {
                     graphicsDescription = new GraphicsDescription();
                 }
 
+                graphicsDescription.hasLinearAccelerationSensor =
+                        data.getBoolean(DiceDrawerReturnChannel.hasLinearAccelerationType);
+                graphicsDescription.hasGravitySensor =
+                        data.getBoolean(DiceDrawerReturnChannel.hasGravityType);
+                graphicsDescription.hasAccelerometer =
+                        data.getBoolean(DiceDrawerReturnChannel.hasAccelerometerType);
                 graphicsDescription.isVulkan = data.getBoolean(DiceDrawerReturnChannel.isVulkan);
                 graphicsDescription.apiName = data.getString(DiceDrawerReturnChannel.apiName);
                 if (data.containsKey(DiceDrawerReturnChannel.apiVersion)) {

@@ -35,10 +35,14 @@ public class DiceDrawerReturnChannel {
     public static final String fileNameMsg = "diceFileName";
     public static final String isModifiedRollMsg = "isModifiedRoll";
 
+    public static final String hasLinearAccelerationType = "hasLinearAcceleration";
+    public static final String hasGravityType = "hasGravity";
+    public static final String hasAccelerometerType = "hasAccelerometer";
     public static final String deviceName = "deviceName";
     public static final String apiVersion = "apiVersion";
     public static final String apiName = "apiName";
     public static final String isVulkan = "isVulkan";
+
     public static final String diceSelected = "diceSelected";
 
     private DiceDrawerMessage m_msgBeingBuilt;
@@ -128,10 +132,15 @@ public class DiceDrawerReturnChannel {
         m_msgBeingBuilt = null;
     }
 
-    public void sendGraphicsDescription(boolean isVulkanAPI, String graphicsName, String version,
+    public void sendGraphicsDescription(boolean hasLinearAcceleration, boolean hasGravity,
+                                        boolean hasAccelerometer, boolean isVulkanAPI,
+                                        String graphicsName, String version,
                                         String graphicsDeviceName) {
         // tell the main thread, the graphics description.
         Bundle bundle = new Bundle();
+        bundle.putBoolean(hasLinearAccelerationType, hasLinearAcceleration);
+        bundle.putBoolean(hasGravityType, hasGravity);
+        bundle.putBoolean(hasAccelerometerType, hasAccelerometer);
         bundle.putBoolean(isVulkan, isVulkanAPI);
         bundle.putString(apiName, graphicsName);
         if (!version.isEmpty()) {

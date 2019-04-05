@@ -33,6 +33,9 @@ public class Constants {
     public static final String GRAPHICS_API_VERSION = "graphics_api_version";
     public static final String GRAPHICS_DEVICE_NAME = "graphics_device_name";
     public static final String GRAPHICS_IS_VULKAN = "graphics_is_vulkan";
+    public static final String SENSOR_HAS_LINEAR_ACCELERATION = "sensor_has_linear_acceleration";
+    public static final String SENSOR_HAS_GRAVITY = "sensor_has_gravity";
+    public static final String SENSOR_HAS_ACCELEROMETER = "sensor_has_accelerometer";
 
     public static final int DICE_LOG_FILE_ACTIVITY = 4;
 

@@ -177,7 +177,7 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
         }
 
         if (m_whichSensors.test(Sensors::ACCELEROMETER_SENSOR) && sensor.hasAccelerometerEvents()) {
-            std::vector<Sensors::AccelerationEvent> events = sensor.getLinearAccelerationEvents();
+            std::vector<Sensors::AccelerationEvent> events = sensor.getAccelerometerEvents();
             for (auto const &event : events) {
                 m_diceGraphics->updateAcceleration(RainbowDice::AccelerationEventType::ACCELEROMETER,
                         event.x, event.y, event.z);
