@@ -35,6 +35,8 @@ import android.widget.CheckBox;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+
 public class ActivityThemeSelector extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     ConfigurationFile configurationFile;
     String graphicsAPIName;
@@ -127,7 +129,7 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         ck.setChecked(configurationFile.useGravity());
 
         ck = findViewById(R.id.drawRollingDice);
-        if (!hasAccelerometer && (!hasGravity || !hasLinearAcceleration)) {
+        if (!hasAccelerometer && !hasLinearAcceleration) {
             configurationFile.setDrawRollingDice(false);
             ck.setEnabled(false);
         }
@@ -147,6 +149,27 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
             TextView view = findViewById(R.id.graphicsDeviceName);
             view.setText(graphicsDeviceName);
         }
+
+        ArrayList<String> sensors = new ArrayList<>();
+        if (hasAccelerometer) {
+            sensors.add(getString(R.string.accelerometerSensor));
+        }
+        if (hasLinearAcceleration) {
+            sensors.add(getString(R.string.linearAccelerationSensor));
+        }
+        if (hasGravity) {
+            sensors.add(getString(R.string.gravitySensor));
+        }
+        StringBuilder sensorsString = new StringBuilder();
+        int length = sensors.size();
+        for (i = 0; i < length; i++) {
+            sensorsString.append(sensors.get(i));
+            if (i != length - 1) {
+                sensorsString.append(",\n");
+            }
+        }
+        TextView sensorText = findViewById(R.id.sensorsList);
+        sensorText.setText(sensorsString.toString());
     }
 
     @Override

@@ -84,7 +84,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="20sp"
-        android:minHeight="50sp"
+        android:minHeight="52sp"
         android:text="@string/diceMessageToStartRolling"/>
     <com.quasar.cerulean.rainbowdice.RainbowDiceSurfaceView
             android:id="@+id/drawingSurface"

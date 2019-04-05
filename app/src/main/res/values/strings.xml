@@ -64,6 +64,10 @@
     <string name="useLegacy">Use Legacy</string>
     <string name="useGravity">Use gravity</string>
     <string name="drawRollingDice">Draw dice rolling</string>
+    <string name="sensorList">Available Sensors:</string>
+    <string name="linearAccelerationSensor">Linear Acceleration</string>
+    <string name="gravitySensor">Gravity</string>
+    <string name="accelerometerSensor">Accelerometer</string>
 
     <string-array name="themeArray">
         <item>Space</item>
