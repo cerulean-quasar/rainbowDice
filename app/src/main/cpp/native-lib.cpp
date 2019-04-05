@@ -585,3 +585,14 @@ void Notify::sendGraphicsDescription(GraphicsDescription const &description) {
     jstring jdeviceName = m_env->NewStringUTF(description.m_deviceName.c_str());
     m_env->CallVoidMethod(m_notify, midSend, description.m_isVulkan, jgraphics, jversion, jdeviceName);
 }
+
+void Notify::sendSelected(bool diceSelected) {
+    jclass notifyClass = m_env->GetObjectClass(m_notify);
+
+    jmethodID midSend = m_env->GetMethodID(notifyClass, "sendSelected", "(Z)V");
+    if (midSend == nullptr) {
+        throw std::runtime_error("Could not send dice selected message.");
+    }
+
+    m_env->CallVoidMethod(m_notify, midSend, diceSelected);
+}

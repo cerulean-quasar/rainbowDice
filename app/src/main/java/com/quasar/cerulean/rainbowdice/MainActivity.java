@@ -254,6 +254,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public  void onResetView(View view) {
+        view.setEnabled(false);
+        view.setBackground(getDrawable(R.drawable.drop_changes_grayscale));
         Draw.resetView();
     }
 
@@ -438,6 +440,28 @@ public class MainActivity extends AppCompatActivity {
                 // the result is an error message.  Print the error message to the text view
                 text.setText(serror);
                 return true;
+            } else if (data.containsKey(DiceDrawerReturnChannel.diceSelected)) {
+                boolean diceSelected = data.getBoolean(DiceDrawerReturnChannel.diceSelected);
+                Button plusRolling = MainActivity.this.findViewById(R.id.plus_rolling_dice);
+                Button rolling = MainActivity.this.findViewById(R.id.rolling_dice);
+                Button deleteDice = MainActivity.this.findViewById(R.id.delete_dice);
+
+                if (diceSelected) {
+                    plusRolling.setBackground(MainActivity.this.getDrawable(R.drawable.plus_rolling_dice));
+                    rolling.setBackground(MainActivity.this.getDrawable(R.drawable.rolling_dice));
+                    deleteDice.setBackground(MainActivity.this.getDrawable(R.drawable.trash));
+                    plusRolling.setEnabled(true);
+                    rolling.setEnabled(true);
+                    deleteDice.setEnabled(true);
+                } else {
+                    plusRolling.setBackground(MainActivity.this.getDrawable(R.drawable.plus_rolling_dice_grayscale));
+                    rolling.setBackground(MainActivity.this.getDrawable(R.drawable.rolling_dice_grayscale));
+                    deleteDice.setBackground(MainActivity.this.getDrawable(R.drawable.trash_grayscale));
+                    plusRolling.setEnabled(false);
+                    rolling.setEnabled(false);
+                    deleteDice.setEnabled(false);
+                }
+
             } else if (data.containsKey(DiceDrawerReturnChannel.isVulkan)) {
                 if (graphicsDescription == null) {
                     graphicsDescription = new GraphicsDescription();

@@ -205,6 +205,9 @@ public:
     // returns true if it needs a redraw
     virtual bool tapDice(float x, float y) = 0;
 
+    // returns true if any dice are selected, false otherwise.
+    virtual bool diceSelected() = 0;
+
     virtual bool changeDice(std::string const &inDiceName,
                     std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
                     std::shared_ptr<TextureAtlas> inTexture) = 0;
@@ -386,6 +389,17 @@ public:
     bool deleteSelected() override;
     void animateMoveStoppedDice() override;
 
+    bool diceSelected() override {
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                if (die->isSelected()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
     void loadObject(std::vector<std::string> const &symbols,
                                        std::vector<uint32_t> const &rerollIndices,
                                        std::vector<float> const &color) override {

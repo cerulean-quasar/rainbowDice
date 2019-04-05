@@ -23,6 +23,7 @@ package com.quasar.cerulean.rainbowdice;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.view.ScaleGestureDetector;
 
 import java.util.ArrayList;
 
@@ -38,6 +39,7 @@ public class DiceDrawerReturnChannel {
     public static final String apiVersion = "apiVersion";
     public static final String apiName = "apiName";
     public static final String isVulkan = "isVulkan";
+    public static final String diceSelected = "diceSelected";
 
     private DiceDrawerMessage m_msgBeingBuilt;
     private ArrayList<DieConfiguration> m_dice;
@@ -128,7 +130,7 @@ public class DiceDrawerReturnChannel {
 
     public void sendGraphicsDescription(boolean isVulkanAPI, String graphicsName, String version,
                                         String graphicsDeviceName) {
-        // tell the main thread, a result has occurred.
+        // tell the main thread, the graphics description.
         Bundle bundle = new Bundle();
         bundle.putBoolean(isVulkan, isVulkanAPI);
         bundle.putString(apiName, graphicsName);
@@ -138,6 +140,15 @@ public class DiceDrawerReturnChannel {
         if (!graphicsDeviceName.isEmpty()) {
             bundle.putString(deviceName, graphicsDeviceName);
         }
+        Message msg = Message.obtain();
+        msg.setData(bundle);
+        m_notify.sendMessage(msg);
+    }
+
+    public void sendSelected(boolean selected) {
+        // tell the main thread, the graphics description.
+        Bundle bundle = new Bundle();
+        bundle.putBoolean(diceSelected, selected);
         Message msg = Message.obtain();
         msg.setData(bundle);
         m_notify.sendMessage(msg);

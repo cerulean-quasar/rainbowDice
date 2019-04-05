@@ -42,5 +42,6 @@ public:
     void sendError(std::string const &error);
     void sendError(char const *error);
     void sendGraphicsDescription(GraphicsDescription const &description);
+    void sendSelected(bool diceSelected);
 };
 #endif // RAINBOWDICE_NATIVELIB_HPP

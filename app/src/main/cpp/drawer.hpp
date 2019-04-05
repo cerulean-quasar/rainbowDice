@@ -148,7 +148,13 @@ public:
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
-        return diceGraphics->tapDice(m_x, m_y);
+        bool before = diceGraphics->diceSelected();
+        bool needsRedraw = diceGraphics->tapDice(m_x, m_y);
+        bool after = diceGraphics->diceSelected();
+        if (before != after) {
+            notify->sendSelected(after);
+        }
+        return needsRedraw;
     }
 
     evtype type() override { return tapDice; }
@@ -162,12 +168,21 @@ public:
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
-        bool hasResult = diceGraphics->rerollSelected();
-        if (hasResult) {
-            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
-            notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
-                               results, diceGraphics->getDiceDescriptions());
-            return true;
+        if (diceGraphics->diceSelected()) {
+            bool hasResult = diceGraphics->rerollSelected();
+            notify->sendSelected(false);
+            if (hasResult) {
+                std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
+                notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
+                                   results, diceGraphics->getDiceDescriptions());
+                return true;
+            } else {
+                // Return false here because we will enter the drawing loop and then the dice will get
+                // redrawn.  If we return true here, then the dice will display, but then there will be
+                // a longish pause (about half a second) as the sensors get initialized at the top of the
+                // drawing loop.
+                return false;
+            }
         } else {
             return false;
         }
@@ -184,12 +199,21 @@ public:
 
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
-        bool hasResult = diceGraphics->addRerollSelected();
-        if (hasResult) {
-            std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
-            notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
-                               results, diceGraphics->getDiceDescriptions());
-            return true;
+        if (diceGraphics->diceSelected()) {
+            bool hasResult = diceGraphics->addRerollSelected();
+            notify->sendSelected(false);
+            if (hasResult) {
+                std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
+                notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
+                                   results, diceGraphics->getDiceDescriptions());
+                return true;
+            } else {
+                // Return false here because we will enter the drawing loop and then the dice will get
+                // redrawn.  If we return true here, then the dice will display, but then there will be
+                // a longish pause (about half a second) as the sensors get initialized at the top of the
+                // drawing loop.
+                return false;
+            }
         } else {
             return false;
         }
@@ -210,6 +234,7 @@ public:
             std::vector<std::vector<uint32_t>> results = diceGraphics->getDiceResults();
             notify->sendResult(diceGraphics->diceName(), diceGraphics->isModifiedRoll(),
                                  results, diceGraphics->getDiceDescriptions());
+            notify->sendSelected(false);
             return true;
         } else {
             return false;
@@ -267,6 +292,7 @@ public:
         // should redraw immediately and not wait for some number of events to come up before we
         // do the redraw.
         diceGraphics->drawFrame();
+        notify->sendSelected(false);
         return false;
     }
 
@@ -291,6 +317,7 @@ public:
     bool operator() (std::unique_ptr<RainbowDice> &diceGraphics,
                      std::shared_ptr<Notify> &notify) override {
         bool hasResult = diceGraphics->changeDice(m_diceName, m_dice, m_texture);
+        notify->sendSelected(false);
         if (hasResult) {
             // The rolling dice are not animated, they are just moved to stopped positions.
             // Return the results to the GUI.
