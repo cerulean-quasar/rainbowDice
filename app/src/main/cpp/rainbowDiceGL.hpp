@@ -119,7 +119,9 @@ public:
     explicit RainbowDiceGL(std::shared_ptr<WindowType> window, bool inDrawRollingDice)
             : RainbowDiceGraphics{inDrawRollingDice},
               m_surface{std::make_shared<graphicsGL::Surface>(std::move(window))},
-              programID{0}
+              m_programLoaded{false},
+              programID{0},
+              m_texture{}
     {
         init();
         setView();
@@ -161,7 +163,10 @@ public:
     void destroyModelGLResources();
 
     void destroyGLResources() {
-        glDeleteProgram(programID);
+        if (m_programLoaded) {
+            glDeleteProgram(programID);
+            m_programLoaded = false;
+        }
     }
 
     ~RainbowDiceGL() override {
@@ -176,6 +181,7 @@ protected:
     std::shared_ptr<DiceGL> createDie(std::shared_ptr<DiceGL> const &inDice) override;
 private:
     std::shared_ptr<graphicsGL::Surface> m_surface;
+    bool m_programLoaded;
     GLuint programID;
     std::shared_ptr<TextureGL> m_texture;
 

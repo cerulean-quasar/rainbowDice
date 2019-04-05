@@ -442,6 +442,8 @@ GLuint RainbowDiceGL::loadShaders(std::string const &vertexShaderFile, std::stri
         }
     }
 
+    m_programLoaded = true;
+
     glDetachShader(ProgramID, VertexShaderID);
     glDetachShader(ProgramID, FragmentShaderID);
 
@@ -470,7 +472,9 @@ void RainbowDiceGL::destroyModelGLResources() {
 void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
     // destroy all GL resources
     destroyModelGLResources();
-    m_texture->destroyGLResources();
+    if (m_texture != nullptr) {
+        m_texture->destroyGLResources();
+    }
     destroyGLResources();
     auto window = m_surface->window();
     m_surface.reset();
@@ -479,7 +483,9 @@ void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
     m_surface = std::make_shared<graphicsGL::Surface>(window);
     init();
     recreateModels();
-    m_texture->initGLResources();
+    if (m_texture != nullptr) {
+        m_texture->initGLResources();
+    }
     updatePerspectiveMatrix(m_surface->width(), m_surface->height());
 
     // move dice to the new position on the screen according to the new screen size.
