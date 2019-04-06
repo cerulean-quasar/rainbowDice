@@ -36,7 +36,6 @@ public class MySurfaceCallback implements SurfaceHolder.Callback {
         Draw.tellDrawerSurfaceChanged(width, height);
     }
 
-
     public void surfaceCreated(SurfaceHolder holder) {
         app.setSurfaceReady(true);
         app.createWorker();
@@ -49,5 +48,6 @@ public class MySurfaceCallback implements SurfaceHolder.Callback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         app.joinDrawer();
         app.setSurfaceReady(false);
+        holder.getSurface().release();
     }
 }

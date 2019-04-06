@@ -545,135 +545,135 @@ void Notify::sendResult(
         bool isModified,
         std::vector<std::vector<uint32_t>> const &results,
         std::vector<std::shared_ptr<DiceDescription>> const &dice) {
+    /* all the jobject or derived from jobject (jstring, jclass, jintArray, etc) used in this
+     * function must be released with DeleteLocalRef before this function returns.  The JVM/JNI
+     * normally frees these, but only when the C++ function returns and exits back to java.  Since
+     * this function is called potentially many times before the worker thread exits the JNI, not
+     * freeing these jobjects is effectively a leak and will eventually cause android to kill the app.
+     */
     auto env = m_env;
     auto deleter = [env](jobject localRefRaw) {
         env->DeleteLocalRef(localRefRaw);
     };
-    try {
-        std::string totalResult;
-        std::shared_ptr<_jclass> notifyClass(m_env->GetObjectClass(m_notify), deleter);
-        handleJNIException(m_env);
 
-        jmethodID midAddMultiResult = m_env->GetMethodID(notifyClass.get(), "addResult", "([I)V");
-        handleJNIException(m_env);
-        if (midAddMultiResult == nullptr) {
-            throw std::runtime_error("Could not send message.");
-        }
+    std::string totalResult;
+    std::shared_ptr<_jclass> notifyClass(m_env->GetObjectClass(m_notify), deleter);
+    handleJNIException(m_env);
 
-        jmethodID midAddSingleResult = m_env->GetMethodID(notifyClass.get(), "addResult", "(I)V");
-        handleJNIException(m_env);
-        if (midAddSingleResult == nullptr) {
-            throw std::runtime_error("Could not send message.");
-        }
+    jmethodID midAddMultiResult = m_env->GetMethodID(notifyClass.get(), "addResult", "([I)V");
+    handleJNIException(m_env);
+    if (midAddMultiResult == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
 
-        for (auto const &result : results) {
-            if (result.size() == 1) {
-                m_env->CallVoidMethod(m_notify, midAddSingleResult, result[0]);
-                handleJNIException(m_env);
-            } else {
-                std::shared_ptr<_jintArray> jresultsArray(m_env->NewIntArray(static_cast<jsize>(result.size())), deleter);
-                handleJNIException(m_env);
-                jint *jresults = m_env->GetIntArrayElements(jresultsArray.get(), nullptr);
-                handleJNIException(m_env);
-                int i = 0;
-                for (auto const &dieResult : result) {
-                    jresults[i++] = dieResult;
-                }
-                m_env->ReleaseIntArrayElements(jresultsArray.get(), jresults, JNI_COMMIT);
-                handleJNIException(m_env);
-                m_env->CallVoidMethod(m_notify, midAddMultiResult, jresultsArray.get());
-                handleJNIException(m_env);
-            }
-        }
+    jmethodID midAddSingleResult = m_env->GetMethodID(notifyClass.get(), "addResult", "(I)V");
+    handleJNIException(m_env);
+    if (midAddSingleResult == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
 
-        jmethodID midAddDice = m_env->GetMethodID(notifyClass.get(), "addDice",
-                                                  "(I[Ljava/lang/String;[Ljava/lang/Integer;[I[FZ)V");
-        handleJNIException(m_env);
-        if (midAddDice == nullptr) {
-            throw std::runtime_error("Could not send message.");
-        }
-        std::shared_ptr<_jstring> emptyStr(m_env->NewStringUTF(""), deleter);
-        handleJNIException(m_env);
-        std::shared_ptr<_jclass> stringClass(m_env->FindClass("java/lang/String"), deleter);
-        handleJNIException(m_env);
-        std::shared_ptr<_jclass> jIntegerClass(m_env->FindClass("java/lang/Integer"), deleter);
-        handleJNIException(m_env);
-        for (auto const &die : dice) {
-            std::shared_ptr<_jobjectArray> jsymbolArray(m_env->NewObjectArray(die->m_symbols.size(),
-                                                              stringClass.get(),
-                                                              emptyStr.get()), deleter);
+    for (auto const &result : results) {
+        if (result.size() == 1) {
+            m_env->CallVoidMethod(m_notify, midAddSingleResult, result[0]);
+            handleJNIException(m_env);
+        } else {
+            std::shared_ptr<_jintArray> jresultsArray(m_env->NewIntArray(static_cast<jsize>(result.size())), deleter);
+            handleJNIException(m_env);
+            jint *jresults = m_env->GetIntArrayElements(jresultsArray.get(), nullptr);
             handleJNIException(m_env);
             int i = 0;
-            for (auto const &symbol : die->m_symbols) {
-                std::shared_ptr<_jstring> str(m_env->NewStringUTF(symbol.c_str()), deleter);
-                handleJNIException(m_env);
-                m_env->SetObjectArrayElement(jsymbolArray.get(), i++, str.get());
-                handleJNIException(m_env);
+            for (auto const &dieResult : result) {
+                jresults[i++] = dieResult;
             }
-
-            std::shared_ptr<_jintArray> jrerollIndicesArray(m_env->NewIntArray(
-                    static_cast<jsize>(die->m_rerollOnIndices.size())), deleter);
+            m_env->ReleaseIntArrayElements(jresultsArray.get(), jresults, JNI_COMMIT);
             handleJNIException(m_env);
-            jint *jindices = m_env->GetIntArrayElements(jrerollIndicesArray.get(), nullptr);
-            handleJNIException(m_env);
-            i = 0;
-            for (auto const &rerollIndex : die->m_rerollOnIndices) {
-                jindices[i++] = rerollIndex;
-            }
-            m_env->ReleaseIntArrayElements(jrerollIndicesArray.get(), jindices, JNI_COMMIT);
-            handleJNIException(m_env);
-
-            std::shared_ptr<_jfloatArray> jcolorArray(
-                    m_env->NewFloatArray(static_cast<jsize>(die->m_color.size())), deleter);
-            handleJNIException(m_env);
-            jfloat *jcolor = m_env->GetFloatArrayElements(jcolorArray.get(), nullptr);
-            handleJNIException(m_env);
-            i = 0;
-            for (auto const &colorValue : die->m_color) {
-                jcolor[i++] = colorValue;
-            }
-            m_env->ReleaseFloatArrayElements(jcolorArray.get(), jcolor, JNI_COMMIT);
-            handleJNIException(m_env);
-
-            jmethodID midIntegerInit = m_env->GetMethodID(jIntegerClass.get(), "<init>", "(I)V");
-            handleJNIException(m_env);
-            std::shared_ptr<_jobjectArray> jvalueArray(m_env->NewObjectArray(die->m_values.size(),
-                                                             jIntegerClass.get(),
-                                                             nullptr), deleter);
-            handleJNIException(m_env);
-            i = 0;
-            for (auto const &value : die->m_values) {
-                if (value != nullptr) {
-                    std::shared_ptr<_jobject> obj(
-                            m_env->NewObject(jIntegerClass.get(), midIntegerInit, *value), deleter);
-                    handleJNIException(m_env);
-                    m_env->SetObjectArrayElement(jvalueArray.get(), i, obj.get());
-                    handleJNIException(m_env);
-                }
-                i++;
-            }
-
-            m_env->CallVoidMethod(m_notify, midAddDice, die->m_nbrDice, jsymbolArray.get(), jvalueArray.get(),
-                                  jrerollIndicesArray.get(), jcolorArray.get(), die->m_isAddOperation);
+            m_env->CallVoidMethod(m_notify, midAddMultiResult, jresultsArray.get());
             handleJNIException(m_env);
         }
-
-        jmethodID midSend = m_env->GetMethodID(notifyClass.get(), "sendResults",
-                                               "(Ljava/lang/String;Z)V");
-        handleJNIException(m_env);
-        if (midSend == nullptr) {
-            throw std::runtime_error("Could not send message.");
-        }
-
-        std::shared_ptr<_jstring> jdiceName(m_env->NewStringUTF(diceName.c_str()), deleter);
-        m_env->CallVoidMethod(m_notify, midSend, jdiceName.get(), isModified);
-        handleJNIException(m_env);
-    } catch (std::exception &e) {
-        e.what();
-        return;
-    } catch (...) {
-        return;
     }
+
+    jmethodID midAddDice = m_env->GetMethodID(notifyClass.get(), "addDice",
+                                              "(I[Ljava/lang/String;[Ljava/lang/Integer;[I[FZ)V");
+    handleJNIException(m_env);
+    if (midAddDice == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
+    std::shared_ptr<_jstring> emptyStr(m_env->NewStringUTF(""), deleter);
+    handleJNIException(m_env);
+    std::shared_ptr<_jclass> stringClass(m_env->FindClass("java/lang/String"), deleter);
+    handleJNIException(m_env);
+    std::shared_ptr<_jclass> jIntegerClass(m_env->FindClass("java/lang/Integer"), deleter);
+    handleJNIException(m_env);
+    for (auto const &die : dice) {
+        std::shared_ptr<_jobjectArray> jsymbolArray(m_env->NewObjectArray(die->m_symbols.size(),
+                                                          stringClass.get(),
+                                                          emptyStr.get()), deleter);
+        handleJNIException(m_env);
+        int i = 0;
+        for (auto const &symbol : die->m_symbols) {
+            std::shared_ptr<_jstring> str(m_env->NewStringUTF(symbol.c_str()), deleter);
+            handleJNIException(m_env);
+            m_env->SetObjectArrayElement(jsymbolArray.get(), i++, str.get());
+            handleJNIException(m_env);
+        }
+
+        std::shared_ptr<_jintArray> jrerollIndicesArray(m_env->NewIntArray(
+                static_cast<jsize>(die->m_rerollOnIndices.size())), deleter);
+        handleJNIException(m_env);
+        jint *jindices = m_env->GetIntArrayElements(jrerollIndicesArray.get(), nullptr);
+        handleJNIException(m_env);
+        i = 0;
+        for (auto const &rerollIndex : die->m_rerollOnIndices) {
+            jindices[i++] = rerollIndex;
+        }
+        m_env->ReleaseIntArrayElements(jrerollIndicesArray.get(), jindices, JNI_COMMIT);
+        handleJNIException(m_env);
+
+        std::shared_ptr<_jfloatArray> jcolorArray(
+                m_env->NewFloatArray(static_cast<jsize>(die->m_color.size())), deleter);
+        handleJNIException(m_env);
+        jfloat *jcolor = m_env->GetFloatArrayElements(jcolorArray.get(), nullptr);
+        handleJNIException(m_env);
+        i = 0;
+        for (auto const &colorValue : die->m_color) {
+            jcolor[i++] = colorValue;
+        }
+        m_env->ReleaseFloatArrayElements(jcolorArray.get(), jcolor, JNI_COMMIT);
+        handleJNIException(m_env);
+
+        jmethodID midIntegerInit = m_env->GetMethodID(jIntegerClass.get(), "<init>", "(I)V");
+        handleJNIException(m_env);
+        std::shared_ptr<_jobjectArray> jvalueArray(m_env->NewObjectArray(die->m_values.size(),
+                                                         jIntegerClass.get(),
+                                                         nullptr), deleter);
+        handleJNIException(m_env);
+        i = 0;
+        for (auto const &value : die->m_values) {
+            if (value != nullptr) {
+                std::shared_ptr<_jobject> obj(
+                        m_env->NewObject(jIntegerClass.get(), midIntegerInit, *value), deleter);
+                handleJNIException(m_env);
+                m_env->SetObjectArrayElement(jvalueArray.get(), i, obj.get());
+                handleJNIException(m_env);
+            }
+            i++;
+        }
+
+        m_env->CallVoidMethod(m_notify, midAddDice, die->m_nbrDice, jsymbolArray.get(), jvalueArray.get(),
+                              jrerollIndicesArray.get(), jcolorArray.get(), die->m_isAddOperation);
+        handleJNIException(m_env);
+    }
+
+    jmethodID midSend = m_env->GetMethodID(notifyClass.get(), "sendResults",
+                                           "(Ljava/lang/String;Z)V");
+    handleJNIException(m_env);
+    if (midSend == nullptr) {
+        throw std::runtime_error("Could not send message.");
+    }
+
+    std::shared_ptr<_jstring> jdiceName(m_env->NewStringUTF(diceName.c_str()), deleter);
+    m_env->CallVoidMethod(m_notify, midSend, jdiceName.get(), isModified);
+    handleJNIException(m_env);
 }
 
 void Notify::sendError(std::string const &error) {
