@@ -60,11 +60,11 @@
     <string name="graphicsAPIName">Graphics API:</string>
     <string name="graphicsAPIVersion">Graphics API version:</string>
     <string name="graphicsDeviceName">Graphics Device Name:</string>
+    <string name="sensorList">Available Sensors:</string>
     <string name="unknown">Unknown</string>
-    <string name="useLegacy">Use Legacy</string>
+    <string name="useLegacy">Use OpenGL Graphics</string>
     <string name="useGravity">Use gravity</string>
     <string name="drawRollingDice">Draw dice rolling</string>
-    <string name="sensorList">Available Sensors:</string>
     <string name="linearAccelerationSensor">Linear Acceleration</string>
     <string name="gravitySensor">Gravity</string>
     <string name="accelerometerSensor">Accelerometer</string>
