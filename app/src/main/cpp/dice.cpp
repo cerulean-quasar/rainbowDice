@@ -856,7 +856,7 @@ void DiceModelHedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     }
 
     // indices - not really using these
-    for (uint32_t i = 0; i < numberFaces*15; i ++) {
+    for (uint32_t i = 0; i < vertices.size(); i ++) {
         indices.push_back(i);
     }
 }
@@ -1088,7 +1088,7 @@ void DiceModelTetrahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtl
     addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, 3);
 
     // indices - not really using these
-    for (uint32_t i = 0; i < numberFaces*15; i ++) {
+    for (uint32_t i = 0; i < vertices.size(); i ++) {
         indices.push_back(i);
     }
 }
@@ -1274,7 +1274,7 @@ void DiceModelIcosahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtl
     addVertices(texAtlas, p0, q, r, p0Normal, qNormal, rNormal, i);
 
     // indices - not really using these
-    for (i = 0; i < numberFaces*15; i ++) {
+    for (i = 0; i < vertices.size(); i ++) {
         indices.push_back(i);
     }
 }
@@ -1666,7 +1666,7 @@ void DiceModelDodecahedron::loadModel(std::shared_ptr<TextureAtlas> const &texAt
                 cornerNormalA, cornerNormalB, cornerNormalC, cornerNormalD, cornerNormalE, i++);
 
     // indices - not really using these
-    for (i = 0; i < numberFaces*5*3; i ++) {
+    for (i = 0; i < vertices.size(); i ++) {
         indices.push_back(i);
     }
 }
