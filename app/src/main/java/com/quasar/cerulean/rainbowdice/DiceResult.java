@@ -93,9 +93,11 @@ public class DiceResult {
             }
         }
 
-        Integer value() { return m_value; }
-        String symbol() { return m_symbol; }
-        Integer index() { return m_diceIndex; }
+        public Integer value() { return m_value; }
+        public String symbol() { return m_symbol; }
+        public Integer index() { return m_diceIndex; }
+
+        public void setIndex(Integer index) { m_diceIndex = index; }
     }
 
     private ArrayList<ArrayList<DieResult>> diceResults;

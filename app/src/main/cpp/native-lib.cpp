@@ -264,7 +264,8 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
     return std::make_pair(dice, texture);
 }
 
-std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults) {
+std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults,
+        std::vector<std::shared_ptr<DiceDescription>> const &dice) {
     std::vector<std::vector<uint32_t>> diceResults;
 
     jclass diceResultsClass = env->GetObjectClass(jDiceResults);
@@ -285,7 +286,19 @@ std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults
         throw std::runtime_error("Could not load dice results");
     }
 
+    int j = 0;
+    int k = 1;
     for (uint32_t i = 0; i < nbrResults; i++) {
+        if (dice[j]->m_symbols.size() == 1) {
+            // we don't want to get the results for constant dice.  Just continue.
+            if (k < dice[j]->m_nbrDice) {
+                k++;
+            } else {
+                j++;
+                k = 1;
+            }
+            continue;
+        }
         std::vector<uint32_t> resultsForDie;
         uint32_t nbrResultsForDie = env->CallIntMethod(jDiceResults, midNbrResultsForDie, i);
         handleJNIException(env);
@@ -304,6 +317,12 @@ std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults
         handleJNIException(env);
 
         diceResults.push_back(resultsForDie);
+        if (k < dice[j]->m_nbrDice) {
+            k++;
+        } else {
+            j++;
+            k = 1;
+        }
     }
 
     return std::move(diceResults);
@@ -395,30 +414,30 @@ Java_com_quasar_cerulean_rainbowdice_Draw_drawStoppedDice(
         jfloatArray textureCoordBottom,
         jbyteArray jbitmap)
 {
-    const char *cdiceName = env->GetStringUTFChars(jdiceName, nullptr);
-    handleJNIException(env);
-    std::string diceName(cdiceName);
-    env->ReleaseStringUTFChars(jdiceName, cdiceName);
-    handleJNIException(env);
-
-    jclass diceResultsClass = env->GetObjectClass(jDiceResults);
-    handleJNIException(env);
-    jmethodID mid = env->GetMethodID(diceResultsClass, "isModifiedRoll", "()Z");
-    handleJNIException(env);
-    if (mid == 0) {
-        return env->NewStringUTF("Could not load dice results");
-    }
-    bool isModifiedRoll = env->CallBooleanMethod(jDiceResults, mid);
-    handleJNIException(env);
-
     try {
+        const char *cdiceName = env->GetStringUTFChars(jdiceName, nullptr);
+        handleJNIException(env);
+        std::string diceName(cdiceName);
+        env->ReleaseStringUTFChars(jdiceName, cdiceName);
+        handleJNIException(env);
 
-        std::vector<std::vector<uint32_t>> upFaceIndices = std::move(initResults(env, jDiceResults));
+        jclass diceResultsClass = env->GetObjectClass(jDiceResults);
+        handleJNIException(env);
+        jmethodID mid = env->GetMethodID(diceResultsClass, "isModifiedRoll", "()Z");
+        handleJNIException(env);
+        if (mid == 0) {
+            return env->NewStringUTF("Could not load dice results");
+        }
+        bool isModifiedRoll = env->CallBooleanMethod(jDiceResults, mid);
+        handleJNIException(env);
+
         std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<TextureAtlas>> dice =
                 initDice(env, jDiceConfigs,
                          jSymbols, width, height, textureCoordLeft,
                          textureCoordRight, textureCoordTop,
                          textureCoordBottom, jbitmap);
+        std::vector<std::vector<uint32_t>> upFaceIndices = std::move(initResults(env, jDiceResults,
+                dice.first));
         std::shared_ptr<DrawEvent> event = std::make_shared<DrawStoppedDiceEvent>(std::move(diceName),
                 std::move(dice.first), dice.second, std::move(upFaceIndices), isModifiedRoll);
         diceChannel().sendEvent(event);

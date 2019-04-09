@@ -273,6 +273,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void drawStoppedDice(String name, DieConfiguration[] diceConfig, DiceResult diceResult) {
+        int i = 0;
+        int j = 1;
+        for (ArrayList<DiceResult.DieResult> dieResults : diceResult.getDiceResults()) {
+            for (DiceResult.DieResult dieResult : dieResults) {
+                if (dieResult.index() == null) {
+                    int index = diceConfig[i].getIndexForSymbol(dieResult.symbol());
+                    dieResult.setIndex(index);
+                }
+            }
+            if (j < diceConfig[i].getNumberOfDice()) {
+                j++;
+            } else {
+                j = 1;
+                i++;
+            }
+        }
         String err = Draw.startDrawingStoppedDice(name, diceConfig, diceResult);
         if (err != null && err.length() > 0) {
             TextView text = findViewById(R.id.rollResult);
