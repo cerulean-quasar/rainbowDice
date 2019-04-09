@@ -202,7 +202,7 @@ public class DiceResult {
         boolean isBegin = true;
         int i = 0;
         int j = 1;
-        int nbrResults = 0;
+        boolean allSymbolsWithValueOne = true;
         TreeMap<String, Integer> totalMap = new TreeMap<>();
         String number = "__cerulean_quasar_numeric_value__";
         StringBuilder resultString = new StringBuilder();
@@ -247,10 +247,10 @@ public class DiceResult {
                 if (nbrTimesOccurred != null) {
                     nbrTimesOccurred += value;
                     totalMap.put(symbol, nbrTimesOccurred);
+                    allSymbolsWithValueOne = false;
                 } else {
                     totalMap.put(symbol, value);
                 }
-                nbrResults++;
             }
             if (j < configs[i].getNumberOfDice()) {
                 j++;
@@ -262,10 +262,6 @@ public class DiceResult {
 
         StringBuilder totalString = new StringBuilder();
         isBegin = true;
-        boolean allSymbolsWithValueOne = true;
-        if (totalMap.size() != nbrResults) {
-            allSymbolsWithValueOne = false;
-        }
         for (Map.Entry<String, Integer> entry : totalMap.entrySet()) {
             Integer value = entry.getValue();
             boolean isAddOperation = true;
@@ -290,14 +286,12 @@ public class DiceResult {
             }
             if (entry.getKey().equals(number)) {
                 totalString.append(value);
-                allSymbolsWithValueOne = false;
             } else {
                 if (value == 1) {
                     totalString.append(entry.getKey());
                 } else {
                     totalString.append(String.format(Locale.getDefault(), "%d*%s",
                             value, entry.getKey()));
-                    allSymbolsWithValueOne = false;
                 }
             }
         }
@@ -337,7 +331,11 @@ public class DiceResult {
     void getResultsForDie(int i, int[] arr) {
         ArrayList<DieResult> res = diceResults.get(i);
         for (int j = 0; j < res.size(); j++) {
-            arr[j] = res.get(j).index();
+            Integer index = res.get(j).index();
+            if (index == null) {
+                index = 0;
+            }
+            arr[j] = index;
         }
     }
 }

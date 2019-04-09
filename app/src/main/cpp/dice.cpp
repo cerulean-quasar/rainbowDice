@@ -42,7 +42,7 @@ const float Vertex::MODE_CENTER_DISTANCE = 1.0f;
 
 float const DicePhysicsModel::errorVal = 0.15f;
 float const DicePhysicsModel::viscosity = 2.0f;
-float const DicePhysicsModel::radius = 0.2f;
+float const DicePhysicsModel::radius = 0.3f;
 float DicePhysicsModel::M_maxposx = 1.0f;
 float DicePhysicsModel::M_maxposy = 1.0f;
 float DicePhysicsModel::M_maxposz = 1.0f;
@@ -57,7 +57,7 @@ float const DicePhysicsModel::goingToStopAnimationTime = 0.2f; // seconds
 float const DicePhysicsModel::waitAfterDoneTime = 0.6f; // seconds
 
 // the radius of the dice after it has moved to the top of the screen.
-float const DicePhysicsModel::stoppedRadius = 0.15f;
+float const DicePhysicsModel::stoppedRadius = 0.2f;
 
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red

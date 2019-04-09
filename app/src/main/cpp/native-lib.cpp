@@ -117,11 +117,6 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
             throw std::runtime_error("Could not load dice models");
         }
         jint nbrSides = env->CallIntMethod(obj, mid);
-        handleJNIException(env);
-        if (nbrSides < 2) {
-            // dice is a constant - ignore this dice.
-            continue;
-        }
 
         // symbols
         std::vector<std::string> symbolsDiceVector;

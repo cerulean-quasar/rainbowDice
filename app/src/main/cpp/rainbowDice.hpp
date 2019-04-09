@@ -660,6 +660,10 @@ void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
 
     m_dice.clear();
     for (auto const &diceDescription : m_diceDescriptions) {
+        if (diceDescription->m_symbols.size() == 1) {
+            // Die is a constant... just ignore.
+            continue;
+        }
         for (int i = 0; i < diceDescription->m_nbrDice; i++) {
             loadObject(diceDescription->m_symbols, diceDescription->m_rerollOnIndices,
                        diceDescription->m_color);
