@@ -389,6 +389,11 @@ public class MainActivity extends AppCompatActivity {
         if (drawer != null) {
             return;
         }
+
+        Button resetView = findViewById(R.id.reset_view);
+        resetView.setBackground(getDrawable(R.drawable.drop_changes_grayscale));
+        resetView.setEnabled(false);
+
         ConfigurationFile configurationFile = new ConfigurationFile(this);
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();

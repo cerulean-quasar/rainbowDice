@@ -202,6 +202,7 @@ public class DiceResult {
         boolean isBegin = true;
         int i = 0;
         int j = 1;
+        int nbrResults = 0;
         TreeMap<String, Integer> totalMap = new TreeMap<>();
         String number = "__cerulean_quasar_numeric_value__";
         StringBuilder resultString = new StringBuilder();
@@ -249,6 +250,7 @@ public class DiceResult {
                 } else {
                     totalMap.put(symbol, value);
                 }
+                nbrResults++;
             }
             if (j < configs[i].getNumberOfDice()) {
                 j++;
@@ -260,6 +262,10 @@ public class DiceResult {
 
         StringBuilder totalString = new StringBuilder();
         isBegin = true;
+        boolean allSymbolsWithValueOne = true;
+        if (totalMap.size() != nbrResults) {
+            allSymbolsWithValueOne = false;
+        }
         for (Map.Entry<String, Integer> entry : totalMap.entrySet()) {
             Integer value = entry.getValue();
             boolean isAddOperation = true;
@@ -284,12 +290,14 @@ public class DiceResult {
             }
             if (entry.getKey().equals(number)) {
                 totalString.append(value);
+                allSymbolsWithValueOne = false;
             } else {
                 if (value == 1) {
                     totalString.append(entry.getKey());
                 } else {
                     totalString.append(String.format(Locale.getDefault(), "%d*%s",
                             value, entry.getKey()));
+                    allSymbolsWithValueOne = false;
                 }
             }
         }
@@ -308,7 +316,10 @@ public class DiceResult {
         if (m_isModifiedRoll) {
             name = "(modified roll) " + name;
         }
-        if (resultBeforeAdd.equals(resultAfterAdd)) {
+
+        if (resultBeforeAdd.equals(resultAfterAdd) || allSymbolsWithValueOne) {
+            // Only display the result one time.  The total before adding is the same as the string
+            // after adding or a reordering of the result afterwards.
             finalResult = String.format(Locale.getDefault(), resultFormat2, name, resultBeforeAdd);
         } else {
             finalResult = String.format(Locale.getDefault(), resultFormat, name, resultBeforeAdd, resultAfterAdd);

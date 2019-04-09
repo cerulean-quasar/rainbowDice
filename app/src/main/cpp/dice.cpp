@@ -321,7 +321,7 @@ bool DicePhysicsModel::updateModelMatrix() {
         glm::mat4 rotate = glm::toMat4(qTotalRotated);
         glm::mat4 translate = glm::translate(m_position);
         m_model = translate * rotate * scale;
-        return true;
+        return false;
     }
 
     float speed = glm::length(velocity);
@@ -405,11 +405,6 @@ bool DicePhysicsModel::updateModelMatrix() {
     if (!goingToStop) {
         float difference = glm::length(m_position - prevPosition);
         if (difference < 0.01f) {
-            needsRedraw = false;
-        } else if (difference > 0.5f) {
-            // the difference in position is too much.  To avoid jumping, just set the position to
-            // previous position and hopefully, next time it won't move so far.
-            m_position = prevPosition;
             needsRedraw = false;
         } else {
             prevPosition = m_position;
