@@ -47,16 +47,23 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
         jfloatArray jArrayTextureCoordsBottom,
         jbyteArray jbitmap) {
 
+    // delete all JNI local references that get allocated in a loop to avoid using them up.  We don't
+    // need to be too careful because the references will be freed at the end of the JNI call and
+    // JNI calls calling this function are not long lived.
+    auto deleter = [env](jobject localRefRaw) {
+        env->DeleteLocalRef(localRefRaw);
+    };
+
     std::vector<std::string> symbols;
     size_t nbrSymbols = static_cast<size_t>(env->GetArrayLength(jSymbols));
     handleJNIException(env);
     for (int i = 0; i < nbrSymbols; i++) {
-        jstring obj = (jstring)env->GetObjectArrayElement(jSymbols, i);
+        std::shared_ptr<_jstring> obj((jstring)env->GetObjectArrayElement(jSymbols, i), deleter);
         handleJNIException(env);
-        char const *csymbol = env->GetStringUTFChars(obj, 0);
+        char const *csymbol = env->GetStringUTFChars(obj.get(), 0);
         handleJNIException(env);
         std::string symbol(csymbol);
-        env->ReleaseStringUTFChars(obj, csymbol);
+        env->ReleaseStringUTFChars(obj.get(), csymbol);
         handleJNIException(env);
         symbols.push_back(symbol);
     }
@@ -101,38 +108,40 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
             textureCoordsTopBottom, std::move(bitmap), bitmapSize);
 
     // Load the models.
+    jclass jintegerclass = env->FindClass("java/lang/Integer");
+    handleJNIException(env);
     jint nbrDiceConfigs = env->GetArrayLength(jDiceConfigs);
     handleJNIException(env);
     std::vector<std::shared_ptr<DiceDescription>> dice;
     for (int i = 0; i < nbrDiceConfigs; i++) {
-        jobject obj = env->GetObjectArrayElement(jDiceConfigs, i);
+        std::shared_ptr<_jobject> obj(env->GetObjectArrayElement(jDiceConfigs, i), deleter);
         handleJNIException(env);
-        jclass diceConfigClass = env->GetObjectClass(obj);
+        std::shared_ptr<_jclass> diceConfigClass(env->GetObjectClass(obj.get()), deleter);
         handleJNIException(env);
 
         // number of symbols and values to expect
-        jmethodID mid = env->GetMethodID(diceConfigClass, "getNumberOfSides", "()I");
+        jmethodID mid = env->GetMethodID(diceConfigClass.get(), "getNumberOfSides", "()I");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
-        jint nbrSides = env->CallIntMethod(obj, mid);
+        jint nbrSides = env->CallIntMethod(obj.get(), mid);
 
         // symbols
         std::vector<std::string> symbolsDiceVector;
-        mid = env->GetMethodID(diceConfigClass, "getSymbolsString", "(I)Ljava/lang/String;");
+        mid = env->GetMethodID(diceConfigClass.get(), "getSymbolsString", "(I)Ljava/lang/String;");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
 
         for (int j = 0; j < nbrSides; j++) {
-            jstring jSymbolsDice = (jstring) env->CallObjectMethod(obj, mid, j);
+            std::shared_ptr<_jstring> jSymbolsDice((jstring) env->CallObjectMethod(obj.get(), mid, j), deleter);
             handleJNIException(env);
-            char const *cSymbolsDice = env->GetStringUTFChars(jSymbolsDice, 0);
+            char const *cSymbolsDice = env->GetStringUTFChars(jSymbolsDice.get(), 0);
             handleJNIException(env);
             std::string symbolsDice(cSymbolsDice);
-            env->ReleaseStringUTFChars(jSymbolsDice, cSymbolsDice);
+            env->ReleaseStringUTFChars(jSymbolsDice.get(), cSymbolsDice);
             handleJNIException(env);
 
             symbolsDiceVector.push_back(symbolsDice);
@@ -142,26 +151,24 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
         // config when the roll is done so that the java GUI can display the result, save it to the
         // log file, etc.
         std::vector<std::shared_ptr<int32_t>> values;
-        mid = env->GetMethodID(diceConfigClass, "getValues", "([Ljava/lang/Integer;)V");
+        mid = env->GetMethodID(diceConfigClass.get(), "getValues", "([Ljava/lang/Integer;)V");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
 
-        jclass jintegerclass = env->FindClass("java/lang/Integer");
+        std::shared_ptr<_jobjectArray> jvalueArray(env->NewObjectArray(nbrSides, jintegerclass, nullptr), deleter);
         handleJNIException(env);
-        jobjectArray jvalueArray = env->NewObjectArray(nbrSides, jintegerclass, nullptr);
-        handleJNIException(env);
-        env->CallVoidMethod(obj, mid, jvalueArray);
+        env->CallVoidMethod(obj.get(), mid, jvalueArray.get());
         handleJNIException(env);
 
         mid = env->GetMethodID(jintegerclass, "intValue", "()I");
         handleJNIException(env);
         for (int j = 0; j < nbrSides; j++) {
-            jobject jvalue = env->GetObjectArrayElement(jvalueArray, j);
+            std::shared_ptr<_jobject> jvalue(env->GetObjectArrayElement(jvalueArray.get(), j), deleter);
             handleJNIException(env);
             if (jvalue != nullptr) {
-                int32_t value = env->CallIntMethod(jvalue, mid);
+                int32_t value = env->CallIntMethod(jvalue.get(), mid);
                 handleJNIException(env);
                 values.push_back(std::make_shared<int32_t>(value));
             } else {
@@ -170,91 +177,91 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
         }
 
         // get the number of dice
-        mid = env->GetMethodID(diceConfigClass, "getNumberOfDice", "()I");
+        mid = env->GetMethodID(diceConfigClass.get(), "getNumberOfDice", "()I");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
-        jint nbrDice = env->CallIntMethod(obj, mid);
+        jint nbrDice = env->CallIntMethod(obj.get(), mid);
 
         // get reroll indices (into symbols vector
-        mid = env->GetMethodID(diceConfigClass, "getNbrIndicesReRollOn", "()I");
+        mid = env->GetMethodID(diceConfigClass.get(), "getNbrIndicesReRollOn", "()I");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
-        jint nbrIndicesRerollOn = env->CallIntMethod(obj, mid);
+        jint nbrIndicesRerollOn = env->CallIntMethod(obj.get(), mid);
         handleJNIException(env);
 
         std::vector<uint32_t> indicesRerollOn;
 
         if (nbrIndicesRerollOn > 0) {
-            jintArray jarrayindicesRerollOn = env->NewIntArray(nbrIndicesRerollOn);
+            std::shared_ptr<_jintArray> jarrayindicesRerollOn(env->NewIntArray(nbrIndicesRerollOn), deleter);
             handleJNIException(env);
 
-            mid = env->GetMethodID(diceConfigClass, "getReRollOn", "([I)V");
+            mid = env->GetMethodID(diceConfigClass.get(), "getReRollOn", "([I)V");
             handleJNIException(env);
             if (mid == 0) {
                 throw std::runtime_error("Could not load dice models");
             }
-            env->CallVoidMethod(obj, mid, jarrayindicesRerollOn);
+            env->CallVoidMethod(obj.get(), mid, jarrayindicesRerollOn.get());
             handleJNIException(env);
 
-            jint *jindicesRerollOn = env->GetIntArrayElements(jarrayindicesRerollOn, NULL);
+            jint *jindicesRerollOn = env->GetIntArrayElements(jarrayindicesRerollOn.get(), nullptr);
             handleJNIException(env);
             for (int i = 0; i < nbrIndicesRerollOn; i++) {
                 indicesRerollOn.push_back(jindicesRerollOn[i]);
             }
 
             // we don't want to copy back changes to the array so use JNI_ABORT mode.
-            env->ReleaseIntArrayElements(jarrayindicesRerollOn, jindicesRerollOn, JNI_ABORT);
+            env->ReleaseIntArrayElements(jarrayindicesRerollOn.get(), jindicesRerollOn, JNI_ABORT);
             handleJNIException(env);
         }
 
         // color
-        mid = env->GetMethodID(diceConfigClass, "isRainbow", "()Z");
+        mid = env->GetMethodID(diceConfigClass.get(), "isRainbow", "()Z");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
-        jboolean rainbow = env->CallBooleanMethod(obj, mid);
+        jboolean rainbow = env->CallBooleanMethod(obj.get(), mid);
         handleJNIException(env);
 
         std::vector<float> color;
         if (!rainbow) {
-            mid = env->GetMethodID(diceConfigClass, "getColor", "([F)Z");
+            mid = env->GetMethodID(diceConfigClass.get(), "getColor", "([F)Z");
             handleJNIException(env);
             if (mid == 0) {
                 throw std::runtime_error("Could not load dice models");
             }
 
             // the color is always 4 floats long
-            jfloatArray jarrayColor = env->NewFloatArray(4);
+            std::shared_ptr<_jfloatArray> jarrayColor(env->NewFloatArray(4), deleter);
             handleJNIException(env);
 
-            jboolean result = env->CallBooleanMethod(obj, mid, jarrayColor);
+            jboolean result = env->CallBooleanMethod(obj.get(), mid, jarrayColor.get());
             handleJNIException(env);
             if (result) {
-                jfloat *jcolor = env->GetFloatArrayElements(jarrayColor, nullptr);
+                jfloat *jcolor = env->GetFloatArrayElements(jarrayColor.get(), nullptr);
                 handleJNIException(env);
                 for (int i = 0; i < 4; i++) {
                     color.push_back(jcolor[i]);
                 }
 
                 // we don't want to copy back changes to the array so use JNI_ABORT mode.
-                env->ReleaseFloatArrayElements(jarrayColor, jcolor, JNI_ABORT);
+                env->ReleaseFloatArrayElements(jarrayColor.get(), jcolor, JNI_ABORT);
                 handleJNIException(env);
             }
         }
 
         // Is this dice config being added or subtracted?
-        mid = env->GetMethodID(diceConfigClass, "isAddOperation", "()Z");
+        mid = env->GetMethodID(diceConfigClass.get(), "isAddOperation", "()Z");
         handleJNIException(env);
         if (mid == 0) {
             throw std::runtime_error("Could not load dice models");
         }
 
-        bool isAddOperation = env->CallBooleanMethod(obj, mid);
+        bool isAddOperation = env->CallBooleanMethod(obj.get(), mid);
         handleJNIException(env);
 
         dice.push_back(std::make_shared<DiceDescription>(static_cast<uint32_t>(nbrDice),
@@ -266,6 +273,14 @@ std::pair<std::vector<std::shared_ptr<DiceDescription>>, std::shared_ptr<Texture
 
 std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults,
         std::vector<std::shared_ptr<DiceDescription>> const &dice) {
+
+    // delete all JNI local references that get allocated in a loop to avoid using them up.  We don't
+    // need to be too careful because the references will be freed at the end of the JNI call and
+    // JNI calls calling this function are not long lived.
+    auto deleter = [env](jobject localRefRaw) {
+        env->DeleteLocalRef(localRefRaw);
+    };
+
     std::vector<std::vector<uint32_t>> diceResults;
 
     jclass diceResultsClass = env->GetObjectClass(jDiceResults);
@@ -302,18 +317,18 @@ std::vector<std::vector<uint32_t>> initResults(JNIEnv *env, jobject jDiceResults
         std::vector<uint32_t> resultsForDie;
         uint32_t nbrResultsForDie = env->CallIntMethod(jDiceResults, midNbrResultsForDie, i);
         handleJNIException(env);
-        jintArray jArrayResultsForDie = env->NewIntArray(nbrResultsForDie);
+        std::shared_ptr<_jintArray> jArrayResultsForDie(env->NewIntArray(nbrResultsForDie), deleter);
         handleJNIException(env);
 
-        env->CallVoidMethod(jDiceResults, midResultsForDie, i, jArrayResultsForDie);
+        env->CallVoidMethod(jDiceResults, midResultsForDie, i, jArrayResultsForDie.get());
         handleJNIException(env);
-        jint *jresultsForDie = env->GetIntArrayElements(jArrayResultsForDie, NULL);
+        jint *jresultsForDie = env->GetIntArrayElements(jArrayResultsForDie.get(), NULL);
         handleJNIException(env);
         for (uint32_t i = 0; i < nbrResultsForDie; i++) {
             resultsForDie.push_back(jresultsForDie[i]);
         }
         // we don't want to copy back changes to the array so use JNI_ABORT mode.
-        env->ReleaseIntArrayElements(jArrayResultsForDie, jresultsForDie, JNI_ABORT);
+        env->ReleaseIntArrayElements(jArrayResultsForDie.get(), jresultsForDie, JNI_ABORT);
         handleJNIException(env);
 
         diceResults.push_back(resultsForDie);
@@ -695,34 +710,44 @@ void Notify::sendError(std::string const &error) {
 }
 
 void Notify::sendError(char const *error) {
-    jclass notifyClass = m_env->GetObjectClass(m_notify);
+    auto env = m_env;
+    auto deleter = [env](jobject localRefRaw) {
+        env->DeleteLocalRef(localRefRaw);
+    };
 
-    jmethodID midSend = m_env->GetMethodID(notifyClass, "sendError", "(Ljava/lang/String;)V");
+    std::shared_ptr<_jclass> notifyClass(m_env->GetObjectClass(m_notify), deleter);
+
+    jmethodID midSend = m_env->GetMethodID(notifyClass.get(), "sendError", "(Ljava/lang/String;)V");
     if (midSend == nullptr) {
         // do not throw because we could already be in a section catching exceptions
         return;
     }
 
-    jstring jerror = m_env->NewStringUTF(error);
-    m_env->CallVoidMethod(m_notify, midSend, jerror);
+    std::shared_ptr<_jstring> jerror(m_env->NewStringUTF(error), deleter);
+    m_env->CallVoidMethod(m_notify, midSend, jerror.get());
 }
 
 void Notify::sendGraphicsDescription(GraphicsDescription const &description,
                                      bool hasLinearAcceleration, bool hasGravity,
                                      bool hasAccelerometer) {
-    jclass notifyClass = m_env->GetObjectClass(m_notify);
+    auto env = m_env;
+    auto deleter = [env](jobject localRefRaw) {
+        env->DeleteLocalRef(localRefRaw);
+    };
 
-    jmethodID midSend = m_env->GetMethodID(notifyClass, "sendGraphicsDescription",
+    std::shared_ptr<_jclass> notifyClass(m_env->GetObjectClass(m_notify), deleter);
+
+    jmethodID midSend = m_env->GetMethodID(notifyClass.get(), "sendGraphicsDescription",
             "(ZZZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     if (midSend == nullptr) {
         throw std::runtime_error("Could not send graphics description message.");
     }
 
-    jstring jgraphics = m_env->NewStringUTF(description.m_graphicsName.c_str());
-    jstring jversion = m_env->NewStringUTF(description.m_version.c_str());
-    jstring jdeviceName = m_env->NewStringUTF(description.m_deviceName.c_str());
+    std::shared_ptr<_jstring> jgraphics(m_env->NewStringUTF(description.m_graphicsName.c_str()), deleter);
+    std::shared_ptr<_jstring> jversion(m_env->NewStringUTF(description.m_version.c_str()), deleter);
+    std::shared_ptr<_jstring> jdeviceName(m_env->NewStringUTF(description.m_deviceName.c_str()), deleter);
     m_env->CallVoidMethod(m_notify, midSend, hasLinearAcceleration, hasGravity, hasAccelerometer,
-            description.m_isVulkan, jgraphics, jversion, jdeviceName);
+            description.m_isVulkan, jgraphics.get(), jversion.get(), jdeviceName.get());
 }
 
 void Notify::sendSelected(bool diceSelected) {

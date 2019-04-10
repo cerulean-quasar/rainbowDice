@@ -285,6 +285,9 @@ public:
 
     bool rerollSelected() override {
         bool hasResult = RainbowDiceGraphics::rerollSelected();
+        // in case the number of dice changed.  It could happen if we're not displaying rolling dice
+        // and the die being rerolled hits a face that requires a die to be added and rerolled.
+        initializeCommandBuffers();
         for (auto const &dice : m_dice) {
             for (auto const &die : dice) {
                 die->updateUniformBuffer(m_projWithPreTransform, m_view);

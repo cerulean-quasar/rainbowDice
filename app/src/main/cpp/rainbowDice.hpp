@@ -771,11 +771,16 @@ bool RainbowDiceGraphics<DiceType>::rerollSelected() {
             }
         }
     }
-    if (!m_drawRollingDice) {
-        moveDiceToStoppedPositions();
-        return true;
-    } else {
+
+    if (m_drawRollingDice) {
         return false;
+    } else {
+        moveDiceToStoppedPositions();
+        while (needsReroll()) {
+            addRerollDice(true);
+            moveDiceToStoppedPositions();
+        }
+        return true;
     }
 }
 
@@ -805,6 +810,12 @@ bool RainbowDiceGraphics<DiceType>::addRerollSelected() {
     } else {
         // just display the result
         moveDiceToStoppedPositions();
+
+        // auto reroll if a die lands on a face that was configured for re-roll.
+        while (needsReroll()) {
+            addRerollDice(true);
+            moveDiceToStoppedPositions();
+        }
         return true;
     }
 }
