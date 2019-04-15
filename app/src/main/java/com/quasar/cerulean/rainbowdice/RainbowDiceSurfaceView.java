@@ -50,14 +50,14 @@ public class RainbowDiceSurfaceView extends SurfaceView {
     private GestureDetector gestureDetector;
     private ScaleGestureDetector scaleGestureDetector;
 
-    RainbowDiceSurfaceView(Context ctx) {
+    public RainbowDiceSurfaceView(Context ctx) {
         super(ctx);
         m_ctx = ctx;
         gestureDetector = new GestureDetector(ctx, new GestureListener());
         scaleGestureDetector = new ScaleGestureDetector(ctx, new ScaleGesterListener());
     }
 
-    RainbowDiceSurfaceView(Context ctx, AttributeSet attrs) {
+    public RainbowDiceSurfaceView(Context ctx, AttributeSet attrs) {
         super(ctx, attrs);
         m_ctx = ctx;
         gestureDetector = new GestureDetector(ctx, new GestureListener());
