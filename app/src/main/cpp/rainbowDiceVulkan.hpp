@@ -70,9 +70,11 @@ public:
         m_poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         m_poolSizes[2].descriptorCount = m_numberOfDescriptorSetsInPool;
         m_poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        m_poolInfo.flags = 0;
         m_poolInfo.poolSizeCount = static_cast<uint32_t>(m_poolSizes.size());
         m_poolInfo.pPoolSizes = m_poolSizes.data();
         m_poolInfo.maxSets = m_numberOfDescriptorSetsInPool;
+        m_poolInfo.pNext = nullptr;
 
         createDescriptorSetLayout();
     }

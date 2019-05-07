@@ -104,11 +104,14 @@ void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface,
 #ifdef CQ_ENABLE_VULKAN
     if (m_tryVulkan) {
         try {
-            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(std::move(surface), inDrawRollingDice);
+            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(surface, inDrawRollingDice);
         } catch (std::runtime_error &e) {
+            m_diceGraphics.reset();
             m_tryVulkan = false;
         }
     }
+#else
+    m_tryVulkan = false;
 #endif
 
     if (!m_tryVulkan) {
@@ -137,17 +140,19 @@ void DiceWorker::waitingLoop() {
             }
         }
 
-        if (nbrRequireRedraw > 0) {
-            m_diceGraphics->drawFrame();
-        }
+        if (m_diceGraphics->hasDice()) {
+            if (nbrRequireRedraw > 0) {
+                m_diceGraphics->drawFrame();
+            }
 
-        while (!m_diceGraphics->allStopped()) {
-            std::shared_ptr<DrawEvent> eventDrawing = drawingLoop();
-            if (eventDrawing != nullptr) {
-                if (eventDrawing->type() == DrawEvent::stopDrawing) {
-                    return;
-                } else {
-                    (*eventDrawing)(m_diceGraphics, m_notify);
+            while (!m_diceGraphics->allStopped()) {
+                std::shared_ptr<DrawEvent> eventDrawing = drawingLoop();
+                if (eventDrawing != nullptr) {
+                    if (eventDrawing->type() == DrawEvent::stopDrawing) {
+                        return;
+                    } else {
+                        (*eventDrawing)(m_diceGraphics, m_notify);
+                    }
                 }
             }
         }

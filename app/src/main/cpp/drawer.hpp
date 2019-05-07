@@ -413,9 +413,7 @@ public:
                 }
             }
         }
-#ifndef CQ_ENABLE_VULKAN
-        m_tryVulkan = false;
-#endif
+
         initDiceGraphics(std::move(inSurface), inUseGravity, inDrawRollingDice);
         m_notify->sendGraphicsDescription(m_diceGraphics->graphicsDescription(),
                                           whichSensors.test(Sensors::LINEAR_ACCELERATION_SENSOR),
