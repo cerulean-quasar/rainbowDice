@@ -210,9 +210,13 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                     return;
                 }
 
+                String string = s.toString();
+                if (string.isEmpty()) {
+                    return;
+                }
+
                 DieConfiguration cfg = diceConfigs.get(configBeingEdited).config;
 
-                String string = s.toString();
                 int nbrSides;
                 if (DieSideConfiguration.isNumeric(string)) {
                     nbrSides = Integer.decode(string);
@@ -225,6 +229,7 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
                 }
 
                 cfg.setNumberOfSides(nbrSides);
+                editConfig(configBeingEdited, true, false);
                 repopulateCurrentListItemFromConfig();
             }
 
@@ -881,6 +886,10 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
     }
 
     private void editConfig(int i, boolean isOtherButton) {
+        editConfig(i, isOtherButton, isOtherButton);
+    }
+
+    private void editConfig(int i, boolean isOtherButton, boolean setupOtherButton) {
         configBeingEdited = i;
         DieConfiguration config = diceConfigs.get(i).config;
         boolean newPanelIsConstant = config.getNumberOfSides() == 1;
@@ -895,9 +904,11 @@ public class DiceCustomizationActivity extends AppCompatActivity implements Adap
         if (isOtherButton) {
             // the "other" button is pressed.  Populate the associated edit text with
             // the number of sides and enable it.
-            other.setEnabled(true);
-            other.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfSides()));
-            info = diceSidesInfos[OTHER_BUTTON_INDEX];
+            if (setupOtherButton) {
+                other.setText(String.format(Locale.getDefault(), "%d", config.getNumberOfSides()));
+                other.setEnabled(true);
+                info = diceSidesInfos[OTHER_BUTTON_INDEX];
+            }
         } else {
             other.setEnabled(false);
         }
