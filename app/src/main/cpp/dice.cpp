@@ -856,16 +856,30 @@ void DiceModelHedron::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
     }
 }
 
+float DiceModelHedron::p0ycoord(glm::vec3 const &q, glm::vec3 const &r) {
+    float hypotenuseSquared = glm::dot(q-r, q-r);
+
+    // if the y coord of p0 is less than 0.75f, then just use 0.75f.  hypotenuse squared can't be
+    // less than 1 because that is the radius of the die (in the longest way in the x and z plane).
+    if (hypotenuseSquared - 1 < 0.5625f) {
+        return 0.75f;
+    }
+
+    float height = glm::sqrt(hypotenuseSquared - 1);
+
+    return height;
+}
+
 void DiceModelHedron::topCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i) {
-    p0 = {0.0f, 1.0f, 0.0f};
     q = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
     r = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
+    p0 = {0.0f, p0ycoord(q, r), 0.0f};
 }
 
 void DiceModelHedron::bottomCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i) {
-    p0 = {0.0f, -1.0f, 0.0f};
     q = {glm::cos(4*i*pi/numberFaces), 0.0f, glm::sin(4*i*pi/numberFaces)};
     r = {glm::cos(4.0f*((i+1)%(numberFaces/2))*pi/numberFaces), 0.0f, glm::sin(4*((i+1)%(numberFaces/2))*pi/numberFaces)};
+    p0 = {0.0f, -p0ycoord(q, r), 0.0f};
 }
 
 void DiceModelHedron::addVertices(std::shared_ptr<TextureAtlas> const &textAtlas,

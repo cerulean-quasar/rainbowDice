@@ -345,6 +345,8 @@ class DiceModelHedron : public DicePhysicsModel {
 private:
     static float const rotateThreshold;
     std::vector<bool> rotated;
+
+    float p0ycoord(glm::vec3 const &q, glm::vec3 const &r);
 protected:
     void addVertices(std::shared_ptr<TextureAtlas> const &textAtlas,
                      glm::vec3 const &p0, glm::vec3 const &q, glm::vec3 const &r,
