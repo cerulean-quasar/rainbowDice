@@ -154,7 +154,7 @@ void main() {
 
         float ambientFactor = 0.3;
         if (isSelected > 0) {
-            ambientFactor = 1.0f;
+            ambientFactor = 1.0;
         }
         vec3 ambient = ambientFactor * color;
         gl_FragColor = vec4(ambient + diffuse + specular, alpha);
