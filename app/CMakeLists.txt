@@ -47,6 +47,7 @@ find_library( # Sets the name of the path variable.
 include_directories(${ANDROID_NDK}/sysroot/usr/include/android)
 include_directories(${ANDROID_NDK}/sources/third_party/vulkan/src/libs)
 include_directories(APP_GLUE_DIR ${ANDROID_NDK}/sources/android/native_app_glue)
+include_directories(/opt/glm-0.9.9.5/glm)
 set(CQ_COMPILE_FLAGS)
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
     list(APPEND CQ_COMPILE_FLAGS -DDEBUG)

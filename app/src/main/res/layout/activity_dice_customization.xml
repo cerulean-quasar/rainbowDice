@@ -13,7 +13,7 @@
         android:layout_height="wrap_content">
         <include layout="@layout/customization_dice_list"/>
     </HorizontalScrollView>
-    <android.support.constraint.ConstraintLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
         <include layout="@layout/customization_main"/>
@@ -163,5 +163,5 @@
             app:layout_constraintRight_toRightOf="parent"
             android:onClick="onDelete">
         </Button>
-    </android.support.constraint.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </LinearLayout>
