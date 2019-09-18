@@ -135,10 +135,12 @@ void DicePhysicsModel::resetPosition() {
     angularVelocity.setAngularSpeed(0);
     angularVelocity.setSpinAxis(glm::vec3(0.0f, 0.0f, 1.0f));
 
+    glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
+    m_model = scale;
+
     randomizeUpFace();
     checkQuaternion(qTotalRotated);
 
-    glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, radius));
     glm::mat4 rotate = glm::toMat4(qTotalRotated);
     glm::mat4 translate = glm::translate(glm::mat4(1.0f), m_position);
     m_model = translate * rotate * scale;
