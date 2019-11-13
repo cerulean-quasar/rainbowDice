@@ -19,15 +19,20 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.content.res.TypedArray;
 import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Parcelable;
+
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.TypedValue;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -35,6 +40,8 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -43,6 +50,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Locale;
 
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
@@ -210,7 +218,133 @@ public class MainActivity extends AppCompatActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.dice_menu, menu);
+
+        int bonus = (new DiceConfigurationManager(this)).bonus();
+        MenuItem item = menu.findItem(R.id.addBonusItem).setTitle(
+                String.format(Locale.getDefault(), getResources().getString(R.string.bonusReadOut), bonus));
         return true;
+    }
+
+    public void onBonusClick(MenuItem item) {
+        LinearLayout layout = findViewById(R.id.activity_main_top_level);
+        LayoutInflater inflater = getLayoutInflater();
+
+        final LinearLayout bonusView = (LinearLayout) inflater.inflate(
+                R.layout.add_bonus_dialog, layout, false);
+
+        final DiceConfigurationManager config = new DiceConfigurationManager(MainActivity.this);
+        int bonus = config.bonus();
+
+        EditText bonusEdit = bonusView.findViewById(R.id.bonusValue);
+        bonusEdit.setText(String.format(Locale.getDefault(), "%d", bonus));
+        final Dialog bonusDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.bonusDialogTitle).setView(bonusView).show();
+
+        Button button = bonusView.findViewById(R.id.cancelBonus);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                bonusDialog.dismiss();
+            }
+        });
+
+        button = bonusView.findViewById(R.id.okBonus);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                CheckBox ck = bonusView.findViewById(R.id.currentRoll);
+                boolean currentRoll = ck.isChecked();
+                ck = bonusView.findViewById(R.id.futureRoll);
+                boolean futureRolls = ck.isChecked();
+
+                // Ignore ok button click if no options are clicked
+                if (!currentRoll && !futureRolls) {
+                    return;
+                }
+
+                EditText bonusEdit = bonusView.findViewById(R.id.bonusValue);
+
+                // Ignore ok button click if the bonus text value is empty.
+                String bonusString = bonusEdit.getText().toString();
+                if (bonusString.isEmpty()) {
+                    return;
+                }
+
+                int bonusValue = Integer.valueOf(bonusString);
+
+                if (bonusValue != 0 && currentRoll) {
+                    LogFile.LogItem logitem = null;
+                    int logFileSize = logFile.size();
+                    if (logFileSize > 0) {
+                        logitem = logFile.getCopy(logFileSize - 1);
+                    }
+
+                    if (logitem != null && logitem.getVersion() >= 1) {
+                        DiceResult result = logitem.getRollResults();
+                        result.addBonus(bonusValue);
+
+                        DieConfiguration[] diceConfig = logitem.getDiceConfiguration();
+                        String diceName = logitem.getDiceName();
+                        TextView text = findViewById(R.id.rollResult);
+                        text.setText(result.generateResultsString(diceConfig, diceName, MainActivity.this));
+
+                        logFile.addRoll(diceName, result, diceConfig);
+                    }
+                }
+
+                if (futureRolls) {
+                    config.setBonus(bonusValue);
+                    config.save();
+                    invalidateOptionsMenu();
+                }
+
+                bonusDialog.dismiss();
+            }
+        });
+
+        class OnToggleCheckboxListenerCreator {
+            public OnToggleCheckboxListenerCreator() { }
+
+            public View.OnClickListener getOnToggleCheckboxListener() {
+                return new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        CheckBox ck = bonusView.findViewById(R.id.currentRoll);
+                        boolean currentRoll = ck.isChecked();
+                        ck = bonusView.findViewById(R.id.futureRoll);
+                        boolean futureRolls = ck.isChecked();
+
+                        Button button = bonusView.findViewById(R.id.okBonus);
+
+                        // Ignore ok button click if no options are clicked
+                        if (!currentRoll && !futureRolls) {
+                            button.setEnabled(false);
+                            button.setClickable(false);
+
+                            int[] attrs = {R.attr.textDisabledColor};
+                            TypedArray ta = obtainStyledAttributes(attrs);
+                            button.setTextColor(ta.getColor(0, 0xff505050));
+                            ta.recycle();
+                        } else {
+                            button.setEnabled(true);
+                            button.setClickable(true);
+
+                            int[] attrs = {android.R.attr.textColor};
+                            TypedArray ta = obtainStyledAttributes(attrs);
+                            button.setTextColor(ta.getColor(0, 0xff505050));
+                            ta.recycle();
+                        }
+                    }
+                };
+            }
+        }
+
+        OnToggleCheckboxListenerCreator cr = new OnToggleCheckboxListenerCreator();
+        CheckBox ck = bonusView.findViewById(R.id.currentRoll);
+        ck.setOnClickListener(cr.getOnToggleCheckboxListener());
+
+        ck = bonusView.findViewById(R.id.futureRoll);
+        ck.setOnClickListener(cr.getOnToggleCheckboxListener());
     }
 
     public void onConfigure(MenuItem item) {
@@ -311,10 +445,7 @@ public class MainActivity extends AppCompatActivity {
         result.diceConfig = item.getDiceConfiguration();
 
         text.setText(result.diceResult.generateResultsString(result.diceConfig,
-                result.name,
-                getString(R.string.diceMessageResult),
-                getString(R.string.diceMessageResult2),
-                getString(R.string.addition), getString(R.string.subtraction)));
+                result.name, this));
         return result;
     }
 
@@ -342,7 +473,6 @@ public class MainActivity extends AppCompatActivity {
         int count = configurationFile.getDiceList().size();
 
         if (count == 0) {
-            String[] jsonStrings = new String[5];
             String filename;
             // There are no favorites or dice configuration defaults.  Add a few example dice
             // configurations.
@@ -518,6 +648,10 @@ public class MainActivity extends AppCompatActivity {
 
                 Parcelable[] diceConfigParcels =
                         data.getParcelableArray(DiceDrawerReturnChannel.diceConfigMsg);
+                if (diceConfigParcels == null || results == null) {
+                    // these values should always be there.
+                    return true;
+                }
                 DieConfiguration[] diceConfig = new DieConfiguration[diceConfigParcels.length];
                 for (int i = 0; i < diceConfigParcels.length; i++) {
                     diceConfig[i] = (DieConfiguration)diceConfigParcels[i];
@@ -533,15 +667,17 @@ public class MainActivity extends AppCompatActivity {
                     isModifiedRoll = data.getBoolean(DiceDrawerReturnChannel.isModifiedRollMsg);
                 }
 
-                DiceResult diceResult = new DiceResult(results, diceConfig, isModifiedRoll);
+                DiceConfigurationManager configurationFile = new DiceConfigurationManager(
+                        MainActivity.this);
+
+                Integer bonusValue = configurationFile.bonus();
+                DiceResult diceResult = new DiceResult(results, diceConfig, isModifiedRoll, bonusValue);
 
                 // no dice need reroll, just update the results text view with the results.
                 logFile.addRoll(filename, diceResult, diceConfig);
                 drawingStarted = false;
                 text.setText(diceResult.generateResultsString(diceConfig, filename,
-                        getString(R.string.diceMessageResult),
-                        getString(R.string.diceMessageResult2),
-                        getString(R.string.addition), getString(R.string.subtraction)));
+                        MainActivity.this));
             }
             return true;
         }

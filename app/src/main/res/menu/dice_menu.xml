@@ -2,9 +2,14 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/addBonusItem"
+        android:title="@string/D1"
+        app:showAsAction="ifRoom"
+        android:onClick="onBonusClick"
+        />
+    <item
         android:id="@+id/updateMenuItem"
         android:title="@string/configureDice"
-        app:showAsAction="ifRoom"
         android:onClick="onConfigure"
         />
     <item

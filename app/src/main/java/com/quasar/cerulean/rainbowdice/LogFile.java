@@ -52,6 +52,13 @@ public class LogFile {
         private String diceRepresentation;
         private String rollResults;
 
+        public LogItemV0(LogItemV0 other) {
+            logTime = other.logTime;
+            diceName = other.diceName;
+            diceRepresentation = other.diceRepresentation;
+            rollResults = other.rollResults;
+        }
+
         public LogItemV0(JSONObject obj) throws JSONException {
             logTime = obj.getString(jsonTime);
             diceName = obj.getString(jsonDiceName);
@@ -101,6 +108,13 @@ public class LogFile {
         private DiceGroup dice;
         private DiceResult result;
 
+        public LogItemV1(LogItemV1 other) {
+            logTime = other.logTime;
+            diceName = other.diceName;
+            dice = new DiceGroup(other.dice.dieConfigurations());
+            result = new DiceResult(other.result);
+        }
+
         public LogItemV1(String inLogTime, String inDiceName, DieConfiguration[] inDice, DiceResult inResult) {
             logTime = inLogTime;
             diceName = inDiceName;
@@ -146,10 +160,7 @@ public class LogFile {
         public String getRollResultsString() {
             Resources res = ctx.getResources();
             return result.generateResultsString(dice.dieConfigurations(),
-                    diceName,
-                    res.getString(R.string.diceMessageResult),
-                    res.getString(R.string.diceMessageResult2),
-                    res.getString(R.string.addition), res.getString(R.string.subtraction));
+                    diceName, ctx);
         }
 
         @Override
@@ -258,6 +269,18 @@ public class LogFile {
 
     public LogItem get(int index) {
         return logItems.get(index);
+    }
+
+    public LogItem getCopy(int index) {
+        LogItem item = logItems.get(index);
+        int version = item.getVersion();
+        if (item.getVersion() == 1) {
+            return new LogItemV1((LogItemV1)item);
+        } else if (version == 0) {
+            return new LogItemV0((LogItemV0)item);
+        } else {
+            return null;
+        }
     }
 
     public int size() {

@@ -20,7 +20,7 @@
     <string name="favorites">Favorites:</string>
     <string name="configureDice">Reorder Dice</string>
     <string name="diceMessageRolling">Rolling&#8230;</string>
-    <string name="diceMessageResult">result: %s: %s = %s</string>
+    <string name="diceMessageResult">result: %s: %s%s = %s</string>
     <string name="diceMessageResult2">result: %s: %s</string>
     <string name="diceMessageToStartRolling">Shake while rolling</string>
     <string name="diceMessageReRoll">Shake while re-rolling required dice</string>
@@ -56,6 +56,13 @@
     <string name="recipes">Recipes</string>
     <string name="add">add</string>
     <string name="replace">replace</string>
+    <string name="bonusDialogTitle">To which rolls should the bonus apply?</string>
+    <string name="currentRoll">Current roll</string>
+    <string name="futureRoll">Future rolls</string>
+    <string name="bonus">bonus</string>
+    <string name="bonusReadOut">Bonus: %d</string>
+    <string name="addedBonuses">(added bonuses)</string>
+    <string name="addedBonus">(added bonus)</string>
     <string name="selectTheme">Theme:</string>
     <string name="graphicsAPIName">Graphics API:</string>
     <string name="graphicsAPIVersion">Graphics API version:</string>

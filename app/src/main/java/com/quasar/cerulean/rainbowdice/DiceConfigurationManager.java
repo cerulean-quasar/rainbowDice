@@ -8,9 +8,9 @@ import java.io.IOException;
 import java.util.LinkedList;
 
 public class DiceConfigurationManager {
-    Context ctx;
-    ConfigurationFile config;
-    LinkedList<String> diceFileList;
+    private Context ctx;
+    private ConfigurationFile config;
+    private LinkedList<String> diceFileList;
     public DiceConfigurationManager(Context inCtx) {
         ctx = inCtx;
         config = new ConfigurationFile(ctx);
@@ -95,6 +95,10 @@ public class DiceConfigurationManager {
     public String getTheme() {
         return config.getTheme();
     }
+
+    public int bonus() { return config.bonus(); }
+
+    public void setBonus(int inBonus) { config.setBonus(inBonus); }
 
     public void save() {
         config.writeFile();

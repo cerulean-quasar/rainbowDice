@@ -57,10 +57,7 @@ void Sensors::initSensors(std::bitset<3> inWhichSensors) {
         }
     }
 
-    m_looper = ALooper_forThread();
-    if (m_looper == nullptr) {
-        m_looper = ALooper_prepare(0);
-    }
+    m_looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
 
     if (m_looper == nullptr) {
         throw std::runtime_error("Could not initialize looper.");

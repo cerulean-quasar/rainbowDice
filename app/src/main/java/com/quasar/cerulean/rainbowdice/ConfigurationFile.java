@@ -49,12 +49,14 @@ public class ConfigurationFile {
     private static final String useLegacy = "useLegacy";
     private static final String useGravity = "useGravity";
     private static final String drawRollingDice = "drawRollingDice";
+    private static final String bonusValue = "bonusValue";
 
     private LinkedList<String> diceConfigList;
     private String themeName;
     private boolean m_useLegacy;
     private boolean m_useGravity;
     private boolean m_drawRollingDice;
+    private int m_bonus;
 
     private Context ctx;
 
@@ -65,6 +67,7 @@ public class ConfigurationFile {
         m_useGravity = true;
         m_useLegacy = false;
         m_drawRollingDice = true;
+        m_bonus = 0;
 
         StringBuilder json = new StringBuilder();
         try {
@@ -138,6 +141,10 @@ public class ConfigurationFile {
         if (obj.has(drawRollingDice)) {
             m_drawRollingDice = obj.getBoolean(drawRollingDice);
         }
+
+        if (obj.has(bonusValue)) {
+            m_bonus = obj.getInt(bonusValue);
+        }
     }
 
     public void writeFile() {
@@ -157,6 +164,7 @@ public class ConfigurationFile {
             obj.put(useLegacy, m_useLegacy);
             obj.put(useGravity, m_useGravity);
             obj.put(drawRollingDice, m_drawRollingDice);
+            obj.put(bonusValue, m_bonus);
 
             json = obj.toString();
         } catch (JSONException e) {
@@ -226,6 +234,10 @@ public class ConfigurationFile {
         return m_drawRollingDice;
     }
 
+    public int bonus() {
+        return m_bonus;
+    }
+
     public void setThemeName(String in) {
         themeName = in;
     }
@@ -240,5 +252,9 @@ public class ConfigurationFile {
 
     public void setDrawRollingDice(boolean in) {
         m_drawRollingDice = in;
+    }
+
+    public void setBonus(int in) {
+        m_bonus = in;
     }
 }

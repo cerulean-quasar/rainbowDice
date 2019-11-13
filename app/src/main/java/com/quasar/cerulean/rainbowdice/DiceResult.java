@@ -19,6 +19,9 @@
  */
 package com.quasar.cerulean.rainbowdice;
 
+import android.content.Context;
+import android.content.res.Resources;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -50,7 +53,16 @@ public class DiceResult {
         // is the result from a constant (D1 dice)?
         private boolean m_isConstant;
 
-        DieResult (String inSymbol, Integer inValue, Integer inDiceIndex, boolean inIsAddOperation, boolean inIsConstant) {
+        public DieResult(DieResult other) {
+            m_diceIndex = other.m_diceIndex;
+            m_value = other.m_value;
+            m_symbol = other.m_symbol;
+            m_isAddOperation = other.m_isAddOperation;
+            m_isConstant = other.m_isConstant;
+        }
+
+        public DieResult (String inSymbol, Integer inValue, Integer inDiceIndex,
+                          boolean inIsAddOperation, boolean inIsConstant) {
             m_symbol = inSymbol;
             m_value = inValue;
             m_diceIndex = inDiceIndex;
@@ -101,12 +113,33 @@ public class DiceResult {
     }
 
     private ArrayList<ArrayList<DieResult>> diceResults;
+    private ArrayList<Integer> m_bonuses;
     private boolean m_isModifiedRoll;
 
     private static final String modified_roll_name = "modified_roll";
     private static final String results_name = "results";
+    private static final String bonuses_name = "bonuses";
 
-    public DiceResult(DiceDrawerMessage result, DieConfiguration[] diceConfigurations, boolean isModifiedRoll) {
+    public DiceResult(DiceResult other) {
+        diceResults = new ArrayList<>();
+        for (ArrayList<DieResult> dieResults : other.diceResults) {
+            ArrayList<DieResult> dieResultsCopy = new ArrayList<>();
+            for (DieResult dieResult : dieResults) {
+                dieResultsCopy.add(new DieResult(dieResult));
+            }
+            diceResults.add(dieResultsCopy);
+        }
+
+        if (other.m_bonuses != null && !other.m_bonuses.isEmpty()) {
+            m_bonuses = new ArrayList<>();
+            m_bonuses.addAll(other.m_bonuses);
+        }
+
+        m_isModifiedRoll = other.m_isModifiedRoll;
+    }
+
+    public DiceResult(DiceDrawerMessage result, DieConfiguration[] diceConfigurations,
+                      boolean isModifiedRoll, Integer bonus) {
         m_isModifiedRoll = isModifiedRoll;
         diceResults = new ArrayList<>();
         LinkedList<LinkedList<Integer>> values = result.results();
@@ -129,6 +162,13 @@ public class DiceResult {
                 }
             }
         }
+
+        if (bonus != null && bonus != 0) {
+            m_bonuses = new ArrayList<>();
+            m_bonuses.add(bonus);
+        } else {
+            m_bonuses = null;
+        }
     }
 
     private ArrayList<DieResult> getResultForIndex(LinkedList<Integer> values, DieConfiguration die, boolean isAddOperation) {
@@ -150,14 +190,25 @@ public class DiceResult {
 
     public JSONObject toJSON() throws JSONException {
         JSONObject obj = new JSONObject();
-        JSONArray arr = toJSONArray();
+        JSONArray arr = toDiceResultsJSONArray();
+        if (m_bonuses != null && !m_bonuses.isEmpty()) {
+            JSONArray arrBonuses = new JSONArray();
+            for (Integer bonus : m_bonuses) {
+                if (bonus != 0) {
+                    arrBonuses.put(bonus);
+                }
+            }
+            if (arrBonuses.length() != 0) {
+                obj.put(bonuses_name, arrBonuses);
+            }
+        }
         obj.put(results_name, arr);
         obj.put(modified_roll_name, m_isModifiedRoll);
 
         return obj;
     }
 
-    public JSONArray toJSONArray() throws JSONException {
+    public JSONArray toDiceResultsJSONArray() throws JSONException {
         JSONArray arrDiceResults = new JSONArray();
         for (ArrayList<DieResult> diceResult : diceResults) {
             JSONArray arrDiceResult = new JSONArray();
@@ -174,12 +225,23 @@ public class DiceResult {
     public DiceResult(JSONArray arr) throws JSONException {
         diceResults = diceResultsFromJsonArray(arr);
         m_isModifiedRoll = false;
+        m_bonuses = null;
     }
 
     public DiceResult(JSONObject obj) throws JSONException {
         JSONArray arr = obj.getJSONArray(results_name);
         diceResults = diceResultsFromJsonArray(arr);
         m_isModifiedRoll = obj.getBoolean(modified_roll_name);
+        if (obj.has(bonuses_name)) {
+            JSONArray arrBonuses = obj.getJSONArray(bonuses_name);
+            m_bonuses = new ArrayList<>();
+            for (int i = 0; i < arrBonuses.length(); i++) {
+                Integer bonus = arrBonuses.getInt(i);
+                m_bonuses.add(bonus);
+            }
+        } else {
+            m_bonuses = null;
+        }
     }
 
     private ArrayList<ArrayList<DieResult>> diceResultsFromJsonArray(JSONArray arr) throws JSONException {
@@ -198,16 +260,54 @@ public class DiceResult {
         return res;
     }
 
-    public String generateResultsString(DieConfiguration[] configs, String name, String resultFormat,
-                                        String resultFormat2,
-                                        String addition, String subtraction) {
-        boolean isBegin = true;
+    public String generateResultsString(DieConfiguration[] configs, String name, Context ctx) {
+        Resources res = ctx.getResources();
+        String addition = res.getString(R.string.addition);
+        String subtraction = res.getString(R.string.subtraction);
+
+        // Build the bonuses string
+        StringBuilder bonusesString = null;
+        int totalBonus = 0;
+        if (m_bonuses != null && !m_bonuses.isEmpty()) {
+            bonusesString = new StringBuilder();
+            boolean isBegin = true;
+            boolean needsParenthesis = m_bonuses.size() > 1;
+            if (needsParenthesis) {
+                bonusesString.append(res.getString(R.string.addedBonuses));
+                bonusesString.append('(');
+            } else {
+                bonusesString.append(res.getString(R.string.addedBonus));
+            }
+            for (Integer bonus : m_bonuses) {
+                totalBonus +=  bonus;
+                if (isBegin) {
+                    isBegin = false;
+                } else {
+                    if (bonus < 0) {
+                        bonusesString.append(subtraction);
+                        bonus = -bonus;
+                    } else {
+                        bonusesString.append(addition);
+                    }
+                }
+                bonusesString.append(bonus);
+            }
+            if (needsParenthesis) {
+                bonusesString.append(')');
+            }
+        }
+
+        // Build the dice results string
+        boolean isBegin = (bonusesString == null);
         int i = 0;
         int j = 1;
         boolean allSymbolsWithValueOne = true;
         TreeMap<String, Integer> totalMap = new TreeMap<>();
         String number = "__cerulean_quasar_numeric_value__";
         StringBuilder resultString = new StringBuilder();
+        if (totalBonus != 0) {
+            totalMap.put(number, totalBonus);
+        }
         for (ArrayList<DieResult> dieResults : diceResults) {
             for (DieResult dieResult : dieResults) {
                 String symbol = dieResult.m_symbol;
@@ -310,27 +410,36 @@ public class DiceResult {
 
         String finalResult;
         if (m_isModifiedRoll) {
-            name = "(modified roll) " + name;
+            name = res.getString(R.string.modifiedRoll) + name;
         }
 
-        if (resultBeforeAdd.equals(resultAfterAdd) || allSymbolsWithValueOne) {
+        if (bonusesString == null && (resultBeforeAdd.equals(resultAfterAdd) || allSymbolsWithValueOne)) {
             // Only display the result one time.  The total before adding is the same as the string
             // after adding or a reordering of the result afterwards.
+            String resultFormat2 = res.getString(R.string.diceMessageResult2);
             finalResult = String.format(Locale.getDefault(), resultFormat2, name, resultBeforeAdd);
         } else {
-            finalResult = String.format(Locale.getDefault(), resultFormat, name, resultBeforeAdd, resultAfterAdd);
+            String bonusesStringValue;
+            if (bonusesString != null) {
+                bonusesStringValue = bonusesString.toString();
+            } else {
+                bonusesStringValue = "";
+            }
+            String resultFormat = res.getString(R.string.diceMessageResult);
+            finalResult = String.format(Locale.getDefault(), resultFormat, name, bonusesStringValue,
+                    resultBeforeAdd, resultAfterAdd);
         }
 
         return finalResult.replace('\n', ' ');
     }
 
-    ArrayList<ArrayList<DieResult>> getDiceResults() {
+    public ArrayList<ArrayList<DieResult>> getDiceResults() {
         return diceResults;
     }
-    boolean isModifiedRoll() { return m_isModifiedRoll; }
-    int getNbrResults() { return diceResults.size(); }
-    int geNbrResultsForDie(int i) { return diceResults.get(i).size(); }
-    void getResultsForDie(int i, int[] arr) {
+    public boolean isModifiedRoll() { return m_isModifiedRoll; }
+    public int getNbrResults() { return diceResults.size(); }
+    public int geNbrResultsForDie(int i) { return diceResults.get(i).size(); }
+    public void getResultsForDie(int i, int[] arr) {
         ArrayList<DieResult> res = diceResults.get(i);
         for (int j = 0; j < res.size(); j++) {
             Integer index = res.get(j).index();
@@ -338,6 +447,16 @@ public class DiceResult {
                 index = 0;
             }
             arr[j] = index;
+        }
+    }
+
+    public void addBonus(Integer bonus) {
+        if (bonus != null && bonus != 0) {
+            if (m_bonuses == null) {
+                m_bonuses = new ArrayList<>();
+            }
+
+            m_bonuses.add(bonus);
         }
     }
 }
