@@ -48,6 +48,15 @@
                 android:onClick="onCheckboxClicked"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
+            <TextView
+                android:text="@string/reverseGravity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+            <CheckBox
+                android:id="@+id/reverseGravity"
+                android:onClick="onCheckboxClicked"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
         </GridLayout>
         <GridLayout
             android:columnCount="2"

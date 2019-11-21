@@ -100,11 +100,12 @@ DiceChannel &diceChannel() {
 }
 
 void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface,
-        bool inUseGravity, bool inDrawRollingDice) {
+        bool inUseGravity, bool inDrawRollingDice, bool reverseGravity) {
 #ifdef CQ_ENABLE_VULKAN
     if (m_tryVulkan) {
         try {
-            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(surface, inDrawRollingDice);
+            m_diceGraphics = std::make_unique<RainbowDiceVulkan>(surface, inDrawRollingDice,
+                    reverseGravity);
         } catch (std::runtime_error &e) {
             m_diceGraphics.reset();
             m_tryVulkan = false;
@@ -115,7 +116,8 @@ void DiceWorker::initDiceGraphics(std::shared_ptr<WindowType> surface,
 #endif
 
     if (!m_tryVulkan) {
-        m_diceGraphics = std::make_unique<RainbowDiceGL>(std::move(surface), inDrawRollingDice);
+        m_diceGraphics = std::make_unique<RainbowDiceGL>(std::move(surface), inDrawRollingDice,
+                reverseGravity);
     }
 }
 

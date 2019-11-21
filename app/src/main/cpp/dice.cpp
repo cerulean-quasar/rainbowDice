@@ -17,6 +17,17 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <cstring>
+#include <cerrno>
+#include <unistd.h>
+#include <limits>
+#include <chrono>
+#include <vector>
+#include <string>
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -29,35 +40,15 @@
 #include "dice.hpp"
 #include "rainbowDiceGlobal.hpp"
 #include "random.hpp"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <limits>
 
 const float Vertex::MODE_EDGE_DISTANCE = 0.0f;
 const float Vertex::MODE_CENTER_DISTANCE = 1.0f;
 
-float const DicePhysicsModel::errorVal = 0.15f;
-float const DicePhysicsModel::viscosity = 2.0f;
-float const DicePhysicsModel::radius = 0.3f;
 float DicePhysicsModel::M_maxposx = 1.0f;
 float DicePhysicsModel::M_maxposy = 1.0f;
 float DicePhysicsModel::M_maxposz = 1.0f;
-
-// Time for the stopped animation to complete
-float const DicePhysicsModel::stoppedAnimationTime = 0.5f; // seconds
-
-// Time it takes for stopped die to settle to being flat from a cocked position.
-float const DicePhysicsModel::goingToStopAnimationTime = 0.2f; // seconds
-
-// Time to wait after the dice settled flat before moving them to the top of the window.
-float const DicePhysicsModel::waitAfterDoneTime = 0.6f; // seconds
-
-// the radius of the dice after it has moved to the top of the screen.
-float const DicePhysicsModel::stoppedRadius = 0.2f;
+bool DicePhysicsModel::M_reverseGravity = false;
+glm::vec3 DicePhysicsModel::acceleration{0.0f, 0.0f, 9.8f};
 
 std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 0.0f}, // red
@@ -70,13 +61,8 @@ std::vector<glm::vec3> const DicePhysicsModel::colors = {
         {1.0f, 0.0f, 1.0f}  // purple
 };
 
-const float DiceModelHedron::rotateThreshold = 0.9f;
-const float DiceModelRhombicTriacontahedron::rotateThreshold = 0.9f;
-
-float const DicePhysicsModel::angularSpeedScaleFactor = 5.0f;
 float const AngularVelocity::maxAngularSpeed = 10.0f;
-const float pi = glm::acos(-1.0f);
-glm::vec3 DicePhysicsModel::acceleration{0.0f, 0.0f, 9.8f};
+float const pi = glm::acos(-1.0f);
 
 void checkQuaternion(glm::quat &q) {
     if (glm::length(q) == 0) {
@@ -91,15 +77,21 @@ bool Vertex::operator==(const Vertex& other) const {
     return pos == other.pos && color == other.color && texCoord == other.texCoord && normal == other.normal;
 }
 
-std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
+std::shared_ptr<DicePhysicsModel> DicePhysicsModel::createDice(std::vector<std::string> const &symbols,
         std::vector<float> const &color, bool isOpenGL) {
     std::shared_ptr<DicePhysicsModel> die;
     glm::vec3 position(0.0f, 0.0f, -1.0f);
     long nbrSides = symbols.size();
     if (nbrSides == 2) {
         die.reset(new DiceModelCoin(symbols, position, color, isOpenGL));
-    } else if (nbrSides == 4) {
+    } else if (nbrSides == 4 && M_reverseGravity) {
         die.reset(new DiceModelTetrahedron(symbols, position, color, isOpenGL));
+    } else if (nbrSides == 4 && !M_reverseGravity) {
+        // Use the octahedron model for the four sided dice if we are not reversing gravity
+        // so that we don't need to do something with the texture like put all textures on all the
+        // faces like real life 4 sided die have.  It would make the textures hard to read for
+        // anything other than numbers.
+        die.reset(new DiceModelHedron(symbols, position, color, 8, isOpenGL));
     } else if (nbrSides == 12) {
         die.reset(new DiceModelDodecahedron(symbols, position, color, isOpenGL));
     } else if (nbrSides == 20) {
@@ -236,7 +228,8 @@ bool DicePhysicsModel::updateModelMatrix() {
                          stoppedPositionX;
             m_position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
                          stoppedPositionY;
-            m_position.z = M_maxposz;
+            m_position.z = (M_maxposz - stoppedPositionZ) / stoppedAnimationTime * animationTime +
+                    stoppedPositionZ;
             glm::mat4 rotate;
             if (stoppedAngle != 0) {
                 glm::quat q = glm::angleAxis(stoppedAngle/stoppedAnimationTime*animationTime,
@@ -261,7 +254,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             glm::mat4 translate = glm::translate(m_position);
             m_model = translate * rotate * scale;
             return true;
-        } else if (goingToStopAnimationTime > stoppedRotateTime){
+        } else if (goingToStopAnimationTime > stoppedRotateTime) {
             // we need to animate the dice slowly settling to the floor.
             stoppedRotateTime += time;
             if (goingToStopAnimationTime < stoppedRotateTime) {
@@ -377,9 +370,13 @@ bool DicePhysicsModel::updateModelMatrix() {
 
     velocity += acceleration * time;
 
-    if ((m_position.z > M_maxposz || M_maxposz - m_position.z < errorVal) && fabs(velocity.z) < errorVal) {
+    if (M_reverseGravity && (m_position.z > M_maxposz || M_maxposz - m_position.z < errorVal) && fabs(velocity.z) < errorVal) {
         goingToStop = true;
+    } else if (!M_reverseGravity && (m_position.z < -M_maxposz || m_position.z + M_maxposz < errorVal) && fabs(velocity.z) < errorVal) {
+        goingToStop = true;
+    }
 
+    if (goingToStop) {
         upFace = calculateUpFace();
 
         // return the actual upFace index as opposed to index into the symbol array.  This is
@@ -392,7 +389,7 @@ bool DicePhysicsModel::updateModelMatrix() {
         velocity = {0.0f, 0.0f, 0.0f};
         stoppedPositionX = m_position.x;
         stoppedPositionY = m_position.y;
-        m_position.z = M_maxposz;
+        stoppedPositionZ = m_position.z;
     }
 
     if (angularVelocity.speed() != 0 && glm::length(angularVelocity.spinAxis()) > 0) {
@@ -558,7 +555,11 @@ void DicePhysicsModel::randomizeUpFace() {
 
     m_position.x = random.getFloat(-M_maxposx, M_maxposx);
     m_position.y = random.getFloat(-M_maxposy, M_maxposy);
-    m_position.z = -M_maxposz;
+    if (M_reverseGravity) {
+        m_position.z = -M_maxposz;
+    } else {
+        m_position.z = M_maxposz;
+    }
 
     prevPosition = m_position;
 

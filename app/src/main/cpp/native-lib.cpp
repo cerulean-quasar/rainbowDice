@@ -19,10 +19,11 @@
  */
 #include <string>
 #include <cstring>
+#include <vector>
 #include <looper.h>
 #include <native_window.h>
 #include <native_window_jni.h>
-#include <vector>
+#include <asset_manager_jni.h>
 #include "android.hpp"
 #include "native-lib.hpp"
 #include "drawer.hpp"
@@ -528,7 +529,8 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         jobject jnotify,
         jboolean juseGravity,
         jboolean jdrawRollingDice,
-        jboolean juseLegacy) {
+        jboolean juseLegacy,
+        jboolean jreverseGravity) {
 
     std::shared_ptr<Notify> notify;
     try {
@@ -555,7 +557,7 @@ Java_com_quasar_cerulean_rainbowdice_DiceWorker_startWorker(
         std::shared_ptr<WindowType> surface(window, deleter);
 
         //diceChannel().clearQueue();
-        DiceWorker worker(surface, notify, juseGravity, jdrawRollingDice, juseLegacy);
+        DiceWorker worker(surface, notify, juseGravity, jdrawRollingDice, juseLegacy, jreverseGravity);
         surface.reset();
         worker.waitingLoop();
     } catch (std::runtime_error &e) {

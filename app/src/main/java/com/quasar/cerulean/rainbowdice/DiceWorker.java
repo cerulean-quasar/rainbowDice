@@ -32,23 +32,27 @@ public class DiceWorker implements Runnable {
     private boolean m_useGravity;
     private boolean m_drawRollingDice;
     private boolean m_useLegacy;
+    private boolean m_reverseGravity;
 
     public DiceWorker(Handler inNotify, SurfaceHolder inSurfaceHolder, AssetManager inAssetManager,
-                      boolean useGravity, boolean drawRollingDice, boolean useLegacy) {
+                      boolean useGravity, boolean drawRollingDice, boolean useLegacy,
+                      boolean reverseGravity) {
         m_notify = new DiceDrawerReturnChannel(inNotify);
         m_surfaceHolder = inSurfaceHolder;
         m_assetManager = inAssetManager;
         m_useGravity = useGravity;
         m_drawRollingDice = drawRollingDice;
         m_useLegacy = useLegacy;
+        m_reverseGravity = reverseGravity;
     }
 
     public void run() {
         startWorker(m_surfaceHolder.getSurface(), m_assetManager, m_notify, m_useGravity,
-                    m_drawRollingDice, m_useLegacy);
+                    m_drawRollingDice, m_useLegacy, m_reverseGravity);
     }
 
     private native void startWorker(Surface jsurface, AssetManager jmanager,
                                     DiceDrawerReturnChannel jnotify, boolean useGravity,
-                                    boolean drawRollingDice, boolean useLegacy);
+                                    boolean drawRollingDice, boolean useLegacy,
+                                    boolean reverseGravity);
 }

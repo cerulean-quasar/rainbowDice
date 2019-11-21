@@ -135,6 +135,9 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         }
         ck.setChecked(configurationFile.drawRollingDice());
 
+        ck = findViewById(R.id.reverseGravity);
+        ck.setChecked(configurationFile.reverseGravity());
+
         if (graphicsAPIName != null) {
             TextView view = findViewById(R.id.graphicsAPIName);
             view.setText(graphicsAPIName);
@@ -225,6 +228,8 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
             case R.id.useLegacy:
                 configurationFile.setUseLegacy(checked);
                 break;
+            case R.id.reverseGravity:
+                configurationFile.setReverseGravity(checked);
         }
     }
 

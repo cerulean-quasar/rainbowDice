@@ -47,6 +47,7 @@
 #include "dice.hpp"
 #include "graphicsVulkan.hpp"
 #include "TextureAtlasVulkan.h"
+#include "../../../../../../Android/Sdk/ndk/20.0.5594570/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/memory"
 
 struct PerObjectFragmentVariables {
     int isSelected;
@@ -54,6 +55,8 @@ struct PerObjectFragmentVariables {
 
 VkVertexInputBindingDescription getBindingDescription();
 std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+VkVertexInputBindingDescription getBindingDescriptionOutlineSquare();
+std::vector<VkVertexInputAttributeDescription> getAttributeDescriptionsOutlineSquare();
 
 class DiceDescriptorSetLayout : public vulkan::DescriptorSetLayout {
 public:
@@ -63,6 +66,8 @@ public:
               m_poolInfo{},
               m_poolSizes{}
     {
+        // TODO: do we really need more than one poolSizes entry for VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER?
+        // just increase descriptorCount to 3 * m_numberOfDescriptorsSetsInPool
         m_poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         m_poolSizes[0].descriptorCount = m_numberOfDescriptorSetsInPool;
         m_poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -104,8 +109,116 @@ private:
     void createDescriptorSetLayout();
 };
 
+class DiceBoxDescriptorSetLayout : public vulkan::DescriptorSetLayout {
+public:
+    DiceBoxDescriptorSetLayout(std::shared_ptr<vulkan::Device> inDevice)
+            : m_device{std::move(inDevice)},
+              m_descriptorSetLayout{},
+              m_poolInfo{},
+              m_poolSizes{}
+    {
+        // The MVP matrices and view vector.  There are two descriptors per descriptor set, so
+        // multiply m_numberOfDescriptorSetsInPool by 2.
+        m_poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        m_poolSizes[0].descriptorCount = m_numberOfDescriptorSetsInPool * 2;
+        m_poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        m_poolInfo.flags = 0;
+        m_poolInfo.poolSizeCount = static_cast<uint32_t>(m_poolSizes.size());
+        m_poolInfo.pPoolSizes = m_poolSizes.data();
+        m_poolInfo.maxSets = m_numberOfDescriptorSetsInPool * 2;
+        m_poolInfo.pNext = nullptr;
+
+        createDescriptorSetLayout();
+    }
+
+    void updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
+                             std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
+                             std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet);
+
+    virtual std::shared_ptr<VkDescriptorSetLayout_T> const &descriptorSetLayout() {
+        return m_descriptorSetLayout;
+    }
+
+    virtual uint32_t numberOfDescriptors() { return m_numberOfDescriptorSetsInPool; }
+
+    virtual VkDescriptorPoolCreateInfo const &poolCreateInfo() {
+        return m_poolInfo;
+    }
+private:
+    static uint32_t constexpr m_numberOfDescriptorSetsInPool = 1;
+    std::shared_ptr<vulkan::Device> m_device;
+    std::shared_ptr<VkDescriptorSetLayout_T> m_descriptorSetLayout;
+    VkDescriptorPoolCreateInfo m_poolInfo;
+    std::array<VkDescriptorPoolSize, 1> m_poolSizes;
+
+    void createDescriptorSetLayout();
+};
+
 struct VulkanGraphics {
     using Buffer = std::shared_ptr<vulkan::Buffer>;
+};
+
+class DiceBoxVulkan : public DiceBox<VulkanGraphics> {
+public:
+    inline auto const &descriptorSet() { return m_descriptorSet; }
+
+    void updateUniformBuffer(glm::mat4 const &proj, glm::mat4 const &view) {
+        UniformBufferObject ubo;
+        ubo.proj = proj;
+        ubo.view = view;
+        ubo.model = glm::mat4(1.0f);
+        m_uniformBuffer->copyRawTo(&ubo, sizeof(ubo));
+    }
+
+    void updateMaxXYZ(float maxX, float maxY, float maxZ) override {
+        populateVerticesIndices(maxX, maxY, maxZ);
+
+        vulkan::updateArrayBuffer(m_device, m_commandPool, m_verticesDiceBox, m_vertexBuffer);
+    }
+
+    DiceBoxVulkan(std::shared_ptr<vulkan::Device> inDevice,
+               std::shared_ptr<DiceBoxDescriptorSetLayout> const &descriptorSetLayout,
+               std::shared_ptr<vulkan::DescriptorPools> const &descriptorPools,
+               std::shared_ptr<vulkan::CommandPool> commandPool,
+               std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
+               glm::mat4 const &proj,
+               glm::mat4 const &view,
+               float maxX,
+               float maxY,
+               float maxZ)
+            : DiceBox<VulkanGraphics>{maxX, maxY, maxZ},
+              m_device{std::move(inDevice)},
+              m_descriptorSet{descriptorPools->allocateDescriptor()},
+              m_uniformBuffer{vulkan::Buffer::createUniformBuffer(
+                      m_device, sizeof (UniformBufferObject))},
+              m_commandPool{std::move(commandPool)}
+    {
+        descriptorSetLayout->updateDescriptorSet(m_uniformBuffer, viewPointBuffer, m_descriptorSet);
+        m_vertexBuffer = createVertexBuffer(m_commandPool, m_verticesDiceBox);
+        m_indexBuffer = createIndexBuffer(m_commandPool, m_indicesDiceBox);
+        updateUniformBuffer(proj, view);
+    }
+
+    ~DiceBoxVulkan() override = default;
+private:
+    std::shared_ptr<vulkan::Device> m_device;
+
+    /* for passing data other than the vertex data to the vertex shader */
+    std::shared_ptr<vulkan::DescriptorSet> m_descriptorSet;
+    std::shared_ptr<vulkan::Buffer> m_uniformBuffer;
+    std::shared_ptr<vulkan::CommandPool> m_commandPool;
+
+    std::shared_ptr<vulkan::Buffer> createVertexBuffer(
+            std::shared_ptr<vulkan::CommandPool> const &commandPool,
+            std::vector<VertexSquareOutline> const &vertices) {
+        return vulkan::createArrayBuffer(m_device, commandPool, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    }
+
+    std::shared_ptr<vulkan::Buffer> createIndexBuffer(
+            std::shared_ptr<vulkan::CommandPool> const &commandPool,
+            std::vector<uint32_t> const &indices) {
+        return vulkan::createArrayBuffer(m_device, commandPool, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    }
 };
 
 class DiceVulkan : public DiceGraphics<VulkanGraphics> {
@@ -168,56 +281,38 @@ private:
     std::shared_ptr<vulkan::Buffer> m_uniformBuffer;
     std::shared_ptr<vulkan::Buffer> m_uniformBufferFrag;
 
-    template <typename ArrayType>
-    std::shared_ptr<vulkan::Buffer> createArrayBuffer(
-            std::shared_ptr<vulkan::CommandPool> const &commandPool,
-            std::vector<ArrayType> const &vertices,
-            VkBufferUsageFlags usage)
-    {
-        VkDeviceSize bufferSize = sizeof (vertices[0]) * vertices.size();
-
-        /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
-         * memory.  Then use a copy command to copy the data into fast graphics card only memory.
-         */
-        vulkan::Buffer stagingBuffer{m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-
-        stagingBuffer.copyRawTo(vertices.data(), static_cast<size_t>(bufferSize));
-
-        std::shared_ptr<vulkan::Buffer> vertexBuffer{new vulkan::Buffer{m_device, bufferSize,
-                                                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-                                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
-
-        vertexBuffer->copyTo(commandPool, stagingBuffer, bufferSize);
-
-        return vertexBuffer;
-    }
-
     std::shared_ptr<vulkan::Buffer> createVertexBuffer(
             std::shared_ptr<vulkan::CommandPool> const &commandPool,
             std::vector<Vertex> const &vertices) {
-        return createArrayBuffer<Vertex>(commandPool, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        return vulkan::createArrayBuffer(m_device, commandPool, vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     }
 
     std::shared_ptr<vulkan::Buffer> createIndexBuffer(
             std::shared_ptr<vulkan::CommandPool> const &commandPool,
             std::vector<uint32_t> const &indices) {
-        return createArrayBuffer<uint32_t>(commandPool, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        return vulkan::createArrayBuffer(m_device, commandPool, indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     }
 };
 
-class RainbowDiceVulkan : public RainbowDiceGraphics<DiceVulkan> {
+class RainbowDiceVulkan : public RainbowDiceGraphics<DiceVulkan, DiceBoxVulkan> {
 public:
-    explicit RainbowDiceVulkan(std::shared_ptr<WindowType> window, bool inDrawRollingDice)
-            : RainbowDiceGraphics{inDrawRollingDice},
+    explicit RainbowDiceVulkan(
+            std::shared_ptr<WindowType> window,
+            bool inDrawRollingDice,
+            bool reverseGravity)
+            : RainbowDiceGraphics{inDrawRollingDice, reverseGravity},
               m_instance{new vulkan::Instance{std::move(window)}},
               m_device{new vulkan::Device{m_instance}},
               m_swapChain{new vulkan::SwapChain{m_device}},
               m_renderPass{new vulkan::RenderPass{m_device, m_swapChain}},
               m_descriptorSetLayout{new DiceDescriptorSetLayout{m_device}},
+              m_descriptorSetLayoutDiceBox{},
               m_descriptorPools{new vulkan::DescriptorPools{m_device, m_descriptorSetLayout}},
+              m_descriptorPoolsDiceBox{},
               m_graphicsPipeline{new vulkan::Pipeline{m_swapChain, m_renderPass, m_descriptorSetLayout,
-                  getBindingDescription(), getAttributeDescriptions(), SHADER_VERT_FILE, SHADER_FRAG_FILE}},
+                                                      std::shared_ptr<vulkan::Pipeline>(),
+                                                      getBindingDescription(), getAttributeDescriptions(), SHADER_VERT_FILE, SHADER_FRAG_FILE}},
+              m_graphicsPipelineDiceBox{},
               m_commandPool{new vulkan::CommandPool{m_device}},
               m_viewPointBuffer{vulkan::Buffer::createUniformBuffer(m_device, sizeof (glm::vec3))},
               m_imageAvailableSemaphore{new vulkan::Semaphore{m_device}},
@@ -236,6 +331,23 @@ public:
         // copy the view point of the scene into device memory to send to the fragment shader for the
         // Blinn-Phong lighting model.  Copy it over here too.
         m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
+
+        // must happen after view and projection matrix and view point buffer initialization
+        if (!reverseGravity) {
+            m_descriptorSetLayoutDiceBox = std::make_shared<DiceBoxDescriptorSetLayout>(m_device);
+
+            // Use separate descriptor pool here because descriptor sets are reused and if a
+            // descriptor set with a different layout (i.e. the dice box descriptor set) is reused
+            // for a dice descriptor set, bad things will happen.
+            m_descriptorPoolsDiceBox = std::make_shared<vulkan::DescriptorPools>(m_device, m_descriptorSetLayoutDiceBox);
+            m_graphicsPipelineDiceBox = std::make_shared<vulkan::Pipeline>(
+                    m_swapChain, m_renderPass, m_descriptorSetLayoutDiceBox, m_graphicsPipeline,
+                    getBindingDescriptionOutlineSquare(), getAttributeDescriptionsOutlineSquare(),
+                    SHADER_LINES_VERT_FILE, SHADER_LINES_FRAG_FILE);
+            m_diceBox = std::make_shared<DiceBoxVulkan>(m_device, m_descriptorSetLayoutDiceBox, m_descriptorPoolsDiceBox,
+                    m_commandPool, m_viewPointBuffer, m_proj, m_view,
+                    m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+        }
     }
 
     void initModels() override;
@@ -255,7 +367,7 @@ public:
     bool changeDice(std::string const &inDiceName,
                     std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
                     std::shared_ptr<TextureAtlas> inTexture) override {
-        bool hasResult = RainbowDiceGraphics<DiceVulkan>::changeDice(inDiceName, inDiceDescriptions, inTexture);
+        bool hasResult = RainbowDiceGraphics<DiceVulkan, DiceBoxVulkan>::changeDice(inDiceName, inDiceDescriptions, inTexture);
         for (auto const &dice : m_dice) {
             for (auto const &die : dice) {
                 die->updateUniformBuffer(m_projWithPreTransform, m_view);
@@ -342,35 +454,20 @@ public:
     void scale(float scaleFactor) override {
         RainbowDice::scale(scaleFactor);
 
-        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const &dice : m_dice) {
-            for (auto const &die : dice) {
-                die->updateUniformBuffer(m_projWithPreTransform, m_view);
-            }
-        }
+        updateViewBuffer();
     }
 
     void scroll(float distanceX, float distanceY) override {
         auto ext = m_swapChain->extent();
         RainbowDice::scroll(distanceX, distanceY, ext.width, ext.height);
 
-        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & dice : m_dice) {
-            for (auto const &die : dice) {
-                die->updateUniformBuffer(m_projWithPreTransform, m_view);
-            }
-        }
+        updateViewBuffer();
     }
 
     void resetView() override {
         RainbowDice::resetView();
 
-        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
-        for (auto const & dice : m_dice) {
-            for (auto const &die : dice) {
-                die->updateUniformBuffer(m_projWithPreTransform, m_view);
-            }
-        }
+        updateViewBuffer();
     }
 
     void setTexture(std::shared_ptr<TextureAtlas> texture) override {
@@ -393,6 +490,8 @@ protected:
 private:
     static std::string const SHADER_VERT_FILE;
     static std::string const SHADER_FRAG_FILE;
+    static std::string const SHADER_LINES_VERT_FILE;
+    static std::string const SHADER_LINES_FRAG_FILE;
 
     std::shared_ptr<vulkan::Instance> m_instance;
     std::shared_ptr<vulkan::Device> m_device;
@@ -401,9 +500,12 @@ private:
 
     /* for passing data other than the vertex data to the vertex shader */
     std::shared_ptr<DiceDescriptorSetLayout> m_descriptorSetLayout;
+    std::shared_ptr<DiceBoxDescriptorSetLayout> m_descriptorSetLayoutDiceBox;
     std::shared_ptr<vulkan::DescriptorPools> m_descriptorPools;
+    std::shared_ptr<vulkan::DescriptorPools> m_descriptorPoolsDiceBox;
 
     std::shared_ptr<vulkan::Pipeline> m_graphicsPipeline;
+    std::shared_ptr<vulkan::Pipeline> m_graphicsPipelineDiceBox;
     std::shared_ptr<vulkan::CommandPool> m_commandPool;
     std::shared_ptr<vulkan::Buffer> m_viewPointBuffer;
 
@@ -463,6 +565,23 @@ private:
 
         return preTransformRet;
     }
+
+    void updateViewBuffer() {
+        m_viewPointBuffer->copyRawTo(&m_viewPoint, sizeof(m_viewPoint));
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                die->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
+        }
+
+        if (m_viewUpdated) {
+            m_viewUpdated = false;
+            if (m_diceBox != nullptr) {
+                m_diceBox->updateUniformBuffer(m_projWithPreTransform, m_view);
+            }
+        }
+    }
+
     void cleanupSwapChain();
     void initializeCommandBuffers();
     void updateDepthResources();

@@ -74,6 +74,50 @@ struct GLGraphics {
     using Buffer = GLuint;
 };
 
+class DiceBoxGL : public DiceBox<GLGraphics> {
+public:
+    DiceBoxGL(float maxX, float maxY, float maxZ)
+            : DiceBox{maxX, maxY, maxZ}
+    {
+        createGLResources();
+    }
+
+    void updateMaxXYZ(float maxX, float maxY, float maxZ) override {
+        populateVerticesIndices(maxX, maxY, maxZ);
+        copyVertexIndices();
+    }
+
+    void destroyGLResources() {
+        glDeleteBuffers(1, &m_vertexBuffer);
+        glDeleteBuffers(1, &m_indexBuffer);
+    }
+
+    void createGLResources() {
+        // the vertex buffer
+        glGenBuffers(1, &m_vertexBuffer);
+
+        // the index buffer
+        glGenBuffers(1, &m_indexBuffer);
+
+        copyVertexIndices();
+    }
+
+    ~DiceBoxGL() override {
+        destroyGLResources();
+    }
+
+private:
+    void copyVertexIndices() {
+        glBindBuffer(GL_ARRAY_BUFFER, m_vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * m_verticesDiceBox.size(),
+                     m_verticesDiceBox.data(), GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * m_indicesDiceBox.size(),
+                     m_indicesDiceBox.data(), GL_STATIC_DRAW);
+    }
+};
+
 template <>
 bool DiceGraphics<GLGraphics>::isGL();
 
@@ -114,18 +158,27 @@ public:
     }
 };
 
-class RainbowDiceGL : public RainbowDiceGraphics<DiceGL> {
+class RainbowDiceGL : public RainbowDiceGraphics<DiceGL, DiceBoxGL> {
 public:
-    explicit RainbowDiceGL(std::shared_ptr<WindowType> window, bool inDrawRollingDice)
-            : RainbowDiceGraphics{inDrawRollingDice},
+    explicit RainbowDiceGL(
+            std::shared_ptr<WindowType> window,
+            bool inDrawRollingDice,
+            bool reverseGravity)
+            : RainbowDiceGraphics{inDrawRollingDice, reverseGravity},
               m_surface{std::make_shared<graphicsGL::Surface>(std::move(window))},
               m_programLoaded{false},
-              programID{0},
+              m_programID{0},
+              m_programLoadedDiceBox{false},
+              m_programIDDiceBox{0},
               m_texture{}
     {
         init();
         setView();
         updatePerspectiveMatrix(m_surface->width(), m_surface->height());
+
+        if (!reverseGravity) {
+            m_diceBox = std::make_shared<DiceBoxGL>(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+        }
     }
 
     void initModels() override;
@@ -164,8 +217,12 @@ public:
 
     void destroyGLResources() {
         if (m_programLoaded) {
-            glDeleteProgram(programID);
+            glDeleteProgram(m_programID);
             m_programLoaded = false;
+        }
+        if (m_programLoadedDiceBox) {
+            glDeleteProgram(m_programIDDiceBox);
+            m_programLoadedDiceBox = false;
         }
     }
 
@@ -182,7 +239,9 @@ protected:
 private:
     std::shared_ptr<graphicsGL::Surface> m_surface;
     bool m_programLoaded;
-    GLuint programID;
+    GLuint m_programID;
+    bool m_programLoadedDiceBox;
+    GLuint m_programIDDiceBox;
     std::shared_ptr<TextureGL> m_texture;
 
     GLuint loadShaders(std::string const &vertexShaderFile, std::string const &fragmentShaderFile);

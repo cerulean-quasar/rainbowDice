@@ -170,14 +170,22 @@ protected:
 private:
     static const std::vector<glm::vec3> colors;
 
-    static float const gravity;
-    static float const viscosity;
-    static float const errorVal;
-    static float const radius;
-    static float const angularSpeedScaleFactor;
-    static float const stoppedAnimationTime;
-    static float const goingToStopAnimationTime;
-    static float const waitAfterDoneTime;
+    static float constexpr angularSpeedScaleFactor = 5.0f;
+
+    static float constexpr errorVal = 0.15f;
+    static float constexpr viscosity = 2.0f;
+
+    // Time for the stopped animation to complete
+    static float constexpr stoppedAnimationTime = 0.5f; // seconds
+
+    // Time it takes for stopped die to settle to being flat from a cocked position.
+    static float constexpr goingToStopAnimationTime = 0.2f; // seconds
+
+    // Time to wait after the dice settled flat before moving them to the top of the window.
+    static float constexpr waitAfterDoneTime = 0.6f; // seconds
+
+    // Which direction do the dice fall?
+    static bool M_reverseGravity;
 
     /* maximum position for x and y.  Set according to the screen size and what the projection matrix is. */
     static float M_maxposz;
@@ -205,12 +213,16 @@ private:
     float doneY;
     float stoppedPositionX;
     float stoppedPositionY;
+    float stoppedPositionZ;
     float animationTime;
     uint32_t result;
     std::vector<float> m_color;
 public:
     // radius of a die when it is done rolling (It is shrunk and moved out of the rolling space).
-    static float const stoppedRadius;
+    static float constexpr stoppedRadius = 0.2f;
+
+    // radius of a die while rolling.
+    static float constexpr radius = 0.3f;
 
     /* Set previous position to a bogus value to make sure the die is drawn first thing */
     DicePhysicsModel(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
@@ -252,6 +264,11 @@ public:
 
     static void updateAcceleration(glm::vec3 const &inAcceleration) {
         acceleration = inAcceleration;
+
+        // For some reason, the gravity comes in reversed from android.
+        if (!M_reverseGravity) {
+            acceleration.z = -acceleration.z;
+        }
     }
 
     bool updateModelMatrix();
@@ -313,6 +330,14 @@ public:
         M_maxposy = y;
         M_maxposz = z;
     }
+
+    static void setReverseGravity(bool reverseGravity) {
+        M_reverseGravity = reverseGravity;
+    }
+
+    static std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
+                                                        std::vector<float> const &color, bool isOpenGL = false);
+
 };
 
 class DiceModelCube : public DicePhysicsModel {
@@ -343,7 +368,7 @@ public:
 // loadModel will have to be changed of course.
 class DiceModelHedron : public DicePhysicsModel {
 private:
-    static float const rotateThreshold;
+    static float constexpr rotateThreshold = 0.9f;
     std::vector<bool> rotated;
 
     float p0ycoord(glm::vec3 const &q, glm::vec3 const &r);
@@ -459,7 +484,8 @@ public:
 
 class DiceModelRhombicTriacontahedron : public DicePhysicsModel {
 private:
-    static float const rotateThreshold;
+    static float constexpr rotateThreshold = 0.9f;
+
     std::vector<bool> rotated;
 
     void addVertices(std::shared_ptr<TextureAtlas> const &textAtlas,
@@ -527,8 +553,5 @@ public:
     virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
     virtual void yAlign(uint32_t faceIndex);
 };
-
-std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
-                                             std::vector<float> const &color, bool isOpenGL = false);
 
 #endif /* RAINBOWDICE_DICE_HPP */

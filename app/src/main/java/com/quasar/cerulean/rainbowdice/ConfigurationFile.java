@@ -50,6 +50,7 @@ public class ConfigurationFile {
     private static final String useGravity = "useGravity";
     private static final String drawRollingDice = "drawRollingDice";
     private static final String bonusValue = "bonusValue";
+    private static final String reverseGravityStr = "reverseGravity";
 
     private LinkedList<String> diceConfigList;
     private String themeName;
@@ -57,6 +58,7 @@ public class ConfigurationFile {
     private boolean m_useGravity;
     private boolean m_drawRollingDice;
     private int m_bonus;
+    private boolean m_reverseGravity;
 
     private Context ctx;
 
@@ -68,6 +70,7 @@ public class ConfigurationFile {
         m_useLegacy = false;
         m_drawRollingDice = true;
         m_bonus = 0;
+        m_reverseGravity = false;
 
         StringBuilder json = new StringBuilder();
         try {
@@ -145,6 +148,14 @@ public class ConfigurationFile {
         if (obj.has(bonusValue)) {
             m_bonus = obj.getInt(bonusValue);
         }
+
+        if (obj.has(reverseGravityStr)) {
+            m_reverseGravity = obj.getBoolean(reverseGravityStr);
+        } else {
+            // If the file exists, this is a previous install... keep the gravity reversed for
+            // them since that was the way it used to function.
+            m_reverseGravity = true;
+        }
     }
 
     public void writeFile() {
@@ -165,6 +176,7 @@ public class ConfigurationFile {
             obj.put(useGravity, m_useGravity);
             obj.put(drawRollingDice, m_drawRollingDice);
             obj.put(bonusValue, m_bonus);
+            obj.put(reverseGravityStr, m_reverseGravity);
 
             json = obj.toString();
         } catch (JSONException e) {
@@ -238,6 +250,10 @@ public class ConfigurationFile {
         return m_bonus;
     }
 
+    public boolean reverseGravity() {
+        return m_reverseGravity;
+    }
+
     public void setThemeName(String in) {
         themeName = in;
     }
@@ -256,5 +272,9 @@ public class ConfigurationFile {
 
     public void setBonus(int in) {
         m_bonus = in;
+    }
+
+    public void setReverseGravity(boolean in) {
+        m_reverseGravity = in;
     }
 }

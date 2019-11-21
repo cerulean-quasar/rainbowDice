@@ -376,7 +376,8 @@ public:
                std::shared_ptr<Notify> inNotify,
                bool inUseGravity,
                bool inDrawRollingDice,
-               bool inUseLegacy)
+               bool inUseLegacy,
+               bool reverseGravity)
             : m_whichSensors{},
               m_tryVulkan{!inUseLegacy},
               m_diceGraphics{},
@@ -414,7 +415,7 @@ public:
             }
         }
 
-        initDiceGraphics(std::move(inSurface), inUseGravity, inDrawRollingDice);
+        initDiceGraphics(std::move(inSurface), inUseGravity, inDrawRollingDice, reverseGravity);
         m_notify->sendGraphicsDescription(m_diceGraphics->graphicsDescription(),
                                           whichSensors.test(Sensors::LINEAR_ACCELERATION_SENSOR),
                                           whichSensors.test(Sensors::GRAVITY_SENSOR),
@@ -432,7 +433,7 @@ private:
 
     std::shared_ptr<DrawEvent> drawingLoop();
     void initDiceGraphics(std::shared_ptr<WindowType> surface,
-                          bool inUseGravity, bool inDrawRollingDice);
+                          bool inUseGravity, bool inDrawRollingDice, bool reverseGravity);
 };
 
 #endif // RAINBOWDICE_DRAWER_HPP

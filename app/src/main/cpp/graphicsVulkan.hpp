@@ -435,6 +435,7 @@ namespace vulkan {
         Pipeline(std::shared_ptr<SwapChain> const &inSwapChain,
                  std::shared_ptr<RenderPass> const &inRenderPass,
                  std::shared_ptr<DescriptorSetLayout> const &inDescriptorSetLayout,
+                 std::shared_ptr<Pipeline> const &derivedPipeline,
                  VkVertexInputBindingDescription const &bindingDescription,
                  std::vector<VkVertexInputAttributeDescription> const &attributeDescription,
                  std::string const &vertexShader,
@@ -446,7 +447,7 @@ namespace vulkan {
                   m_pipelineLayout{},
                   m_pipeline{} {
             createGraphicsPipeline(bindingDescription, attributeDescription, vertexShader,
-                                   fragmentShader);
+                                   fragmentShader, derivedPipeline);
         }
 
         inline std::shared_ptr<VkPipeline_T> const &pipeline() { return m_pipeline; }
@@ -468,7 +469,8 @@ namespace vulkan {
 
         void createGraphicsPipeline(VkVertexInputBindingDescription const &bindingDescription,
                                     std::vector<VkVertexInputAttributeDescription> const &attributeDescriptions,
-                                    std::string const &vertexShader, std::string const &fragmentShader);
+                                    std::string const &vertexShader, std::string const &fragmentShader,
+                                    std::shared_ptr<Pipeline> derivedPipeline);
     };
 
     class CommandPool {
@@ -757,6 +759,54 @@ namespace vulkan {
 
         void createCommandBuffers();
     };
+
+    template <typename ArrayType>
+    std::shared_ptr<vulkan::Buffer> updateArrayBuffer(
+            std::shared_ptr<Device> const &device,
+            std::shared_ptr<CommandPool> const &commandPool,
+            std::vector<ArrayType> const &vertices,
+            std::shared_ptr<Buffer> &vertexBuffer)
+    {
+        VkDeviceSize bufferSize = sizeof (vertices[0]) * vertices.size();
+
+        /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
+         * memory.  Then use a copy command to copy the data into fast graphics card only memory.
+         */
+        vulkan::Buffer stagingBuffer{device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+
+        stagingBuffer.copyRawTo(vertices.data(), static_cast<size_t>(bufferSize));
+
+        vertexBuffer->copyTo(commandPool, stagingBuffer, bufferSize);
+
+        return vertexBuffer;
+    }
+
+    template <typename ArrayType>
+    std::shared_ptr<vulkan::Buffer> createArrayBuffer(
+            std::shared_ptr<Device> const &device,
+            std::shared_ptr<vulkan::CommandPool> const &commandPool,
+            std::vector<ArrayType> const &vertices,
+            VkBufferUsageFlags usage)
+    {
+        VkDeviceSize bufferSize = sizeof (vertices[0]) * vertices.size();
+
+        /* use a staging buffer in the CPU accessable memory to copy the data into graphics card
+         * memory.  Then use a copy command to copy the data into fast graphics card only memory.
+         */
+        vulkan::Buffer stagingBuffer{device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+
+        stagingBuffer.copyRawTo(vertices.data(), static_cast<size_t>(bufferSize));
+
+        std::shared_ptr<vulkan::Buffer> vertexBuffer{new vulkan::Buffer{device, bufferSize,
+                                                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+                                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT}};
+
+        vertexBuffer->copyTo(commandPool, stagingBuffer, bufferSize);
+
+        return vertexBuffer;
+    }
 } /* namespace vulkan */
 
 #endif /* RAINBOWDICE_VULKAN_GRAPHICS_HPP */

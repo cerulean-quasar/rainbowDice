@@ -22,6 +22,8 @@
 #include <list>
 #include <set>
 #include <vector>
+#include <chrono>
+#include <deque>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -35,6 +37,16 @@
 #include "diceDescription.hpp"
 #include "dice.hpp"
 #include "text.hpp"
+
+struct VertexSquareOutline {
+    glm::vec3 pos;
+    glm::vec4 color;
+    glm::vec3 normal;
+    glm::vec3 corner1;
+    glm::vec3 corner2;
+    glm::vec3 corner3;
+    glm::vec3 corner4;
+};
 
 /* for applying a high pass filter on the acceleration sample data */
 class Filter {
@@ -54,53 +66,7 @@ public:
     {
     }
 
-    glm::vec3 acceleration(glm::vec3 const &sensorInputs) {
-        float RC = 3.0f;
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - highPassAccelerationPrevTime).count();
-
-        highPassAccelerationPrevTime = currentTime;
-
-        unsigned long size = highPassAcceleration.size();
-        glm::vec3 acceleration(0.0f, 0.0f, 0.0f);
-
-        if (dt > 1) {
-            // the time diff is too long.  This is not good data. Just return the sensor inputs and
-            // save the time difference for next call through.
-            acceleration = sensorInputs;
-        } else if (size == 0) {
-            high_pass_samples sample;
-            acceleration = sample.output = sample.input = sensorInputs;
-            sample.dt = dt;
-            highPassAcceleration.push_back(sample);
-        } else {
-            glm::vec3 nextOut;
-            for (unsigned long i=1; i < size; i++) {
-                high_pass_samples &sample = highPassAcceleration[i];
-                high_pass_samples &prev = highPassAcceleration[i-1];
-                float alpha = RC/(RC+sample.dt);
-                sample.output = alpha*(prev.output + sample.input - prev.input);
-
-            }
-            high_pass_samples sample;
-            float alpha = RC/(RC+dt);
-            high_pass_samples &prev = highPassAcceleration.back();
-            sample.output = alpha*(prev.output + sensorInputs - prev.input);
-            sample.input = sensorInputs;
-            sample.dt = dt;
-            highPassAcceleration.push_back(sample);
-            if (size + 1 > highPassAccelerationMaxSize) {
-                highPassAcceleration.pop_front();
-            }
-
-            if (size < 100) {
-                acceleration = sample.output;
-            } else {
-                acceleration = 20.0f * sample.output + sensorInputs - sample.output;
-            }
-        }
-        return acceleration;
-    }
+    glm::vec3 acceleration(glm::vec3 const &sensorInputs);
 };
 
 template <typename GraphicsType>
@@ -135,7 +101,7 @@ public:
     DiceGraphics(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
                  std::vector<float> const &color,
                  std::shared_ptr<TextureAtlas> const &textureAtlas)
-            : m_die{std::move(createDice(symbols, color, isGL()))},
+            : m_die{std::move(DicePhysicsModel::createDice(symbols, color, isGL()))},
               m_rerollIndices{std::move(inRerollIndices)},
               m_isSelected{false},
               m_vertexBuffer{},
@@ -156,6 +122,152 @@ protected:
      * the specified order.  Note, vertices can be listed twice if they should be part of more
      * than one triangle.
      */
+    typename GraphicsType::Buffer m_vertexBuffer;
+    typename GraphicsType::Buffer m_indexBuffer;
+};
+
+// Describes a box for the dice to roll in.
+template <typename GraphicsType>
+class DiceBox {
+public:
+    inline uint32_t nbrIndices() { return m_indicesDiceBox.size(); }
+
+    inline typename GraphicsType::Buffer const &indexBuffer() { return m_indexBuffer; }
+    inline typename GraphicsType::Buffer const &vertexBuffer() { return m_vertexBuffer; }
+
+    DiceBox(float maxX, float maxY, float maxZ)
+    {
+        populateVerticesIndices(maxX, maxY, maxZ);
+    }
+
+    virtual void updateMaxXYZ(float maxX, float maxY, float maxZ) = 0;
+
+    virtual ~DiceBox() = default;
+protected:
+    void populateVerticesIndices(float x, float y, float z) {
+        m_verticesDiceBox.clear();
+        m_indicesDiceBox.clear();
+
+        glm::vec4 red = {1.0f, 0.0f, 0.0f, 1.0f};
+        glm::vec4 yellow = {1.0f, 1.0f, 0.0f, 1.0f};
+        glm::vec4 green = {0.0f, 1.0f, 0.0f, 1.0f};
+        glm::vec4 blue = {0.0f, 0.0f, 1.0f, 1.0f};
+
+        uint32_t offset = 0;
+        glm::vec3 c1;
+        glm::vec3 c2;
+        glm::vec3 c3;
+        glm::vec3 c4;
+        glm::vec3 normal;
+
+        // bottom
+        c1 = {x, y, -z};
+        c2 = {x, -y, -z};
+        c3 = {-x, -y, -z};
+        c4 = {-x, y, -z};
+        normal = {0.0f, 0.0f, -1.0f};
+
+        m_verticesDiceBox.push_back(VertexSquareOutline{c1, red, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c2, yellow, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c3, green, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c4, blue, normal, c1, c2, c3, c4});
+
+        m_indicesDiceBox.push_back(offset + 0);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 1);
+
+        m_indicesDiceBox.push_back(offset + 1);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 2);
+
+        // right facing
+        offset += 4;
+        c1 = {x, y, z};
+        c2 = {x, -y, z};
+        c3 = {x, -y, -z};
+        c4 = {x, y, -z};
+        normal = {1.0f, 0.0f, 0.0f};
+
+        m_verticesDiceBox.push_back(VertexSquareOutline{c1, red, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c2, yellow, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c3, green, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c4, blue, normal, c1, c2, c3, c4});
+
+        m_indicesDiceBox.push_back(offset + 0);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 1);
+
+        m_indicesDiceBox.push_back(offset + 1);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 2);
+
+        // positive y facing
+        offset += 4;
+        c1 = {x, y, z};
+        c2 = {x, y, -z};
+        c3 = {-x, y, -z};
+        c4 = {-x, y, z};
+        normal = {0.0f, 1.0f, 0.0f};
+
+        m_verticesDiceBox.push_back(VertexSquareOutline{c1, red, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c2, yellow, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c3, green, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c4, blue, normal, c1, c2, c3, c4});
+
+        m_indicesDiceBox.push_back(offset + 0);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 1);
+
+        m_indicesDiceBox.push_back(offset + 1);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 2);
+
+        // left facing
+        offset += 4;
+        c1 = {-x, y, z};
+        c2 = {-x, y, -z};
+        c3 = {-x, -y, -z};
+        c4 = {-x, -y, z};
+        normal = {-1.0f, 0.0f, 0.0f};
+
+        m_verticesDiceBox.push_back(VertexSquareOutline{c1, red, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c2, yellow, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c3, green, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c4, blue, normal, c1, c2, c3, c4});
+
+        m_indicesDiceBox.push_back(offset + 0);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 1);
+
+        m_indicesDiceBox.push_back(offset + 1);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 2);
+
+        // negative y facing
+        offset += 4;
+        c1 = {x, -y, z};
+        c2 = {-x, -y, z};
+        c3 = {-x, -y, -z};
+        c4 = {x, -y, -z};
+        normal = {0.0f, -1.0f, 0.0f};
+
+        m_verticesDiceBox.push_back(VertexSquareOutline{c1, red, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c2, yellow, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c3, green, normal, c1, c2, c3, c4});
+        m_verticesDiceBox.push_back(VertexSquareOutline{c4, blue, normal, c1, c2, c3, c4});
+
+        m_indicesDiceBox.push_back(offset + 0);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 1);
+
+        m_indicesDiceBox.push_back(offset + 1);
+        m_indicesDiceBox.push_back(offset + 3);
+        m_indicesDiceBox.push_back(offset + 2);
+    }
+
+    std::vector<VertexSquareOutline> m_verticesDiceBox;
+    std::vector<uint32_t> m_indicesDiceBox;
+
     typename GraphicsType::Buffer m_vertexBuffer;
     typename GraphicsType::Buffer m_indexBuffer;
 };
@@ -235,6 +347,7 @@ public:
     void setView() {
         /* glm::lookAt takes the eye position, the center position, and the up axis as parameters */
         m_view = glm::lookAt(m_viewPoint, m_viewPointCenterPosition, glm::vec3(0.0f, 1.0f, 0.0f));
+        m_viewUpdated = true;
     }
 
     virtual void updatePerspectiveMatrix(uint32_t surfaceWidth, uint32_t surfaceHeight) {
@@ -244,7 +357,8 @@ public:
         m_proj = glm::perspective(glm::radians(67.0f), surfaceWidth / (float) surfaceHeight,
                                   0.1f, 10.0f);
         getScreenCoordinatesInWorldSpace();
-        DicePhysicsModel::setMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, 1.0f);
+        DicePhysicsModel::setMaxXYZ(m_screenWidth/2.0f - DicePhysicsModel::radius,
+                m_screenHeight/2.0f - DicePhysicsModel::radius, M_maxZ - DicePhysicsModel::radius);
     }
 
     virtual void resetView() {
@@ -291,20 +405,25 @@ public:
 
     bool isModifiedRoll() { return m_isModifiedRoll; }
 
-    RainbowDice()
+    RainbowDice(bool reverseGravity)
             : m_screenWidth{2.0f},
               m_screenHeight{2.0f},
+              m_viewUpdated{false},
               m_viewPoint{startViewPoint()},
               m_viewPointCenterPosition{startViewPointCenterPosition()},
               m_isModifiedRoll{false},
               m_linearAcceleration{},
               m_gravity{0.0f, 0.0f, 9.8f},
               m_filter{}
-    {}
+    {
+        DicePhysicsModel::setReverseGravity(reverseGravity);
+    }
 
     virtual ~RainbowDice() = default;
 
 protected:
+    static float constexpr M_maxZ = 1.0f + DicePhysicsModel::radius;
+
     float m_screenWidth;
     float m_screenHeight;
 
@@ -313,6 +432,7 @@ protected:
 
     glm::mat4 m_proj;
     glm::mat4 m_view;
+    bool m_viewUpdated;
 
     glm::vec3 m_viewPoint;
     glm::vec3 m_viewPointCenterPosition;
@@ -326,15 +446,20 @@ protected:
     static glm::vec3 startViewPoint() { return {0.0f, 0.0f, 3.0f}; };
 
     void getScreenCoordinatesInWorldSpace() {
+        auto wh = getScreenCoordinatesInWorldSpaceGivenZ(M_maxZ);
+        m_screenWidth = wh.first;
+        m_screenHeight = wh.second;
+    }
+
+    std::pair<float, float> getScreenCoordinatesInWorldSpaceGivenZ(float maxZ) {
         glm::mat4 view = glm::lookAt(startViewPoint(), startViewPointCenterPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::vec4 worldZ{0.0f, 0.0f, 1.0f+DicePhysicsModel::stoppedRadius, 1.0f};
+        glm::vec4 worldZ{0.0f, 0.0f, maxZ, 1.0f};
         glm::vec4 z = m_proj * view * worldZ;
 
         glm::vec4 plus = glm::vec4{z.w, z.w, z.z, z.w};
         glm::vec4 worldPlus = glm::inverse(view) * glm::inverse(m_proj) * plus;
 
-        m_screenWidth = worldPlus.x/worldPlus.w * 2;
-        m_screenHeight = worldPlus.y/worldPlus.w * 2;
+        return std::make_pair(worldPlus.x/worldPlus.w * 2, worldPlus.y/worldPlus.w * 2);
     }
 
     void scroll(float distanceX, float distanceY, uint32_t windowWidth, uint32_t windowHeight) {
@@ -374,7 +499,7 @@ private:
     Filter m_filter;
 };
 
-template <typename DiceType>
+template <typename DiceType, typename DiceBoxType>
 class RainbowDiceGraphics : public RainbowDice {
 public:
     void addRollingDice() override;
@@ -447,10 +572,11 @@ public:
         return true;
     }
 
-    explicit RainbowDiceGraphics(bool inDrawRollingDice)
-      : RainbowDice{},
+    explicit RainbowDiceGraphics(bool inDrawRollingDice, bool reverseGravity)
+      : RainbowDice{reverseGravity},
         m_drawRollingDice{inDrawRollingDice},
-        m_dice{}
+        m_dice{},
+        m_diceBox{}
     {
     }
 
@@ -459,6 +585,8 @@ protected:
     bool m_drawRollingDice;
     using DiceList = std::list<std::list<std::shared_ptr<DiceType>>>;
     DiceList m_dice;
+
+    std::shared_ptr<DiceBoxType> m_diceBox;
 
     virtual std::shared_ptr<DiceType> createDie(std::vector<std::string> const &symbols,
                                                 std::vector<uint32_t> const &inRerollIndices,
@@ -474,8 +602,8 @@ private:
 // Template class functions
 
 // returns true if we already have a result.
-template <typename DiceType>
-bool RainbowDiceGraphics<DiceType>::changeDice(std::string const &inDiceName,
+template <typename DiceType, typename DiceBoxType>
+bool RainbowDiceGraphics<DiceType, DiceBoxType>::changeDice(std::string const &inDiceName,
                 std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
                 std::shared_ptr<TextureAtlas> inTexture) {
     setTexture(std::move(inTexture));
@@ -498,8 +626,8 @@ bool RainbowDiceGraphics<DiceType>::changeDice(std::string const &inDiceName,
     }
 }
 
-template <typename DiceType>
-bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, uint32_t height) {
+template <typename DiceType, typename DiceBoxType>
+bool RainbowDiceGraphics<DiceType, DiceBoxType>::tapDice(float x, float y, uint32_t width, uint32_t height) {
     float swidth = 2.0;
     float sheight = 2.0;
     float xnorm = x/width * swidth - swidth / 2.0f;
@@ -533,8 +661,8 @@ bool RainbowDiceGraphics<DiceType>::tapDice(float x, float y, uint32_t width, ui
     return needsRedraw;
 }
 
-template <typename DiceType>
-bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
+template <typename DiceType, typename DiceBoxType>
+bool RainbowDiceGraphics<DiceType, DiceBoxType>::updateUniformBuffer() {
     for (auto iti = m_dice.begin(); iti != m_dice.end(); iti++) {
         for (auto itdi = iti->begin(); itdi != iti->end(); itdi++) {
             auto const &die1 = *itdi;
@@ -593,8 +721,8 @@ bool RainbowDiceGraphics<DiceType>::updateUniformBuffer() {
     return needsRedraw;
 }
 
-template <typename DiceType>
-std::vector<std::vector<uint32_t >> RainbowDiceGraphics<DiceType>::getDiceResults() {
+template <typename DiceType, typename DiceBoxType>
+std::vector<std::vector<uint32_t >> RainbowDiceGraphics<DiceType, DiceBoxType>::getDiceResults() {
     std::vector<std::vector<uint32_t>> results;
     for (auto const &dice : m_dice) {
         std::vector<uint32_t > dieResults;
@@ -611,8 +739,8 @@ std::vector<std::vector<uint32_t >> RainbowDiceGraphics<DiceType>::getDiceResult
     return std::move(results);
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     uint32_t i = 0;
     uint32_t k = 0;
     float width = m_screenWidth;
@@ -652,8 +780,8 @@ void RainbowDiceGraphics<DiceType>::resetToStoppedPositions(std::vector<std::vec
     }
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::setDice(std::string const &inDiceName,
                                             std::vector<std::shared_ptr<DiceDescription>> const &inDiceDescriptions,
                                             bool inIsModifiedRoll) {
     RainbowDice::setDice(inDiceName, inDiceDescriptions, inIsModifiedRoll);
@@ -671,8 +799,8 @@ void RainbowDiceGraphics<DiceType>::setDice(std::string const &inDiceName,
     }
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::addRerollDice(bool resetPosition) {
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::addRerollDice(bool resetPosition) {
     for (auto &dice : m_dice) {
         if (dice.empty()) {
             continue;
@@ -703,14 +831,14 @@ void RainbowDiceGraphics<DiceType>::addRerollDice(bool resetPosition) {
     }
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::addRollingDice() {
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::addRollingDice() {
     addRerollDice(true);
     animateMoveStoppedDice();
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::moveDiceToStoppedRandomUpface() {
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::moveDiceToStoppedRandomUpface() {
     int i=0;
     auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
@@ -725,8 +853,8 @@ void RainbowDiceGraphics<DiceType>::moveDiceToStoppedRandomUpface() {
     }
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::moveDiceToStoppedPositions() {
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::moveDiceToStoppedPositions() {
     int i=0;
     auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
@@ -741,8 +869,8 @@ void RainbowDiceGraphics<DiceType>::moveDiceToStoppedPositions() {
     }
 }
 
-template <typename DiceType>
-void RainbowDiceGraphics<DiceType>::animateMoveStoppedDice() {
+template <typename DiceType, typename DiceBoxType>
+void RainbowDiceGraphics<DiceType, DiceBoxType>::animateMoveStoppedDice() {
     int i=0;
     auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
@@ -760,8 +888,8 @@ void RainbowDiceGraphics<DiceType>::animateMoveStoppedDice() {
 }
 
 // returns true if a result is ready, false otherwise
-template <typename DiceType>
-bool RainbowDiceGraphics<DiceType>::rerollSelected() {
+template <typename DiceType, typename DiceBoxType>
+bool RainbowDiceGraphics<DiceType, DiceBoxType>::rerollSelected() {
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->isSelected()) {
@@ -785,8 +913,8 @@ bool RainbowDiceGraphics<DiceType>::rerollSelected() {
 }
 
 // returns true if a result is ready, false otherwise
-template <typename DiceType>
-bool RainbowDiceGraphics<DiceType>::addRerollSelected() {
+template <typename DiceType, typename DiceBoxType>
+bool RainbowDiceGraphics<DiceType, DiceBoxType>::addRerollSelected() {
     for (auto &dice : m_dice) {
         for (auto diceIt = dice.begin(); diceIt != dice.end(); diceIt++) {
             if (diceIt->get()->isSelected()) {
@@ -821,8 +949,8 @@ bool RainbowDiceGraphics<DiceType>::addRerollSelected() {
 }
 
 // returns true if a redraw is needed, and false otherwise.
-template <typename DiceType>
-bool RainbowDiceGraphics<DiceType>::deleteSelected() {
+template <typename DiceType, typename DiceBoxType>
+bool RainbowDiceGraphics<DiceType, DiceBoxType>::deleteSelected() {
     bool diceDeleted = false;
     for (auto &dice : m_dice) {
         for (auto diceIt = dice.begin(); diceIt != dice.end();) {

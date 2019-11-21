@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -20,6 +20,7 @@
 
 #include <set>
 #include "graphicsVulkan.hpp"
+#include "../../../../../../Android/Sdk/ndk/20.0.5594570/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/memory"
 
 namespace vulkan {
 /**
@@ -767,7 +768,8 @@ namespace vulkan {
 
     void Pipeline::createGraphicsPipeline(VkVertexInputBindingDescription const &bindingDescription,
                                           std::vector<VkVertexInputAttributeDescription> const &attributeDescriptions,
-                                          std::string const &vertexShader, std::string const &fragmentShader) {
+                                          std::string const &vertexShader, std::string const &fragmentShader,
+                                          std::shared_ptr<vulkan::Pipeline> derivedPipeline) {
         Shader vertShaderModule(m_device, vertexShader);
         Shader fragShaderModule(m_device, fragmentShader);
 
@@ -846,7 +848,8 @@ namespace vulkan {
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
 
         /* can also just draw the lines or points with VK_POLYGON_MODE_LINE or
-         * VK_POLYGON_MODE_POINT respectively.  Using a mode other than fill requires a GPU feature.
+         * VK_POLYGON_MODE_POINT respectively.  Using a mode other than these three modes requires
+         * a GPU feature.
          */
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 
@@ -999,9 +1002,17 @@ namespace vulkan {
         pipelineInfo.subpass = 0; // index of the subpass
 
         /* if you want to create a pipeline from an already existing pipeline use these.
-         * It is less expensive to switch between piplines derrived from each other
+         * It is less expensive to switch between pipelines derived from each other
          */
-        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+        if (derivedPipeline == nullptr) {
+            pipelineInfo.flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+            pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+        } else {
+            pipelineInfo.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+            pipelineInfo.basePipelineHandle = derivedPipeline->pipeline().get();
+        }
+
+        // Can use index or handle to refer to the base pipeline.  We use the handle so, set this to -1.
         pipelineInfo.basePipelineIndex = -1; // Optional
 
         VkPipeline pipelineRaw;

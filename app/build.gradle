@@ -35,7 +35,7 @@ android {
     sourceSets {
         main {
             jniLibs {
-                srcDir "/home/cerulean.quasar/Android/Sdk/ndk-bundle/sources/third_party/vulkan/src/build-android/jniLibs"
+                srcDir "/home/cerulean.quasar/Android/Sdk/ndk/20.0.5594570/sources/third_party/vulkan/src/build-android/jniLibs"
             }
         }
     }

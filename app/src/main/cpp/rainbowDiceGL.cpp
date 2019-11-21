@@ -17,7 +17,7 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <string>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <EGL/egl.h>
@@ -154,8 +154,10 @@ namespace graphicsGL {
 
 } /* namespace graphicsGL */
 
-std::string const SHADER_VERT_FILE("shaderGL.vert");
-std::string const SHADER_FRAG_FILE("shaderGL.frag");
+char constexpr const *SHADER_VERT_FILE = "shaderGL.vert";
+char constexpr const *SHADER_FRAG_FILE = "shaderGL.frag";
+char constexpr const *SHADER_LINES_VERT_FILE = "shaderLinesGL.vert";
+char constexpr const *SHADER_LINES_FRAG_FILE = "shaderLinesGL.frag";
 
 template <>
 bool DiceGraphics<GLGraphics>::isGL() {
@@ -163,10 +165,11 @@ bool DiceGraphics<GLGraphics>::isGL() {
 }
 
 void RainbowDiceGL::init() {
-    programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
+    m_programID = loadShaders(SHADER_VERT_FILE, SHADER_FRAG_FILE);
+    m_programLoaded = true;
 
-    // set the shader to use
-    glUseProgram(programID);
+    m_programIDDiceBox = loadShaders(SHADER_LINES_VERT_FILE, SHADER_LINES_FRAG_FILE);
+    m_programLoadedDiceBox = true;
 }
 
 void RainbowDiceGL::initModels() {
@@ -175,12 +178,15 @@ void RainbowDiceGL::initModels() {
 void RainbowDiceGL::drawFrame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    GLint textureID = glGetUniformLocation(programID, "texSampler");
+    // Use the dice shader.
+    glUseProgram(m_programID);
+
+    GLint textureID = glGetUniformLocation(m_programID, "texSampler");
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_texture->texture());
     glUniform1i(textureID, 0);
 
-    GLint viewPos = glGetUniformLocation(programID, "viewPosition");
+    GLint viewPos = glGetUniformLocation(m_programID, "viewPosition");
     glUniform3fv(viewPos, 1, &m_viewPoint[0]);
 
     for (auto const &dice : m_dice) {
@@ -190,30 +196,30 @@ void RainbowDiceGL::drawFrame() {
             // different MVP matrix (At least for the M part)
 
             // the projection matrix
-            GLint MatrixID = glGetUniformLocation(programID, "proj");
+            GLint MatrixID = glGetUniformLocation(m_programID, "proj");
             glm::mat4 matrix = die->die()->alterPerspective(m_proj);
             glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
             // view matrix
-            MatrixID = glGetUniformLocation(programID, "view");
+            MatrixID = glGetUniformLocation(m_programID, "view");
             glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_view[0][0]);
 
             // model matrix
-            MatrixID = glGetUniformLocation(programID, "model");
+            MatrixID = glGetUniformLocation(m_programID, "model");
             glm::mat4 model = die->die()->model();
             glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &model[0][0]);
 
             // the model matrix for the normal vector
-            MatrixID = glGetUniformLocation(programID, "normalMatrix");
+            MatrixID = glGetUniformLocation(m_programID, "normalMatrix");
             matrix = glm::transpose(glm::inverse(model));
             glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
             // whether the die is selected
-            GLint var = glGetUniformLocation(programID, "isSelected");
+            GLint var = glGetUniformLocation(m_programID, "isSelected");
             glUniform1i(var, die->isSelected() ? 1 : 0);
 
             // 1st attribute buffer : colors
-            GLint colorID = glGetAttribLocation(programID, "inColor");
+            GLint colorID = glGetAttribLocation(m_programID, "inColor");
             glBindBuffer(GL_ARRAY_BUFFER, die->vertexBuffer());
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, die->indexBuffer());
             glVertexAttribPointer(
@@ -227,7 +233,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(colorID);
 
             // attribute buffer : vertices for die
-            GLint position = glGetAttribLocation(programID, "inPosition");
+            GLint position = glGetAttribLocation(m_programID, "inPosition");
             glVertexAttribPointer(
                     position,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -239,7 +245,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(position);
 
             // Send in the texture coordinates
-            GLint texCoordID = glGetAttribLocation(programID, "inTexCoord");
+            GLint texCoordID = glGetAttribLocation(m_programID, "inTexCoord");
             glVertexAttribPointer(
                     texCoordID,                       // The position of the attribute in the shader
                     2,                                // size
@@ -251,7 +257,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(texCoordID);
 
             // attribute buffer : normal vector to the face
-            GLint normalID = glGetAttribLocation(programID, "inNormal");
+            GLint normalID = glGetAttribLocation(m_programID, "inNormal");
             glVertexAttribPointer(
                     normalID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -263,7 +269,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(normalID);
 
             // attribute buffer : normal vector to the corner
-            GLint cornerNormalID = glGetAttribLocation(programID, "inCornerNormal");
+            GLint cornerNormalID = glGetAttribLocation(m_programID, "inCornerNormal");
             glVertexAttribPointer(
                     cornerNormalID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -275,7 +281,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(cornerNormalID);
 
             // attribute buffer : vertices for die
-            GLint corner1ID = glGetAttribLocation(programID, "inCorner1");
+            GLint corner1ID = glGetAttribLocation(m_programID, "inCorner1");
             glVertexAttribPointer(
                     corner1ID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -287,7 +293,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(corner1ID);
 
             // attribute buffer : vertices for die
-            GLint corner2ID = glGetAttribLocation(programID, "inCorner2");
+            GLint corner2ID = glGetAttribLocation(m_programID, "inCorner2");
             glVertexAttribPointer(
                     corner2ID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -299,7 +305,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(corner2ID);
 
             // attribute buffer : vertices for die
-            GLint corner3ID = glGetAttribLocation(programID, "inCorner3");
+            GLint corner3ID = glGetAttribLocation(m_programID, "inCorner3");
             glVertexAttribPointer(
                     corner3ID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -311,7 +317,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(corner3ID);
 
             // attribute buffer : vertices for die
-            GLint corner4ID = glGetAttribLocation(programID, "inCorner4");
+            GLint corner4ID = glGetAttribLocation(m_programID, "inCorner4");
             glVertexAttribPointer(
                     corner4ID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -323,7 +329,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(corner4ID);
 
             // attribute buffer : vertices for die
-            GLint corner5ID = glGetAttribLocation(programID, "inCorner5");
+            GLint corner5ID = glGetAttribLocation(m_programID, "inCorner5");
             glVertexAttribPointer(
                     corner5ID,                        // The position of the attribute in the shader.
                     3,                               // size
@@ -335,7 +341,7 @@ void RainbowDiceGL::drawFrame() {
             glEnableVertexAttribArray(corner5ID);
 
             // attribute buffer : mode for the way the nearness to edges is detected.
-            GLint modeID = glGetAttribLocation(programID, "inMode");
+            GLint modeID = glGetAttribLocation(m_programID, "inMode");
             glVertexAttribPointer(
                     modeID,                          // The position of the attribute in the shader.
                     1,                               // size
@@ -363,6 +369,129 @@ void RainbowDiceGL::drawFrame() {
             glDisableVertexAttribArray(modeID);
         }
     }
+
+    if (m_diceBox != nullptr && !allStopped()) {
+        // Use the dice box shader.
+        glUseProgram(m_programIDDiceBox);
+        viewPos = glGetUniformLocation(m_programIDDiceBox, "viewPosition");
+        glUniform3fv(viewPos, 1, &m_viewPoint[0]);
+
+        // the projection matrix
+        GLint MatrixID = glGetUniformLocation(m_programIDDiceBox, "proj");
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_proj[0][0]);
+
+        // view matrix
+        MatrixID = glGetUniformLocation(m_programIDDiceBox, "view");
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_view[0][0]);
+
+        // model matrix
+        MatrixID = glGetUniformLocation(m_programIDDiceBox, "model");
+        glm::mat4 model = glm::mat4(1);
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &model[0][0]);
+
+        // the model matrix for the normal vector
+        MatrixID = glGetUniformLocation(m_programIDDiceBox, "normalMatrix");
+        glm::mat4 matrix = glm::transpose(glm::inverse(model));
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+
+        // 1st attribute buffer : colors
+        GLint colorID = glGetAttribLocation(m_programIDDiceBox, "inColor");
+        glBindBuffer(GL_ARRAY_BUFFER, m_diceBox->vertexBuffer());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_diceBox->indexBuffer());
+        glVertexAttribPointer(
+                colorID,                          // The color of the attribute in the shader.
+                4,                                // size
+                GL_FLOAT,                         // type
+                GL_FALSE,                         // normalized?
+                sizeof(VertexSquareOutline),                   // stride
+                (void *) (offsetof(VertexSquareOutline, color))// array buffer offset
+        );
+        glEnableVertexAttribArray(colorID);
+
+        // attribute buffer : vertices for die
+        GLint position = glGetAttribLocation(m_programIDDiceBox, "inPosition");
+        glVertexAttribPointer(
+                position,                        // The position of the attribute in the shader.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(VertexSquareOutline),                  // stride
+                (void *) (offsetof(VertexSquareOutline, pos)) // array buffer offset
+        );
+        glEnableVertexAttribArray(position);
+
+        // attribute buffer : normal vector to the face
+        GLint normalID = glGetAttribLocation(m_programIDDiceBox, "inNormal");
+        glVertexAttribPointer(
+                normalID,                        // The normal vector to the fragment.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(VertexSquareOutline),                  // stride
+                (void *) (offsetof(VertexSquareOutline, normal)) // array buffer offset
+        );
+        glEnableVertexAttribArray(normalID);
+
+        // attribute buffer : vertices for die
+        GLint corner1ID = glGetAttribLocation(m_programIDDiceBox, "inCorner1");
+        glVertexAttribPointer(
+                corner1ID,                       // The position of the first corner of the square.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(VertexSquareOutline),                  // stride
+                (void *) (offsetof(VertexSquareOutline, corner1)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner1ID);
+
+        // attribute buffer : vertices for die
+        GLint corner2ID = glGetAttribLocation(m_programIDDiceBox, "inCorner2");
+        glVertexAttribPointer(
+                corner2ID,                       // The position of the second corner of the square.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(VertexSquareOutline),                  // stride
+                (void *) (offsetof(VertexSquareOutline, corner2)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner2ID);
+
+        // attribute buffer : vertices for die
+        GLint corner3ID = glGetAttribLocation(m_programIDDiceBox, "inCorner3");
+        glVertexAttribPointer(
+                corner3ID,                       // The position of the third corner of the square.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(VertexSquareOutline),                  // stride
+                (void *) (offsetof(VertexSquareOutline, corner3)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner3ID);
+
+        // attribute buffer : vertices for die
+        GLint corner4ID = glGetAttribLocation(m_programIDDiceBox, "inCorner4");
+        glVertexAttribPointer(
+                corner4ID,                       // The position of the forth corner of the square.
+                3,                               // size
+                GL_FLOAT,                        // type
+                GL_FALSE,                        // normalized?
+                sizeof(VertexSquareOutline),                  // stride
+                (void *) (offsetof(VertexSquareOutline, corner4)) // array buffer offset
+        );
+        glEnableVertexAttribArray(corner4ID);
+
+        // Draw the triangles !
+        glDrawElements(GL_TRIANGLES, m_diceBox->nbrIndices(), GL_UNSIGNED_INT, 0);
+
+        glDisableVertexAttribArray(position);
+        glDisableVertexAttribArray(colorID);
+        glDisableVertexAttribArray(normalID);
+        glDisableVertexAttribArray(corner1ID);
+        glDisableVertexAttribArray(corner2ID);
+        glDisableVertexAttribArray(corner3ID);
+        glDisableVertexAttribArray(corner4ID);
+    }
+
     eglSwapBuffers(m_surface->display(), m_surface->surface());
 }
 
@@ -442,8 +571,6 @@ GLuint RainbowDiceGL::loadShaders(std::string const &vertexShaderFile, std::stri
         }
     }
 
-    m_programLoaded = true;
-
     glDetachShader(ProgramID, VertexShaderID);
     glDetachShader(ProgramID, FragmentShaderID);
 
@@ -459,6 +586,10 @@ void RainbowDiceGL::recreateModels() {
             die->createGLResources();
         }
     }
+
+    if (m_diceBox != nullptr) {
+        m_diceBox->createGLResources();
+    }
 }
 
 void RainbowDiceGL::destroyModelGLResources() {
@@ -466,6 +597,10 @@ void RainbowDiceGL::destroyModelGLResources() {
         for (auto const &die : dice) {
             die->destroyGLResources();
         }
+    }
+
+    if (m_diceBox != nullptr) {
+        m_diceBox->destroyGLResources();
     }
 }
 
@@ -482,11 +617,14 @@ void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
     // recreate everything from scratch and update the perspective matrix
     m_surface = std::make_shared<graphicsGL::Surface>(window);
     init();
+    updatePerspectiveMatrix(m_surface->width(), m_surface->height());
+    if (m_diceBox != nullptr) {
+        m_diceBox->updateMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+    }
     recreateModels();
     if (m_texture != nullptr) {
         m_texture->initGLResources();
     }
-    updatePerspectiveMatrix(m_surface->width(), m_surface->height());
 
     // move dice to the new position on the screen according to the new screen size.
     if (m_drawRollingDice) {

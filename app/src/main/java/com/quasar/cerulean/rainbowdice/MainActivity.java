@@ -543,7 +543,7 @@ public class MainActivity extends AppCompatActivity {
         Handler notify = new Handler(new ResultHandler(resultView));
         drawer = new Thread(new DiceWorker(notify, drawSurfaceHolder, assetManager,
                 configurationFile.useGravity(), configurationFile.drawRollingDice(),
-                configurationFile.useLegacy()));
+                configurationFile.useLegacy(), configurationFile.reverseGravity()));
         drawer.start();
     }
 

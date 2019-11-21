@@ -72,6 +72,7 @@
     <string name="useLegacy">Use OpenGL Graphics</string>
     <string name="useGravity">Use gravity</string>
     <string name="drawRollingDice">Draw dice rolling</string>
+    <string name="reverseGravity">Reverse Gravity</string>
     <string name="linearAccelerationSensor">Linear Acceleration</string>
     <string name="gravitySensor">Gravity</string>
     <string name="accelerometerSensor">Accelerometer</string>

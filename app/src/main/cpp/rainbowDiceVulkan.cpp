@@ -23,9 +23,77 @@
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
 #include "android.hpp"
+#include "../../../../../../Android/Sdk/ndk/20.0.5594570/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/memory"
+
+VkVertexInputBindingDescription getBindingDescriptionOutlineSquare() {
+    VkVertexInputBindingDescription bindingDescription = {};
+
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(VertexSquareOutline);
+
+    /* move to the next data entry after each vertex.  VK_VERTEX_INPUT_RATE_INSTANCE
+     * moves to the next data entry after each instance, but we are not using instanced
+     * rendering
+     */
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    return bindingDescription;
+}
+
+std::vector<VkVertexInputAttributeDescription> getAttributeDescriptionsOutlineSquare() {
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+
+    attributeDescriptions.resize(7);
+
+    /* position */
+    attributeDescriptions[0].binding = 0; /* binding description to use */
+    attributeDescriptions[0].location = 0; /* matches the location in the vertex shader */
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[0].offset = offsetof(VertexSquareOutline, pos);
+
+    /* color */
+    attributeDescriptions[1].binding = 0; /* binding description to use */
+    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attributeDescriptions[1].offset = offsetof(VertexSquareOutline, color);
+
+    /* normal to the surface this vertex is on */
+    attributeDescriptions[2].binding = 0;
+    attributeDescriptions[2].location = 2;
+    attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[2].offset = offsetof(VertexSquareOutline, normal);
+
+    /* positional vector to 1st corner */
+    attributeDescriptions[3].binding = 0;
+    attributeDescriptions[3].location = 3;
+    attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[3].offset = offsetof(VertexSquareOutline, corner1);
+
+    /* positional vector to 2nd corner */
+    attributeDescriptions[4].binding = 0;
+    attributeDescriptions[4].location = 4;
+    attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[4].offset = offsetof(VertexSquareOutline, corner2);
+
+    /* positional vector to 3rd corner */
+    attributeDescriptions[5].binding = 0;
+    attributeDescriptions[5].location = 5;
+    attributeDescriptions[5].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[5].offset = offsetof(VertexSquareOutline, corner3);
+
+    /* positional vector to 4th corner */
+    attributeDescriptions[6].binding = 0;
+    attributeDescriptions[6].location = 6;
+    attributeDescriptions[6].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[6].offset = offsetof(VertexSquareOutline, corner4);
+
+    return attributeDescriptions;
+}
 
 std::string const RainbowDiceVulkan::SHADER_VERT_FILE("shaders/shader.vert.spv");
 std::string const RainbowDiceVulkan::SHADER_FRAG_FILE("shaders/shader.frag.spv");
+std::string const RainbowDiceVulkan::SHADER_LINES_VERT_FILE("shaders/shaderLines.vert.spv");
+std::string const RainbowDiceVulkan::SHADER_LINES_FRAG_FILE("shaders/shaderLines.frag.spv");
 
 VkVertexInputBindingDescription getBindingDescription() {
     VkVertexInputBindingDescription bindingDescription = {};
@@ -246,6 +314,96 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
+/* for accessing data other than the vertices from the shaders */
+void DiceBoxDescriptorSetLayout::createDescriptorSetLayout() {
+    /* MVP matrix */
+    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+
+    /* only accessing the MVP matrix from the vertex shader */
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+
+    /* View Point vector */
+    VkDescriptorSetLayoutBinding viewPointLayoutBinding = {};
+    viewPointLayoutBinding.binding = 1;
+    viewPointLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    viewPointLayoutBinding.descriptorCount = 1;
+    viewPointLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    viewPointLayoutBinding.pImmutableSamplers = nullptr; // Optional
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, viewPointLayoutBinding};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    VkDescriptorSetLayout descriptorSetLayoutRaw;
+    if (vkCreateDescriptorSetLayout(m_device->logicalDevice().get(), &layoutInfo, nullptr, &descriptorSetLayoutRaw) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+    }
+
+    auto const &capDevice = m_device;
+    auto deleter = [capDevice](VkDescriptorSetLayout descriptorSetLayoutRaw) {
+        vkDestroyDescriptorSetLayout(capDevice->logicalDevice().get(), descriptorSetLayoutRaw, nullptr);
+    };
+
+    m_descriptorSetLayout.reset(descriptorSetLayoutRaw, deleter);
+}
+
+/* descriptor set for the box in which the dice roll (MVP matrix and view vector only) */
+void DiceBoxDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
+                                                     std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
+                                                  std::shared_ptr<vulkan::DescriptorSet> const &descriptorSet) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = uniformBuffer->buffer().get();
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = descriptorSet->descriptorSet().get();
+
+    /* must be the same as the binding in the vertex shader */
+    descriptorWrites[0].dstBinding = 0;
+
+    /* index into the array of descriptors */
+    descriptorWrites[0].dstArrayElement = 0;
+
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+    /* how many array elements you want to update */
+    descriptorWrites[0].descriptorCount = 1;
+
+    /* which one of these pointers needs to be used depends on which descriptorType we are
+     * using.  pBufferInfo is for buffer based data, pImageInfo is used for image data, and
+     * pTexelBufferView is used for decriptors that refer to buffer views.
+     */
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+    descriptorWrites[0].pImageInfo = nullptr; // Optional
+    descriptorWrites[0].pTexelBufferView = nullptr; // Optional
+
+    VkDescriptorBufferInfo bufferInfoViewPoint = {};
+    bufferInfoViewPoint.buffer = viewPointBuffer->buffer().get();
+    bufferInfoViewPoint.offset = 0;
+    bufferInfoViewPoint.range = sizeof(glm::vec3);
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = descriptorSet->descriptorSet().get();
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &bufferInfoViewPoint;
+    descriptorWrites[1].pImageInfo = nullptr; // Optional
+    descriptorWrites[1].pTexelBufferView = nullptr; // Optional
+
+    vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
 void RainbowDiceVulkan::initModels() {
     updateDepthResources();
 
@@ -264,9 +422,16 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
     updateDepthResources();
 
     m_renderPass.reset(new vulkan::RenderPass{m_device, m_swapChain});
-    m_graphicsPipeline.reset(new vulkan::Pipeline{m_swapChain, m_renderPass, m_descriptorSetLayout,
-                                            getBindingDescription(), getAttributeDescriptions(),
-                                            SHADER_VERT_FILE, SHADER_FRAG_FILE});
+    m_graphicsPipeline = std::make_shared<vulkan::Pipeline>(
+            m_swapChain, m_renderPass, m_descriptorSetLayout, std::shared_ptr<vulkan::Pipeline>(),
+            getBindingDescription(), getAttributeDescriptions(),
+            SHADER_VERT_FILE, SHADER_FRAG_FILE);
+    if (m_diceBox != nullptr) {
+        m_graphicsPipelineDiceBox = std::make_shared<vulkan::Pipeline>(
+                m_swapChain, m_renderPass, m_descriptorSetLayoutDiceBox, m_graphicsPipeline,
+                getBindingDescriptionOutlineSquare(), getAttributeDescriptionsOutlineSquare(),
+                SHADER_LINES_VERT_FILE, SHADER_LINES_FRAG_FILE);
+    }
     m_swapChainCommands.reset(new vulkan::SwapChainCommands{m_swapChain, m_commandPool, m_renderPass,
                                                             m_depthImageView});
 
@@ -296,11 +461,19 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
             die->updateUniformBuffer(m_projWithPreTransform, m_view);
         }
     }
+
+    if (m_diceBox != nullptr) {
+        m_diceBox->updateUniformBuffer(m_projWithPreTransform, m_view);
+
+        // needs to come after updatePerspectiveMatrix call.
+        m_diceBox->updateMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+    }
 }
 
 void RainbowDiceVulkan::cleanupSwapChain() {
     m_swapChainCommands.reset();
     m_graphicsPipeline.reset();
+    m_graphicsPipelineDiceBox.reset();
     m_renderPass.reset();
 
     m_depthImageView.reset();
@@ -352,12 +525,39 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
          */
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        VkDeviceSize offsets[1] = {0};
+        if (m_diceBox != nullptr && !allStopped()) {
+            /* bind the pipeline for the dice box */
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              m_graphicsPipelineDiceBox->pipeline().get());
+
+            VkBuffer vertexBuffer = m_diceBox->vertexBuffer()->buffer().get();
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, m_diceBox->indexBuffer()->buffer().get(), 0,
+                                 VK_INDEX_TYPE_UINT32);
+
+            /* The MVP matrix and view point vector */
+            VkDescriptorSet descriptorSet = m_diceBox->descriptorSet()->descriptorSet().get();
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    m_graphicsPipelineDiceBox->layout().get(), 0, 1,
+                                    &descriptorSet, 0, nullptr);
+
+            /* indexed draw command:
+             * parameter 1 - Command buffer for the draw command
+             * parameter 2 - the number of indices (the vertex count)
+             * parameter 3 - the instance count, use 1 because we are not using instanced rendering
+             * parameter 4 - offset into the index buffer
+             * parameter 5 - offset to add to the indices in the index buffer
+             * parameter 6 - offset for instance rendering
+             */
+            vkCmdDrawIndexed(commandBuffer, m_diceBox->nbrIndices(), 1, 0, 0, 0);
+        }
+
         /* bind the graphics pipeline to the command buffer, the second parameter tells Vulkan
          * that we are binding to a graphics pipeline.
          */
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->pipeline().get());
 
-        VkDeviceSize offsets[1] = {0};
         for (auto const &dice : m_dice) {
             for (auto const &die : dice) {
                 VkBuffer vertexBuffer = die->vertexBuffer()->buffer().get();
@@ -543,6 +743,11 @@ bool RainbowDiceVulkan::updateUniformBuffer() {
             for (auto const &die : dice) {
                 die->updateUniformBuffer(m_projWithPreTransform, m_view);
             }
+        }
+
+        // get rid of the dice box while dice are stopped.
+        if (m_diceBox != nullptr && allStopped()) {
+            initializeCommandBuffers();
         }
     }
 
