@@ -1,6 +1,5 @@
-#include <stdexcept>
 /**
- * Copyright 2018 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2019 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -18,6 +17,7 @@
  *  along with RainbowDice.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#include <stdexcept>
 #include <limits>
 #include <unistd.h>
 #include <fcntl.h>
