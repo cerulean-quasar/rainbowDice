@@ -21,8 +21,13 @@
 package com.quasar.cerulean.rainbowdice;
 
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.content.res.Resources;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Menu;
@@ -36,9 +41,11 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class ActivityThemeSelector extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
     ConfigurationFile configurationFile;
+    String appVersionName;
     String graphicsAPIName;
     String graphicsAPIVersion;
     String graphicsDeviceName;
@@ -59,6 +66,13 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
             TypedValue value = new TypedValue();
             getTheme().resolveAttribute(R.attr.background_landscape, value, true);
             getWindow().setBackgroundDrawableResource(value.resourceId);
+        }
+
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            appVersionName = info.versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            appVersionName = getString(R.string.unknown);
         }
 
         Intent intent = getIntent();
@@ -138,18 +152,21 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         ck = findViewById(R.id.reverseGravity);
         ck.setChecked(configurationFile.reverseGravity());
 
+        TextView view = findViewById(R.id.appVersionName);
+        view.setText(appVersionName);
+
         if (graphicsAPIName != null) {
-            TextView view = findViewById(R.id.graphicsAPIName);
+            view = findViewById(R.id.graphicsAPIName);
             view.setText(graphicsAPIName);
         }
 
         if (graphicsAPIVersion != null) {
-            TextView view = findViewById(R.id.graphicsAPIVersion);
+            view = findViewById(R.id.graphicsAPIVersion);
             view.setText(graphicsAPIVersion);
         }
 
         if (graphicsDeviceName != null) {
-            TextView view = findViewById(R.id.graphicsDeviceName);
+            view = findViewById(R.id.graphicsDeviceName);
             view.setText(graphicsDeviceName);
         }
 
