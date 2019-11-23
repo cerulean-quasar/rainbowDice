@@ -21,6 +21,14 @@
         android:onClick="onOpenLogFile"
         />
     <item
+        android:title="@string/exportDice"
+        android:onClick="onExportClick"
+        />
+    <item
+        android:title="@string/importDice"
+        android:onClick="onImportClick"
+        />
+    <item
         android:title="@string/settingsMenuItem"
         android:onClick="onSelectTheme"
         />

@@ -183,6 +183,12 @@ public class LogFile {
         loadFile();
     }
 
+    public LogFile(Context inCtx, JSONArray arr) throws JSONException {
+        ctx = inCtx;
+        logItems = new ArrayList<>();
+        loadJSON(arr);
+    }
+
     private void loadFile() {
         StringBuilder json = new StringBuilder();
 
@@ -206,37 +212,47 @@ public class LogFile {
 
         try {
             JSONArray arr = new JSONArray(json.toString());
-            for (int i=0; i < arr.length(); i++) {
-                JSONObject obj = arr.getJSONObject(i);
-                int version = 0;
-                if (obj.has(version_name)) {
-                    version = obj.getInt(version_name);
-                }
-                LogItem item;
-                if (version == 0) {
-                    item = new LogItemV0(obj);
-                } else if (version == 1) {
-                    item = new LogItemV1(obj);
-                } else {
-                    // not a valid entry...
-                    continue;
-                }
-                logItems.add(item);
-            }
+            loadJSON(arr);
         } catch (JSONException e) {
             System.out.println("Exception on reading JSON from file: " + diceLogFilename + " message: " + e.getMessage());
             return;
         }
     }
 
+    private void loadJSON(JSONArray arr) throws JSONException {
+        for (int i=0; i < arr.length(); i++) {
+            JSONObject obj = arr.getJSONObject(i);
+            int version = 0;
+            if (obj.has(version_name)) {
+                version = obj.getInt(version_name);
+            }
+            LogItem item;
+            if (version == 0) {
+                item = new LogItemV0(obj);
+            } else if (version == 1) {
+                item = new LogItemV1(obj);
+            } else {
+                // not a valid entry...
+                continue;
+            }
+            logItems.add(item);
+        }
+    }
+
+    public JSONArray toJSON() throws JSONException {
+        JSONArray arr = new JSONArray();
+        for (LogItem logItem: logItems) {
+            JSONObject obj = logItem.toJSON();
+            arr.put(obj);
+        }
+
+        return arr;
+    }
+
     public void writeFile() {
         String json;
         try {
-            JSONArray arr = new JSONArray();
-            for (LogItem logItem: logItems) {
-                JSONObject obj = logItem.toJSON();
-                arr.put(obj);
-            }
+            JSONArray arr = toJSON();
             json = arr.toString();
         } catch (JSONException e) {
             System.out.println("Exception in writing out JSON: " + e.getMessage());

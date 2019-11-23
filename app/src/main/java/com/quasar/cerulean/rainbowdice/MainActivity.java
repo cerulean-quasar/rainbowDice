@@ -20,12 +20,15 @@
 package com.quasar.cerulean.rainbowdice;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.TypedArray;
 import android.graphics.PixelFormat;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Message;
+import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 
 import androidx.appcompat.app.AlertDialog;
@@ -45,12 +48,17 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Locale;
+import java.util.Objects;
 
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
@@ -211,6 +219,23 @@ public class MainActivity extends AppCompatActivity {
             }
         } else if (requestCode == DICE_CUSTOMIZATION_ACTIVITY) {
             resetDiceList(new DiceConfigurationManager(this));
+        } else if (requestCode == Constants.DICE_EXPORT_FILE_ACTIVITY) {
+            if (resultCode != RESULT_OK) {
+                // The user cancelled the export
+                return;
+            }
+            saveDiceToExternalFile(data.getData());
+        } else if (requestCode == Constants.DICE_IMPORT_FILE_ACTIVITY) {
+            if (resultCode != RESULT_OK) {
+                // The user cancelled the import
+                return;
+            }
+            // close the log file so that the data can be overridden
+            logFile = null;
+            restoreDiceFromExternalFile(data.getData());
+            logFile = new LogFile(this);
+
+            resetDiceList(new DiceConfigurationManager(this));
         }
     }
 
@@ -223,6 +248,91 @@ public class MainActivity extends AppCompatActivity {
         MenuItem item = menu.findItem(R.id.addBonusItem).setTitle(
                 String.format(Locale.getDefault(), getResources().getString(R.string.bonusReadOut), bonus));
         return true;
+    }
+
+    public void onExportClick(MenuItem item) {
+        LinearLayout layout = findViewById(R.id.activity_main_top_level);
+        LayoutInflater inflater = getLayoutInflater();
+
+        final LinearLayout dialogView = (LinearLayout) inflater.inflate(
+                R.layout.message_ok_cancel, layout, false);
+
+        TextView message = dialogView.findViewById(R.id.message);
+        message.setText(R.string.exportOK);
+        final Dialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.exportDice).setView(dialogView).show();
+
+        Button button = dialogView.findViewById(R.id.cancelButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+
+        button = dialogView.findViewById(R.id.okButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Choose a file to save the dice data to.
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+
+                // Filter to only show results that can be "opened", such as a
+                // file (as opposed to a list of contacts or timezones)
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+                // Search for all documents available via installed storage providers.
+                // There is no document type for json.
+                intent.setType("*/*");
+
+                intent.putExtra(Intent.EXTRA_TITLE, Constants.EXPORT_FILE_NAME);
+                startActivityForResult(intent, Constants.DICE_EXPORT_FILE_ACTIVITY);
+
+                dialog.dismiss();
+            }
+        });
+    }
+
+    public void onImportClick(MenuItem item) {
+        LinearLayout layout = findViewById(R.id.activity_main_top_level);
+        LayoutInflater inflater = getLayoutInflater();
+
+        final LinearLayout dialogView = (LinearLayout) inflater.inflate(
+                R.layout.message_ok_cancel, layout, false);
+
+        TextView message = dialogView.findViewById(R.id.message);
+        message.setText(R.string.importOK);
+        final Dialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.importDice).setView(dialogView).show();
+
+        Button button = dialogView.findViewById(R.id.cancelButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+
+        button = dialogView.findViewById(R.id.okButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Choose a file to save the dice data to.
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+
+                // Filter to only show results that can be "opened", such as a
+                // file (as opposed to a list of contacts or timezones)
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+                // Search for all documents available via installed storage providers.
+                // There is no document type for json.
+                intent.setType("*/*");
+
+                intent.putExtra(Intent.EXTRA_TITLE, Constants.EXPORT_FILE_NAME);
+                startActivityForResult(intent, Constants.DICE_IMPORT_FILE_ACTIVITY);
+                dialog.dismiss();
+            }
+        });
     }
 
     public void onBonusClick(MenuItem item) {
@@ -396,6 +506,66 @@ public class MainActivity extends AppCompatActivity {
         view.setEnabled(false);
         view.setBackground(getDrawable(R.drawable.drop_changes_grayscale));
         Draw.resetView();
+    }
+
+    private void displayMessageDialog(int titleID, int messageID) {
+        LinearLayout layout = findViewById(R.id.activity_main_top_level);
+        LayoutInflater inflater = getLayoutInflater();
+
+        final LinearLayout dialogView = (LinearLayout) inflater.inflate(
+                R.layout.message_dialog, layout, false);
+
+        TextView message = dialogView.findViewById(R.id.message);
+        message.setText(messageID);
+        final Dialog dialog = new AlertDialog.Builder(this)
+                .setTitle(titleID).setView(dialogView).show();
+
+        Button button = dialogView.findViewById(R.id.okButton);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+    }
+
+    private void saveDiceToExternalFile(Uri file) {
+        boolean succeeded = true;
+        try {
+            ParcelFileDescriptor pfd = getContentResolver().openFileDescriptor(file, "w");
+            if (pfd == null) {
+                return;
+            }
+            FileOutputStream fileOutputStream = new FileOutputStream(pfd.getFileDescriptor());
+            succeeded = DataExporter.exportAllToFile(this, fileOutputStream);
+
+            // Let the document provider know you're done by closing the stream.
+            fileOutputStream.close();
+            pfd.close();
+        } catch (FileNotFoundException e) {
+            succeeded = false;
+        } catch (IOException e) {
+            succeeded = false;
+        }
+
+        if (!succeeded) {
+            displayMessageDialog(R.string.error, R.string.errorExportFailed);
+        }
+    }
+
+    private void restoreDiceFromExternalFile(Uri uri) {
+        boolean succeeded = true;
+        try {
+            InputStream inputStream = getContentResolver().openInputStream(uri);
+            succeeded = DataExporter.importAllFromFile(this, inputStream);
+
+        } catch (IOException e) {
+            succeeded = false;
+        }
+
+        if (!succeeded) {
+            displayMessageDialog(R.string.error, R.string.errorImportFailed);
+        }
     }
 
     public void setSurfaceReady(boolean inIsReady) {

@@ -19,6 +19,12 @@
     <string name="new_dice">New Dice</string>
     <string name="favorites">Favorites:</string>
     <string name="configureDice">Reorder Dice</string>
+    <string name="importDice">Import</string>
+    <string name="importOK">This feature replaces all configuration in Rainbow Dice with configuration from the file.
+        Do you want to import?.</string>
+    <string name="exportDice">Export</string>
+    <string name="exportOK">Export all of the configuration information and logs from Rainbow Dice into an external file.
+        Do you want to export?</string>
     <string name="diceMessageRolling">Rolling&#8230;</string>
     <string name="diceMessageResult">result: %s: %s%s = %s</string>
     <string name="diceMessageResult2">result: %s: %s</string>
@@ -34,6 +40,8 @@
     <string name="diceMessageStartup">Click on a dice name above to roll, or add new dice by selecting "New Dice" from the menu.</string>
     <string name="errorNoDiceDefinitions">There are dice listed.  Create some with "Choose Dice->New".</string>
     <string name="errorRenameFailed">Rename failed: new dice name cannot be too long or contain directory separators.</string>
+    <string name="errorExportFailed">Export failed.</string>
+    <string name="errorImportFailed">Import failed.</string>
     <string name="confirm">Delete dice configuration: %s?</string>
     <string name="D1">Bonus</string>
     <string name="D2">Coin</string>

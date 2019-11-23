@@ -91,23 +91,39 @@ public class ConfigurationFile {
 
         try {
             JSONObject obj = new JSONObject(json.toString());
-            int versionNbr;
-            try {
-                versionNbr = obj.getInt(version);
-            } catch (JSONException e) {
-                // if there is no version, then we are using version 0.
-                versionNbr = 0;
-            }
-
-            if (versionNbr == 0) {
-                loadVersion0(obj);
-            } else if (versionNbr == 1) {
-                loadVersion1(obj);
-            }
+            loadFromJSON(obj);
         } catch (JSONException e) {
         }
+
     }
 
+    ConfigurationFile(Context inCtx, JSONObject obj) throws JSONException {
+        ctx = inCtx;
+        diceConfigList = new LinkedList<>();
+        themeName = "Space";
+        m_useGravity = true;
+        m_useLegacy = false;
+        m_drawRollingDice = true;
+        m_bonus = 0;
+        m_reverseGravity = false;
+        loadFromJSON(obj);
+    }
+
+    private void loadFromJSON(JSONObject obj) throws JSONException {
+        int versionNbr;
+        try {
+            versionNbr = obj.getInt(version);
+        } catch (JSONException e) {
+            // if there is no version, then we are using version 0.
+            versionNbr = 0;
+        }
+
+        if (versionNbr == 0) {
+            loadVersion0(obj);
+        } else if (versionNbr == 1) {
+            loadVersion1(obj);
+        }
+    }
     private void loadVersion0(JSONObject obj) throws JSONException {
         String fav1File = obj.getString(favorite1);
         String fav2File = obj.getString(favorite2);
@@ -158,26 +174,31 @@ public class ConfigurationFile {
         }
     }
 
+    public JSONObject toJSON() throws JSONException {
+        JSONObject obj = new JSONObject();
+
+        obj.put(version, 1);
+
+        JSONArray arr = new JSONArray();
+        for (String dice : diceConfigList) {
+            arr.put(dice);
+        }
+
+        obj.put(diceList, arr);
+        obj.put(theme, themeName);
+        obj.put(useLegacy, m_useLegacy);
+        obj.put(useGravity, m_useGravity);
+        obj.put(drawRollingDice, m_drawRollingDice);
+        obj.put(bonusValue, m_bonus);
+        obj.put(reverseGravityStr, m_reverseGravity);
+
+        return obj;
+    }
+
     public void writeFile() {
         String json;
         try {
-            JSONObject obj = new JSONObject();
-
-            obj.put(version, 1);
-
-            JSONArray arr = new JSONArray();
-            for (String dice : diceConfigList) {
-                arr.put(dice);
-            }
-
-            obj.put(diceList, arr);
-            obj.put(theme, themeName);
-            obj.put(useLegacy, m_useLegacy);
-            obj.put(useGravity, m_useGravity);
-            obj.put(drawRollingDice, m_drawRollingDice);
-            obj.put(bonusValue, m_bonus);
-            obj.put(reverseGravityStr, m_reverseGravity);
-
+            JSONObject obj = toJSON();
             json = obj.toString();
         } catch (JSONException e) {
             System.out.println("Exception in writing out JSON: " + e.getMessage());

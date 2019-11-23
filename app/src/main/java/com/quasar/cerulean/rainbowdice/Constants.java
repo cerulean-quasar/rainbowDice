@@ -27,6 +27,7 @@ public class Constants {
     public static final String DICE_CONFIGURATION = "DiceConfiguration";
     public static final String DICE_BEING_EDITED = "DiceBeingEdited";
 
+    // Settings Activity
     public static final int DICE_THEME_SELECTION_ACTIVITY = 3;
     public static final String themeNameConfigValue = "ThemeName";
     public static final String GRAPHICS_API_NAME = "graphics_api_name";
@@ -37,12 +38,20 @@ public class Constants {
     public static final String SENSOR_HAS_GRAVITY = "sensor_has_gravity";
     public static final String SENSOR_HAS_ACCELEROMETER = "sensor_has_accelerometer";
 
+    // Log file activity
     public static final int DICE_LOG_FILE_ACTIVITY = 4;
 
     // DiceSidesActivity
     public static final int DICE_SIDES_ACTIVITY = 5;
     public static final String DICE_SIDE_CONFIGURATION = "DiceSideConfiguration";
     public static final String DICE_SIDES_JSON = "DiceSidesJson";
+
+    // Export Config Activity
+    public static final int DICE_EXPORT_FILE_ACTIVITY = 6;
+    public static final String EXPORT_FILE_NAME = "rainbowDice.json";
+
+    // Import Config Activity
+    public static final int DICE_IMPORT_FILE_ACTIVITY = 7;
 
     // Dice colors
     public static final float[] RED = new float[]{1.0f, 0.0f, 0.0f, 1.0f};

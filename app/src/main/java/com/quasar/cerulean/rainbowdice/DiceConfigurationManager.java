@@ -22,6 +22,9 @@ package com.quasar.cerulean.rainbowdice;
 
 import android.content.Context;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -40,17 +43,19 @@ public class DiceConfigurationManager {
         excludeFiles[1] = LogFile.diceLogFilename;
 
         File[] filearr = ctx.getFilesDir().listFiles();
-        for (File file : filearr) {
-            boolean found = false;
-            for (String filename : excludeFiles) {
-                if (file.getName().equals(filename)) {
-                    found = true;
-                    break;
+        if (filearr != null) {
+            for (File file : filearr) {
+                boolean found = false;
+                for (String filename : excludeFiles) {
+                    if (file.getName().equals(filename)) {
+                        found = true;
+                        break;
+                    }
                 }
-            }
 
-            if (!found) {
-                diceFileList.add(file.getName());
+                if (!found) {
+                    diceFileList.add(file.getName());
+                }
             }
         }
 
@@ -124,4 +129,7 @@ public class DiceConfigurationManager {
         config.writeFile();
     }
 
+    public JSONObject getConfigJSON() throws JSONException {
+        return config.toJSON();
+    }
 }
