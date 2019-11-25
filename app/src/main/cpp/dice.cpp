@@ -1849,7 +1849,7 @@ void DiceModelRhombicTriacontahedron::loadModel(std::shared_ptr<TextureAtlas> co
             cornerNormal[i] = {0.0f, 0.0f, 0.0f};
             for (auto const &faceIndexForVertex : facesForVertex(vertices[i])) {
                 corners(faceIndexForVertex, p0, p1, p2, p3);
-                cornerNormal[i] += glm::cross(p3 - p0, p1 - p0);
+                cornerNormal[i] += glm::cross(p1 - p0, p3 - p0);
             }
             cornerNormal[i] = glm::normalize(cornerNormal[i]);
         }
@@ -1897,12 +1897,12 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
 
     Vertex vertex{};
     vertex.mode = Vertex::MODE_EDGE_DISTANCE;
-    vertex.corner1 = p3;
-    vertex.corner2 = p2;
-    vertex.corner3 = p1;
-    vertex.corner4 = p0;
+    vertex.corner1 = p0;
+    vertex.corner2 = p1;
+    vertex.corner3 = p2;
+    vertex.corner4 = p3;
     vertex.corner5 = {1000.0, 1000.0, 1000.0};
-    vertex.normal = glm::normalize(glm::cross(p3-p0, p1-p0));
+    vertex.normal = glm::normalize(glm::cross(p1-p0, p3-p0));
 
     vertex.pos = p0;
     vertex.color = color(faceIndex);
@@ -1924,11 +1924,11 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.cornerNormal = cornerNormal1;
     if (rotate) {
         vertex.texCoord = {textureCoords.left + 0.5*symbolWidthTextureSpace,
-                           textureCoords.bottom +
-                           symbolHeightTextureSpace * glm::length(0.5f*(t1+t2) - p1)/glm::length(t0-t1)};
+                           textureCoords.top -
+                           symbolHeightTextureSpace*glm::length(0.5f*(t3+t0) - p3)/glm::length(t0-t1)};
     } else {
-        vertex.texCoord = {textureCoords.right +
-                           symbolWidthTextureSpace * glm::length(p1 - v) / glm::length(v - u),
+        vertex.texCoord = {textureCoords.left -
+                           symbolWidthTextureSpace * glm::length(p3 - u) / glm::length(v - u),
                            textureCoords.bottom - symbolHeightTextureSpace * 0.5f};
     }
     vertices.push_back(vertex);
@@ -1953,21 +1953,21 @@ void DiceModelRhombicTriacontahedron::addVertices(std::shared_ptr<TextureAtlas> 
     vertex.cornerNormal = cornerNormal3;
     if (rotate) {
         vertex.texCoord = {textureCoords.left + symbolWidthTextureSpace * 0.5f,
-                           textureCoords.top -
-                           symbolHeightTextureSpace*glm::length(0.5f*(t3+t0) - p3)/glm::length(t0-t1)};
+                           textureCoords.bottom +
+                           symbolHeightTextureSpace * glm::length(0.5f*(t1+t2) - p1)/glm::length(t0-t1)};
     } else {
-        vertex.texCoord = {textureCoords.left -
-                           symbolWidthTextureSpace * glm::length(p3 - u) / glm::length(v - u),
+        vertex.texCoord = {textureCoords.right +
+                           symbolWidthTextureSpace * glm::length(p1 - v) / glm::length(v - u),
                            textureCoords.bottom - symbolHeightTextureSpace * 0.5f};
     }
     vertices.push_back(vertex);
 
     indices.push_back(0 + faceIndex*4);
-    indices.push_back(3 + faceIndex*4);
-    indices.push_back(1 + faceIndex*4);
     indices.push_back(1 + faceIndex*4);
     indices.push_back(3 + faceIndex*4);
+    indices.push_back(1 + faceIndex*4);
     indices.push_back(2 + faceIndex*4);
+    indices.push_back(3 + faceIndex*4);
 }
 
 std::vector<uint32_t> DiceModelRhombicTriacontahedron::facesForVertex(uint32_t vertexNumber) {
@@ -2329,7 +2329,7 @@ void DiceModelRhombicTriacontahedron::getAngleAxis(uint32_t faceIndex, float &an
     glm::vec3 p0 = glm::vec3(p04.x, p04.y, p04.z);
     glm::vec3 p1 = glm::vec3(p14.x, p14.y, p14.z);
     glm::vec3 p2 = glm::vec3(p24.x, p24.y, p24.z);
-    axis = glm::normalize(glm::cross(p0-p1, p2-p1));
+    axis = glm::normalize(glm::cross(p2-p1, p0-p1));
     angle = glm::acos(glm::dot(axis, zaxis));
 }
 
