@@ -47,10 +47,10 @@
 #include "dice.hpp"
 #include "graphicsVulkan.hpp"
 #include "TextureAtlasVulkan.h"
-#include "../../../../../../Android/Sdk/ndk/20.0.5594570/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/memory"
 
 struct PerObjectFragmentVariables {
     int isSelected;
+    float edgeWidth;
 };
 
 VkVertexInputBindingDescription getBindingDescription();
@@ -225,7 +225,7 @@ class DiceVulkan : public DiceGraphics<VulkanGraphics> {
 public:
     inline auto const &descriptorSet() { return m_descriptorSet; }
 
-    void updateUniformBuffer(glm::mat4 const &proj, glm::mat4 const &view) {
+    void updateUniformBufferVertexVariables(glm::mat4 const &proj, glm::mat4 const &view) {
         UniformBufferObject ubo;
         ubo.proj = m_die->alterPerspective(proj);
         ubo.view = view;
@@ -233,9 +233,17 @@ public:
         m_uniformBuffer->copyRawTo(&ubo, sizeof(ubo));
     }
 
+    void updateUniformBuffer(glm::mat4 const &proj, glm::mat4 const &view) {
+        updateUniformBufferVertexVariables(proj, view);
+        if (m_die->isStopped()) {
+            updateUniformBufferFragmentVariables();
+        }
+    }
+
     void updateUniformBufferFragmentVariables() {
         PerObjectFragmentVariables fragmentVariables = {};
         fragmentVariables.isSelected = m_isSelected ? 1 : 0;
+        fragmentVariables.edgeWidth = m_die->edgeWidth();
         m_uniformBufferFrag->copyRawTo(&fragmentVariables, sizeof (fragmentVariables));
     }
 
@@ -346,7 +354,7 @@ public:
                     SHADER_LINES_VERT_FILE, SHADER_LINES_FRAG_FILE);
             m_diceBox = std::make_shared<DiceBoxVulkan>(m_device, m_descriptorSetLayoutDiceBox, m_descriptorPoolsDiceBox,
                     m_commandPool, m_viewPointBuffer, m_proj, m_view,
-                    m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+                    m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxDicePosZ);
         }
     }
 

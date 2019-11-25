@@ -205,7 +205,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             animationDone = true;
             m_position.x = doneX;
             m_position.y = doneY;
-            m_position.z = M_maxposz;
+            m_position.z = stoppedMoveToZ;
             glm::mat4 scale = glm::scale(glm::vec3(stoppedRadius, stoppedRadius, stoppedRadius));
             if (stoppedAngle != 0) {
                 glm::quat q = glm::angleAxis(stoppedAngle, stoppedRotationAxis);
@@ -228,7 +228,7 @@ bool DicePhysicsModel::updateModelMatrix() {
                          stoppedPositionX;
             m_position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
                          stoppedPositionY;
-            m_position.z = (M_maxposz - stoppedPositionZ) / stoppedAnimationTime * animationTime +
+            m_position.z = (stoppedMoveToZ - stoppedPositionZ) / stoppedAnimationTime * animationTime +
                     stoppedPositionZ;
             glm::mat4 rotate;
             if (stoppedAngle != 0) {
@@ -472,7 +472,7 @@ void DicePhysicsModel::positionDice(uint32_t inUpFaceIndex, float x, float y) {
 
     m_position.x = x;
     m_position.y = y;
-    m_position.z = M_maxposz;
+    m_position.z = stoppedMoveToZ;
     stoppedPositionX = x;
     stoppedPositionY = y;
 
@@ -1847,7 +1847,7 @@ void DiceModelRhombicTriacontahedron::loadModel(std::shared_ptr<TextureAtlas> co
         corners(faceIndex, vertices[0], vertices[1], vertices[2], vertices[3]);
         for (uint32_t i = 0; i < 4; i++) {
             cornerNormal[i] = {0.0f, 0.0f, 0.0f};
-            for (auto &&faceIndexForVertex : facesForVertex(vertices[i])) {
+            for (auto const &faceIndexForVertex : facesForVertex(vertices[i])) {
                 corners(faceIndexForVertex, p0, p1, p2, p3);
                 cornerNormal[i] += glm::cross(p3 - p0, p1 - p0);
             }
@@ -2367,12 +2367,15 @@ void DiceModelRhombicTriacontahedron::yAlign(uint32_t faceIndex) {
 
 glm::mat4 DiceModelRhombicTriacontahedron::alterPerspective(glm::mat4 proj) {
     // I don't know why, but we need to invert the z-axis if using OpenGL for this dice type only.
-    if (isOpenGl) {
+    // this is not needed if you cull back faces.  There is still something very wrong with this
+    // model.  The cull back faces thing is a clue.  Also, the y axis seems to be inverted (i.e.
+    // the wrong side of the dice (in y) is lit up).
+    /*if (isOpenGl) {
         proj[0][2] *= -1;
         proj[1][2] *= -1;
         proj[2][2] *= -1;
         proj[3][2] *= -1;
-    }
+    }*/
 
     return proj;
 }

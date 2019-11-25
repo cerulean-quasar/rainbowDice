@@ -333,10 +333,10 @@ public:
     virtual void scale(float scaleFactor) {
         m_viewPoint.z /= scaleFactor;
 
-        if (m_viewPoint.z > m_maxZ) {
-            m_viewPoint.z = m_maxZ;
-        } else if (m_viewPoint.z < m_minZ) {
-            m_viewPoint.z = m_minZ;
+        if (m_viewPoint.z > M_maxViewPointZ) {
+            m_viewPoint.z = M_maxViewPointZ;
+        } else if (m_viewPoint.z < M_minViewPointZ) {
+            m_viewPoint.z = M_minViewPointZ;
         }
 
         setView();
@@ -355,10 +355,13 @@ public:
          * view planes.
          */
         m_proj = glm::perspective(glm::radians(67.0f), surfaceWidth / (float) surfaceHeight,
-                                  0.1f, 10.0f);
+                                  0.1f, 50.0f);
         getScreenCoordinatesInWorldSpace();
+        auto wh = getScreenCoordinatesInWorldSpaceGivenZ(DicePhysicsModel::stoppedMoveToZ + DicePhysicsModel::stoppedRadius);
+        m_screenWidthStoppedDicePlane = wh.first;
+        m_screenHeightStoppedDicePlane = wh.second;
         DicePhysicsModel::setMaxXYZ(m_screenWidth/2.0f - DicePhysicsModel::radius,
-                m_screenHeight/2.0f - DicePhysicsModel::radius, M_maxZ - DicePhysicsModel::radius);
+                m_screenHeight/2.0f - DicePhysicsModel::radius, M_maxDicePosZ - DicePhysicsModel::radius);
     }
 
     virtual void resetView() {
@@ -422,10 +425,13 @@ public:
     virtual ~RainbowDice() = default;
 
 protected:
-    static float constexpr M_maxZ = 1.0f + DicePhysicsModel::radius;
+    static float constexpr M_maxDicePosZ = 1.0f + DicePhysicsModel::radius;
 
     float m_screenWidth;
     float m_screenHeight;
+
+    float m_screenWidthStoppedDicePlane;
+    float m_screenHeightStoppedDicePlane;
 
     std::string m_diceName;
     std::vector<std::shared_ptr<DiceDescription>> m_diceDescriptions;
@@ -439,14 +445,14 @@ protected:
 
     bool m_isModifiedRoll;
 
-    static constexpr float m_maxZ = 10.0f;
-    static constexpr float m_minZ = 1.5f;
+    static constexpr float M_maxViewPointZ = 10.0f;
+    static constexpr float M_minViewPointZ = 1.5f;
     static constexpr float m_maxScroll = 10.0f;
     static glm::vec3 startViewPointCenterPosition() { return {0.0f, 0.0f, 0.0f}; }
     static glm::vec3 startViewPoint() { return {0.0f, 0.0f, 3.0f}; };
 
     void getScreenCoordinatesInWorldSpace() {
-        auto wh = getScreenCoordinatesInWorldSpaceGivenZ(M_maxZ);
+        auto wh = getScreenCoordinatesInWorldSpaceGivenZ(M_maxDicePosZ);
         m_screenWidth = wh.first;
         m_screenHeight = wh.second;
     }
@@ -463,8 +469,8 @@ protected:
     }
 
     void scroll(float distanceX, float distanceY, uint32_t windowWidth, uint32_t windowHeight) {
-        float x = distanceX/windowWidth * 2.0f;
-        float y = distanceY/windowHeight * 2.0f;
+        float x = distanceX/windowWidth * 4.0f;
+        float y = distanceY/windowHeight * 4.0f;
 
         m_viewPointCenterPosition.x += x;
         m_viewPointCenterPosition.y -= y;
@@ -597,6 +603,16 @@ protected:
 private:
     void addRerollDice(bool resetPosition);
     void moveDiceToStoppedRandomUpface();
+
+    std::pair<float, float> findStoppedDiceXY(int diceNbr) {
+        auto nbrX = static_cast<uint32_t>(m_screenWidthStoppedDicePlane / (2 * DicePhysicsModel::stoppedRadius));
+        uint32_t stoppedX = diceNbr % nbrX;
+        uint32_t stoppedY = diceNbr / nbrX;
+        float x = -m_screenWidthStoppedDicePlane / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
+        float y = m_screenHeightStoppedDicePlane / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
+
+        return std::make_pair(x, y);
+    }
 };
 
 // Template class functions
@@ -695,8 +711,6 @@ bool RainbowDiceGraphics<DiceType, DiceBoxType>::updateUniformBuffer() {
 
     bool needsRedraw = false;
     uint32_t i = 0;
-    float width = m_screenWidth;
-    float height = m_screenHeight;
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->die()->updateModelMatrix()) {
@@ -707,12 +721,8 @@ bool RainbowDiceGraphics<DiceType, DiceBoxType>::updateUniformBuffer() {
             // positioned, then the stopped animation is done, but never started.
             if (die->die()->isStopped() && !die->die()->isStoppedAnimationDone() &&
                 !die->die()->isStoppedAnimationStarted()) {
-                auto nbrX = static_cast<uint32_t>(width / (2 * DicePhysicsModel::stoppedRadius));
-                uint32_t stoppedX = i % nbrX;
-                uint32_t stoppedY = i / nbrX;
-                float x = -width / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-                float y = height / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-                die->die()->animateMove(x, y);
+                auto xy = findStoppedDiceXY(i);
+                die->die()->animateMove(xy.first, xy.second);
             }
             i++;
         }
@@ -743,9 +753,6 @@ template <typename DiceType, typename DiceBoxType>
 void RainbowDiceGraphics<DiceType, DiceBoxType>::resetToStoppedPositions(std::vector<std::vector<uint32_t>> const &upFaceIndices) {
     uint32_t i = 0;
     uint32_t k = 0;
-    float width = m_screenWidth;
-    float height = m_screenHeight;
-    auto nbrX = static_cast<uint32_t>(width/(2*DicePhysicsModel::stoppedRadius));
 
     for (auto diceIt = m_dice.begin(); diceIt != m_dice.end(); diceIt++) {
         size_t size = diceIt->size();
@@ -758,20 +765,16 @@ void RainbowDiceGraphics<DiceType, DiceBoxType>::resetToStoppedPositions(std::ve
             break;
         }
         for (uint32_t j = 0; j < upFaceIndices[i].size(); j++) {
-            uint32_t stoppedX = k%nbrX;
-            uint32_t stoppedY = k/nbrX;
-            float x = -width/2 + (2*stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = height/2 - (2*stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-
+            auto xy = findStoppedDiceXY(k);
             if (j < size) {
                 auto diceItj = diceIt->begin();
                 for (int l = 0; l < j; l++) {
                     diceItj++;
                 }
-                diceItj->get()->die()->positionDice(upFaceIndices[i][j], x, y);
+                diceItj->get()->die()->positionDice(upFaceIndices[i][j], xy.first, xy.second);
             } else {
                 auto die = createDie(*(diceIt->begin()));
-                die->die()->positionDice(upFaceIndices[i][j], x, y);
+                die->die()->positionDice(upFaceIndices[i][j], xy.first, xy.second);
                 diceIt->push_back(die);
             }
             k++;
@@ -840,14 +843,10 @@ void RainbowDiceGraphics<DiceType, DiceBoxType>::addRollingDice() {
 template <typename DiceType, typename DiceBoxType>
 void RainbowDiceGraphics<DiceType, DiceBoxType>::moveDiceToStoppedRandomUpface() {
     int i=0;
-    auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
-            uint32_t stoppedX = i % nbrX;
-            uint32_t stoppedY = i / nbrX;
-            float x = -m_screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = m_screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die()->positionDice(x, y, true);
+            auto xy = findStoppedDiceXY(i);
+            die->die()->positionDice(xy.first, xy.second, true);
             i++;
         }
     }
@@ -856,14 +855,10 @@ void RainbowDiceGraphics<DiceType, DiceBoxType>::moveDiceToStoppedRandomUpface()
 template <typename DiceType, typename DiceBoxType>
 void RainbowDiceGraphics<DiceType, DiceBoxType>::moveDiceToStoppedPositions() {
     int i=0;
-    auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
-            uint32_t stoppedX = i % nbrX;
-            uint32_t stoppedY = i / nbrX;
-            float x = -m_screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-            float y = m_screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-            die->die()->positionDice(x, y, false);
+            auto xy = findStoppedDiceXY(i);
+            die->die()->positionDice(xy.first, xy.second, false);
             i++;
         }
     }
@@ -872,15 +867,11 @@ void RainbowDiceGraphics<DiceType, DiceBoxType>::moveDiceToStoppedPositions() {
 template <typename DiceType, typename DiceBoxType>
 void RainbowDiceGraphics<DiceType, DiceBoxType>::animateMoveStoppedDice() {
     int i=0;
-    auto nbrX = static_cast<uint32_t>(m_screenWidth / (2 * DicePhysicsModel::stoppedRadius));
     for (auto const &dice : m_dice) {
         for (auto const &die : dice) {
             if (die->die()->isStopped()) {
-                uint32_t stoppedX = i % nbrX;
-                uint32_t stoppedY = i / nbrX;
-                float x = -m_screenWidth / 2 + (2 * stoppedX + 1) * DicePhysicsModel::stoppedRadius;
-                float y = m_screenHeight / 2 - (2 * stoppedY + 1) * DicePhysicsModel::stoppedRadius;
-                die->die()->animateMove(x, y);
+                auto xy = findStoppedDiceXY(i);
+                die->die()->animateMove(xy.first, xy.second);
             }
             i++;
         }

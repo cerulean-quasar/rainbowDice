@@ -219,10 +219,13 @@ private:
     std::vector<float> m_color;
 public:
     // radius of a die when it is done rolling (It is shrunk and moved out of the rolling space).
-    static float constexpr stoppedRadius = 0.2f;
+    static float constexpr stoppedRadius = 0.5f;
 
     // radius of a die while rolling.
     static float constexpr radius = 0.3f;
+
+    // where the dice are moved to in Z when they are stopped.
+    static float constexpr stoppedMoveToZ = -1.0f - radius - 2*stoppedRadius;
 
     /* Set previous position to a bogus value to make sure the die is drawn first thing */
     DicePhysicsModel(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
@@ -303,6 +306,15 @@ public:
     uint32_t getResult() { return result; }
     void resetPosition();
     virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) = 0;
+    virtual float stoppedEdgeWidth() = 0;
+    virtual float rollingEdgeWidth() = 0;
+    float edgeWidth() {
+        if (isStopped()) {
+            return stoppedEdgeWidth();
+        } else {
+            return rollingEdgeWidth();
+        }
+    }
     uint32_t calculateUpFace();
     void randomizeUpFace();
     virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
@@ -337,7 +349,6 @@ public:
 
     static std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
                                                         std::vector<float> const &color, bool isOpenGL = false);
-
 };
 
 class DiceModelCube : public DicePhysicsModel {
@@ -357,9 +368,11 @@ public:
     {
     }
 
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
-    virtual void yAlign(uint32_t faceIndex);
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) override;
+    void yAlign(uint32_t faceIndex) override;
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.03f; }
 };
 
 
@@ -406,10 +419,12 @@ public:
         }
     }
 
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
-    virtual uint32_t getUpFaceIndex(uint32_t i);
-    virtual void yAlign(uint32_t faceIndex);
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) override;
+    uint32_t getUpFaceIndex(uint32_t i) override;
+    void yAlign(uint32_t faceIndex) override;
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.03f; }
 };
 
 class DiceModelTetrahedron : public DiceModelHedron {
@@ -427,12 +442,14 @@ public:
     {
     }
 
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    uint32_t getFaceIndexForSymbol(std::string symbol) override {
         return DicePhysicsModel::getFaceIndexForSymbol(symbol);
     }
 
-    virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
+    uint32_t getUpFaceIndex(uint32_t index) override { return index; }
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.03f; }
 };
 
 class DiceModelIcosahedron : public DiceModelHedron {
@@ -450,11 +467,13 @@ public:
     {
     }
 
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual uint32_t getUpFaceIndex(uint32_t index) { return index; }
-    virtual uint32_t getFaceIndexForSymbol(std::string symbol) {
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    uint32_t getUpFaceIndex(uint32_t index) override { return index; }
+    uint32_t getFaceIndexForSymbol(std::string symbol) override {
         return DicePhysicsModel::getFaceIndexForSymbol(symbol);
     }
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.02f; }
 };
 
 class DiceModelDodecahedron : public DicePhysicsModel {
@@ -477,9 +496,11 @@ public:
     {
     }
 
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
-    virtual void yAlign(uint32_t faceIndex);
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) override;
+    void yAlign(uint32_t faceIndex) override;
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.03f; }
 };
 
 class DiceModelRhombicTriacontahedron : public DicePhysicsModel {
@@ -523,10 +544,12 @@ public:
         }
     }
 
-    virtual glm::mat4 alterPerspective(glm::mat4 proj);
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
-    virtual void yAlign(uint32_t faceIndex);
+    glm::mat4 alterPerspective(glm::mat4 proj) override;
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) override;
+    void yAlign(uint32_t faceIndex) override;
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.02f; }
 };
 
 class DiceModelCoin : public DicePhysicsModel {
@@ -549,9 +572,11 @@ public:
     {
     }
 
-    virtual void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas);
-    virtual void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis);
-    virtual void yAlign(uint32_t faceIndex);
+    void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
+    void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) override;
+    void yAlign(uint32_t faceIndex) override;
+    float rollingEdgeWidth() override { return 0.01f; }
+    float stoppedEdgeWidth() override { return 0.03f; }
 };
 
 #endif /* RAINBOWDICE_DICE_HPP */

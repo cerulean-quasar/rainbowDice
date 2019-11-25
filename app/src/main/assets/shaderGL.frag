@@ -35,6 +35,7 @@ varying float fragMode;
 uniform sampler2D texSampler;
 uniform vec3 viewPosition;
 uniform int isSelected;
+uniform float edgeWidth;
 
 float proximity(vec3 position, vec3 sideNormal, float factor, vec3 sideAvg) {
     if (length(sideNormal) == 0.0) {
@@ -71,7 +72,7 @@ void main() {
     vec3 halfWayDirection = normalize(lightDirection + viewDirection);
 
     vec3 specNormal;
-    float factor = 0.01;
+    float factor = edgeWidth;
     float factor2 = 0.005;
 
     vec3 sideNormal1;

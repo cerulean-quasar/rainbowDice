@@ -39,6 +39,7 @@ layout(set = 0, binding = 2) uniform UniformBufferObject {
 
 layout(set = 0, binding = 3) uniform UniformBufferObjectObj {
     int isSelected;
+    float edgeWidth;
 } fragPerObjUbo;
 
 layout(location = 0) out vec4 outColor;
@@ -78,7 +79,7 @@ void main() {
     vec3 halfWayDirection = normalize(lightDirection + viewDirection);
 
     vec3 specNormal;
-    float factor = 0.01;
+    float factor = fragPerObjUbo.edgeWidth;
     float factor2 = 0.005;
 
     vec3 sideNormal1;

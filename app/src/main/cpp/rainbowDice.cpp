@@ -20,7 +20,7 @@
 
 #include "rainbowDice.hpp"
 
-float constexpr RainbowDice::M_maxZ;
+float constexpr RainbowDice::M_maxDicePosZ;
 
 glm::vec3 Filter::acceleration(glm::vec3 const &sensorInputs) {
     float RC = 3.0f;

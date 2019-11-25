@@ -182,7 +182,7 @@ std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
     return attributeDescriptions;
 }
 
-/* for accessing data other than the vertices from the shaders */
+/* for accessing data other than the vertices from the shaders for the dice. */
 void DiceDescriptorSetLayout::createDescriptorSetLayout() {
     /* MVP matrix */
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
@@ -239,7 +239,7 @@ void DiceDescriptorSetLayout::createDescriptorSetLayout() {
     m_descriptorSetLayout.reset(descriptorSetLayoutRaw, deleter);
 }
 
-/* descriptor set for the MVP matrix and texture samplers */
+/* descriptor set for the MVP matrix and texture samplers for the dice */
 void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer> const &uniformBuffer,
                                                   std::shared_ptr<vulkan::Buffer> const &viewPointBuffer,
                                                   std::shared_ptr<vulkan::Buffer> const &perObjFragVars,
@@ -314,7 +314,7 @@ void DiceDescriptorSetLayout::updateDescriptorSet(std::shared_ptr<vulkan::Buffer
     vkUpdateDescriptorSets(m_device->logicalDevice().get(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-/* for accessing data other than the vertices from the shaders */
+/* for accessing data other than the vertices from the shaders for the box the dice roll in */
 void DiceBoxDescriptorSetLayout::createDescriptorSetLayout() {
     /* MVP matrix */
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
@@ -466,7 +466,7 @@ void RainbowDiceVulkan::recreateSwapChain(uint32_t width, uint32_t height) {
         m_diceBox->updateUniformBuffer(m_projWithPreTransform, m_view);
 
         // needs to come after updatePerspectiveMatrix call.
-        m_diceBox->updateMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+        m_diceBox->updateMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxDicePosZ);
     }
 }
 
@@ -526,33 +526,6 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         VkDeviceSize offsets[1] = {0};
-        if (m_diceBox != nullptr && !allStopped()) {
-            /* bind the pipeline for the dice box */
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              m_graphicsPipelineDiceBox->pipeline().get());
-
-            VkBuffer vertexBuffer = m_diceBox->vertexBuffer()->buffer().get();
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, m_diceBox->indexBuffer()->buffer().get(), 0,
-                                 VK_INDEX_TYPE_UINT32);
-
-            /* The MVP matrix and view point vector */
-            VkDescriptorSet descriptorSet = m_diceBox->descriptorSet()->descriptorSet().get();
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_graphicsPipelineDiceBox->layout().get(), 0, 1,
-                                    &descriptorSet, 0, nullptr);
-
-            /* indexed draw command:
-             * parameter 1 - Command buffer for the draw command
-             * parameter 2 - the number of indices (the vertex count)
-             * parameter 3 - the instance count, use 1 because we are not using instanced rendering
-             * parameter 4 - offset into the index buffer
-             * parameter 5 - offset to add to the indices in the index buffer
-             * parameter 6 - offset for instance rendering
-             */
-            vkCmdDrawIndexed(commandBuffer, m_diceBox->nbrIndices(), 1, 0, 0, 0);
-        }
-
         /* bind the graphics pipeline to the command buffer, the second parameter tells Vulkan
          * that we are binding to a graphics pipeline.
          */
@@ -590,6 +563,33 @@ void RainbowDiceVulkan::initializeCommandBuffers() {
                  */
                 vkCmdDrawIndexed(commandBuffer, die->nbrIndices(), 1, 0, 0, 0);
             }
+        }
+
+        if (m_diceBox != nullptr && !allStopped()) {
+            /* bind the pipeline for the dice box */
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              m_graphicsPipelineDiceBox->pipeline().get());
+
+            VkBuffer vertexBuffer = m_diceBox->vertexBuffer()->buffer().get();
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, m_diceBox->indexBuffer()->buffer().get(), 0,
+                                 VK_INDEX_TYPE_UINT32);
+
+            /* The MVP matrix and view point vector */
+            VkDescriptorSet descriptorSet = m_diceBox->descriptorSet()->descriptorSet().get();
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    m_graphicsPipelineDiceBox->layout().get(), 0, 1,
+                                    &descriptorSet, 0, nullptr);
+
+            /* indexed draw command:
+             * parameter 1 - Command buffer for the draw command
+             * parameter 2 - the number of indices (the vertex count)
+             * parameter 3 - the instance count, use 1 because we are not using instanced rendering
+             * parameter 4 - offset into the index buffer
+             * parameter 5 - offset to add to the indices in the index buffer
+             * parameter 6 - offset for instance rendering
+             */
+            vkCmdDrawIndexed(commandBuffer, m_diceBox->nbrIndices(), 1, 0, 0, 0);
         }
 
         vkCmdEndRenderPass(commandBuffer);

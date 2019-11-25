@@ -177,7 +177,7 @@ public:
         updatePerspectiveMatrix(m_surface->width(), m_surface->height());
 
         if (!reverseGravity) {
-            m_diceBox = std::make_shared<DiceBoxGL>(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+            m_diceBox = std::make_shared<DiceBoxGL>(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxDicePosZ);
         }
     }
 

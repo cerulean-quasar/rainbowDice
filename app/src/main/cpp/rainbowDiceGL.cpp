@@ -122,6 +122,9 @@ namespace graphicsGL {
         glViewport(0, 0, m_width, m_height);
 
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
     }
 
     void Surface::destroySurface() {
@@ -217,6 +220,10 @@ void RainbowDiceGL::drawFrame() {
             // whether the die is selected
             GLint var = glGetUniformLocation(m_programID, "isSelected");
             glUniform1i(var, die->isSelected() ? 1 : 0);
+
+            // the width of the edges of the die
+            var = glGetUniformLocation(m_programID, "edgeWidth");
+            glUniform1f(var, die->die()->edgeWidth());
 
             // 1st attribute buffer : colors
             GLint colorID = glGetAttribLocation(m_programID, "inColor");
@@ -619,7 +626,7 @@ void RainbowDiceGL::recreateSwapChain(uint32_t width, uint32_t height) {
     init();
     updatePerspectiveMatrix(m_surface->width(), m_surface->height());
     if (m_diceBox != nullptr) {
-        m_diceBox->updateMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxZ);
+        m_diceBox->updateMaxXYZ(m_screenWidth/2.0f, m_screenHeight/2.0f, M_maxDicePosZ);
     }
     recreateModels();
     if (m_texture != nullptr) {

@@ -900,14 +900,10 @@ namespace vulkan {
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-
-        /* differs from what they said to do in the Vulkan tutorial.  We want both the destination and
-         * the source alpha channel to be considered when choosing the final alpha channel value in case
-         * the top surface is see through and we need to see the bottom one through it.
-         */
+        /* take the source alpha */
         colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_MAX;
+        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
         /* color blending for all the framebuffers and allows you to set blend constants used
          * as blend factors in the per framebuffer color blending operations
