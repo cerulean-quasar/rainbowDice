@@ -174,6 +174,8 @@ private:
 
     static float constexpr errorVal = 0.15f;
     static float constexpr viscosity = 2.0f;
+    static float constexpr maxStartVelocity = 10.0f;
+    static float constexpr startPosZRangeFactor = 0.5f; // should be between 0 and 1
 
     // Time for the stopped animation to complete
     static float constexpr stoppedAnimationTime = 0.5f; // seconds

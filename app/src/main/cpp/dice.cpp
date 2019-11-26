@@ -556,17 +556,16 @@ void DicePhysicsModel::randomizeUpFace() {
     m_position.x = random.getFloat(-M_maxposx, M_maxposx);
     m_position.y = random.getFloat(-M_maxposy, M_maxposy);
     if (M_reverseGravity) {
-        m_position.z = -M_maxposz;
+        m_position.z = random.getFloat(-M_maxposz, -M_maxposz*startPosZRangeFactor);
     } else {
-        m_position.z = M_maxposz;
+        m_position.z = random.getFloat(M_maxposz*startPosZRangeFactor, M_maxposz);
     }
 
     prevPosition = m_position;
 
-    float factor = 10;
-    velocity.x = random.getFloat(-factor, factor);
-    velocity.y = random.getFloat(-factor, factor);
-    velocity.x = random.getFloat(-factor, factor);
+    velocity.x = random.getFloat(-maxStartVelocity, maxStartVelocity);
+    velocity.y = random.getFloat(-maxStartVelocity, maxStartVelocity);
+    velocity.x = random.getFloat(-maxStartVelocity, maxStartVelocity);
 }
 
 void DiceModelCube::loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) {
