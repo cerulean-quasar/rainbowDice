@@ -127,7 +127,11 @@ void DiceWorker::waitingLoop() {
         auto event = diceChannel().getEvent();
         if (event->type() == DrawEvent::stopDrawing) {
             return;
-        } else if ((*event)(m_diceGraphics, m_notify)) {
+        }
+
+        bool reportResult = needsReport(event->type());
+
+        if ((*event)(m_diceGraphics, m_notify)) {
             nbrRequireRedraw++;
         }
 
@@ -140,6 +144,7 @@ void DiceWorker::waitingLoop() {
             } else if ((*event)(m_diceGraphics, m_notify)) {
                 nbrRequireRedraw++;
             }
+            reportResult = reportResult || needsReport(event->type());
         }
 
         if (m_diceGraphics->hasDice()) {
@@ -148,7 +153,7 @@ void DiceWorker::waitingLoop() {
             }
 
             while (!m_diceGraphics->allStopped()) {
-                std::shared_ptr<DrawEvent> eventDrawing = drawingLoop();
+                std::shared_ptr<DrawEvent> eventDrawing = drawingLoop(reportResult);
                 if (eventDrawing != nullptr) {
                     if (eventDrawing->type() == DrawEvent::stopDrawing) {
                         return;
@@ -161,7 +166,7 @@ void DiceWorker::waitingLoop() {
     }
 }
 
-std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
+std::shared_ptr<DrawEvent> DiceWorker::drawingLoop(bool reportResult) {
     Sensors sensor{m_whichSensors};
 
     while (true) {
@@ -235,9 +240,11 @@ std::shared_ptr<DrawEvent> DiceWorker::drawingLoop() {
                 m_diceGraphics->addRollingDice();
                 continue;
             }
-            std::vector<std::vector<uint32_t>> results = m_diceGraphics->getDiceResults();
-            m_notify->sendResult(m_diceGraphics->diceName(), m_diceGraphics->isModifiedRoll(),
-                    results, m_diceGraphics->getDiceDescriptions());
+            if (reportResult) {
+                std::vector<std::vector<uint32_t>> results = m_diceGraphics->getDiceResults();
+                m_notify->sendResult(m_diceGraphics->diceName(), m_diceGraphics->isModifiedRoll(),
+                                     results, m_diceGraphics->getDiceDescriptions());
+            }
             return std::shared_ptr<DrawEvent>();
         }
     }

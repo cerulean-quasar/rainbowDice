@@ -92,16 +92,14 @@ private:
 class DiceModel {
 protected:
     std::vector<std::string> symbols;
-    bool isOpenGl;
 
     /* vertex, index, and texture data for drawing the model */
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
 public:
-    explicit DiceModel(std::vector<std::string> const &inSymbols, bool inIsOpenGl = false)
+    explicit DiceModel(std::vector<std::string> const &inSymbols)
     {
-        isOpenGl = inIsOpenGl;
         symbols = inSymbols;
     }
 
@@ -213,6 +211,7 @@ private:
     bool animationDone;
     float doneX;
     float doneY;
+    float moveAnimationStartedRadius;
     float stoppedPositionX;
     float stoppedPositionY;
     float stoppedPositionZ;
@@ -231,8 +230,8 @@ public:
 
     /* Set previous position to a bogus value to make sure the die is drawn first thing */
     DicePhysicsModel(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                     uint32_t inNumberFaces, bool inIsOpenGl = false)
-        : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
+                     uint32_t inNumberFaces)
+        : DiceModel(inSymbols), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), m_position(0.0f, 0.0f, 0.0f),
@@ -243,9 +242,8 @@ public:
     }
 
     DicePhysicsModel(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                     std::vector<float> const &inColor, uint32_t inNumberFaces,
-                     bool inIsOpenGl = false)
-        : DiceModel(inSymbols, inIsOpenGl), qTotalRotated(), numberFaces(inNumberFaces),
+                     std::vector<float> const &inColor, uint32_t inNumberFaces)
+        : DiceModel(inSymbols), qTotalRotated(), numberFaces(inNumberFaces),
           prevTime(std::chrono::high_resolution_clock::now()),
           angularVelocity(0.0f, glm::vec3(0.0f,0.0f,0.0f)),
           velocity(0.0f,0.0f,0.0f), m_position(inPosition),
@@ -253,10 +251,6 @@ public:
           stopped(false), animationDone(false), doneX(0.0f), doneY(0.0f), animationTime(0.0f),
           m_color(inColor)
     {
-    }
-
-    virtual glm::mat4 alterPerspective(glm::mat4 proj) {
-        return proj;
     }
 
     glm::mat4 model() {
@@ -279,6 +273,11 @@ public:
     bool updateModelMatrix();
     void calculateBounce(DicePhysicsModel *other);
     void animateMove(float x, float y) {
+        // animateMove might be called long after the last call to updateModel Matrix.  Reset the
+        // previous time so that it will actually move the dice slowly in this case instead of
+        // immediately moving them to the final position.
+        prevTime = std::chrono::high_resolution_clock::now();
+
         // if doneX and doneY are not 0, then we have completed a previous stopped animation
         // and are now moving the die because of a reroll.  So store the previous doneX and doneY
         // as the current stoppedPositionX and stoppedPositionY. Also, make the stoppedAngle 0, so
@@ -287,6 +286,8 @@ public:
             stoppedPositionX = doneX;
             stoppedPositionY = doneY;
             stoppedAngle = 0.0f;
+            moveAnimationStartedRadius = stoppedRadius;
+            stoppedPositionZ = stoppedMoveToZ;
         }
 
         // if the die is to be moved, then set animationDone to false and animationTime to 0.
@@ -350,7 +351,7 @@ public:
     }
 
     static std::shared_ptr<DicePhysicsModel> createDice(std::vector<std::string> const &symbols,
-                                                        std::vector<float> const &color, bool isOpenGL = false);
+                                                        std::vector<float> const &color);
 };
 
 class DiceModelCube : public DicePhysicsModel {
@@ -358,15 +359,14 @@ private:
     void cubeTop(glm::vec3 &pos, uint32_t i);
     void cubeBottom(glm::vec3 &pos, uint32_t i);
 public:
-    DiceModelCube(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                  bool inIsOpenGl = false)
-        : DicePhysicsModel(inSymbols, inColor, 6, inIsOpenGl)
+    DiceModelCube(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor)
+        : DicePhysicsModel(inSymbols, inColor, 6)
     {
     }
 
     DiceModelCube(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                  std::vector<float> const &inColor, bool inIsOpenGl = false)
-        : DicePhysicsModel(inSymbols, inPosition, inColor, 6, inIsOpenGl)
+                  std::vector<float> const &inColor)
+        : DicePhysicsModel(inSymbols, inPosition, inColor, 6)
     {
     }
 
@@ -395,8 +395,8 @@ protected:
     void topCorners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, int i);
 public:
     DiceModelHedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                    uint32_t inNumberFaces = 0, bool inIsOpenGl = false)
-        : DicePhysicsModel(inSymbols, inColor, inNumberFaces, inIsOpenGl)
+                    uint32_t inNumberFaces = 0)
+        : DicePhysicsModel(inSymbols, inColor, inNumberFaces)
     {
         if (inNumberFaces == 0) {
             numberFaces = inSymbols.size()%2==0?inSymbols.size():inSymbols.size()*2;
@@ -409,9 +409,8 @@ public:
     DiceModelHedron(std::vector<std::string> const &inSymbols,
                     glm::vec3 &inPosition,
                     std::vector<float> const &inColor,
-                    uint32_t inNumberFaces = 0,
-                    bool inIsOpenGl = false)
-        : DicePhysicsModel(inSymbols, inPosition, inColor, inNumberFaces, inIsOpenGl)
+                    uint32_t inNumberFaces = 0)
+        : DicePhysicsModel(inSymbols, inPosition, inColor, inNumberFaces)
     {
         if (inNumberFaces == 0) {
             numberFaces = inSymbols.size()%2==0?inSymbols.size():inSymbols.size()*2;
@@ -432,15 +431,14 @@ public:
 class DiceModelTetrahedron : public DiceModelHedron {
     void corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, uint32_t i);
 public:
-    DiceModelTetrahedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                         bool inIsOpenGl = false)
-        : DiceModelHedron(inSymbols, inColor, 4, inIsOpenGl)
+    DiceModelTetrahedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor)
+        : DiceModelHedron(inSymbols, inColor, 4)
     {
     }
 
     DiceModelTetrahedron(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                         std::vector<float> const &inColor, bool inIsOpenGl = false)
-        : DiceModelHedron(inSymbols, inPosition, inColor, 4, inIsOpenGl)
+                         std::vector<float> const &inColor)
+        : DiceModelHedron(inSymbols, inPosition, inColor, 4)
     {
     }
 
@@ -457,15 +455,14 @@ public:
 class DiceModelIcosahedron : public DiceModelHedron {
     void corners(glm::vec3 &p0, glm::vec3 &q, glm::vec3 &r, uint32_t i);
 public:
-    DiceModelIcosahedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                         bool inIsOpenGl = false)
-            : DiceModelHedron(inSymbols, inColor, 20, inIsOpenGl)
+    DiceModelIcosahedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor)
+            : DiceModelHedron(inSymbols, inColor, 20)
     {
     }
 
     DiceModelIcosahedron(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                         std::vector<float> const &inColor, bool inIsOpenGl = false)
-            : DiceModelHedron(inSymbols, inPosition, inColor, 20, inIsOpenGl)
+                         std::vector<float> const &inColor)
+            : DiceModelHedron(inSymbols, inPosition, inColor, 20)
     {
     }
 
@@ -486,15 +483,14 @@ private:
                      glm::vec3 cornerNormalD, glm::vec3 cornerNormalE, uint32_t i);
     void corners(glm::vec3 &a, glm::vec3 &b, glm::vec3 &c, glm::vec3 &d, glm::vec3 &e, uint32_t i);
 public:
-    DiceModelDodecahedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                          bool inIsOpenGl = false)
-    : DicePhysicsModel(inSymbols, inColor, 12, inIsOpenGl)
+    DiceModelDodecahedron(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor)
+    : DicePhysicsModel(inSymbols, inColor, 12)
             {
             }
 
     DiceModelDodecahedron(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                          std::vector<float> const &inColor, bool inIsOpenGl = false)
-    : DicePhysicsModel(inSymbols, inPosition, inColor, 12, inIsOpenGl)
+                          std::vector<float> const &inColor)
+    : DicePhysicsModel(inSymbols, inPosition, inColor, 12)
     {
     }
 
@@ -529,8 +525,8 @@ private:
     std::vector<uint32_t> facesForVertex(uint32_t vertexNumber);
 public:
     DiceModelRhombicTriacontahedron(std::vector<std::string> const &inSymbols,
-                                    std::vector<float> const &inColor, bool inIsOpenGl = false)
-            : DicePhysicsModel(inSymbols, inColor, 30, inIsOpenGl)
+                                    std::vector<float> const &inColor)
+            : DicePhysicsModel(inSymbols, inColor, 30)
     {
         for (int i = 0; i < symbols.size(); i++) {
             rotated.push_back(false);
@@ -538,15 +534,14 @@ public:
     }
 
     DiceModelRhombicTriacontahedron(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                                    std::vector<float> const &inColor, bool inIsOpenGl = false)
-            : DicePhysicsModel(inSymbols, inPosition, inColor, 30, inIsOpenGl)
+                                    std::vector<float> const &inColor)
+            : DicePhysicsModel(inSymbols, inPosition, inColor, 30)
     {
         for (int i = 0; i < symbols.size(); i++) {
             rotated.push_back(false);
         }
     }
 
-    glm::mat4 alterPerspective(glm::mat4 proj) override;
     void loadModel(std::shared_ptr<TextureAtlas> const &texAtlas) override;
     void getAngleAxis(uint32_t faceIndex, float &angle, glm::vec3 &axis) override;
     void yAlign(uint32_t faceIndex) override;
@@ -562,15 +557,14 @@ private:
     void addEdgeVertices();
     void addFaceVertices(std::shared_ptr<TextureAtlas> const &texAtlas);
 public:
-    DiceModelCoin(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor,
-                  bool inIsOpenGl = false)
-            : DicePhysicsModel(inSymbols, inColor, 2, inIsOpenGl)
+    DiceModelCoin(std::vector<std::string> const &inSymbols, std::vector<float> const &inColor)
+            : DicePhysicsModel(inSymbols, inColor, 2)
     {
     }
 
     DiceModelCoin(std::vector<std::string> const &inSymbols, glm::vec3 &inPosition,
-                  std::vector<float> const &inColor, bool inIsOpenGl = false)
-            : DicePhysicsModel(inSymbols, inPosition, inColor, 2, inIsOpenGl)
+                  std::vector<float> const &inColor)
+            : DicePhysicsModel(inSymbols, inPosition, inColor, 2)
     {
     }
 

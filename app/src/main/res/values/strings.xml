@@ -3,6 +3,7 @@
     <string name="addition">+</string>
     <string name="subtraction">-</string>
     <string name="done">Done</string>
+    <string name="close">Close</string>
     <string name="roll">Roll</string>
     <string name="sideColumnClearValue">Clear Value</string>
     <string name="sideColumnRepeats">Repeats</string>

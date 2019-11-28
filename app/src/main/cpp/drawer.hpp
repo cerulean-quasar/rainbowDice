@@ -372,6 +372,13 @@ DiceChannel &diceChannel();
 
 class DiceWorker {
 public:
+    bool needsReport(DrawEvent::evtype evtype) {
+        return evtype == DrawEvent::diceChange ||
+            evtype == DrawEvent::rerollSelected ||
+            evtype == DrawEvent::addRerollSelected ||
+            evtype == DrawEvent::deleteSelected;
+    }
+
     DiceWorker(std::shared_ptr<WindowType> inSurface,
                std::shared_ptr<Notify> inNotify,
                bool inUseGravity,
@@ -431,7 +438,7 @@ private:
     std::unique_ptr<RainbowDice> m_diceGraphics;
     std::shared_ptr<Notify> m_notify;
 
-    std::shared_ptr<DrawEvent> drawingLoop();
+    std::shared_ptr<DrawEvent> drawingLoop(bool reportResult);
     void initDiceGraphics(std::shared_ptr<WindowType> surface,
                           bool inUseGravity, bool inDrawRollingDice, bool reverseGravity);
 };

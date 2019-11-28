@@ -101,7 +101,7 @@ public:
     DiceGraphics(std::vector<std::string> const &symbols, std::vector<uint32_t> inRerollIndices,
                  std::vector<float> const &color,
                  std::shared_ptr<TextureAtlas> const &textureAtlas)
-            : m_die{std::move(DicePhysicsModel::createDice(symbols, color, isGL()))},
+            : m_die{std::move(DicePhysicsModel::createDice(symbols, color))},
               m_rerollIndices{std::move(inRerollIndices)},
               m_isSelected{false},
               m_vertexBuffer{},
@@ -576,6 +576,18 @@ public:
             }
         }
         return true;
+    }
+
+    bool anyRolling() {
+        for (auto const &dice : m_dice) {
+            for (auto const &die : dice) {
+                if (!die->die()->isStopped()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     explicit RainbowDiceGraphics(bool inDrawRollingDice, bool reverseGravity)

@@ -227,7 +227,7 @@ public:
 
     void updateUniformBufferVertexVariables(glm::mat4 const &proj, glm::mat4 const &view) {
         UniformBufferObject ubo;
-        ubo.proj = m_die->alterPerspective(proj);
+        ubo.proj = proj;
         ubo.view = view;
         ubo.model = m_die->model();
         m_uniformBuffer->copyRawTo(&ubo, sizeof(ubo));

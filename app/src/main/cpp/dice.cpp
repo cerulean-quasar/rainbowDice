@@ -78,30 +78,30 @@ bool Vertex::operator==(const Vertex& other) const {
 }
 
 std::shared_ptr<DicePhysicsModel> DicePhysicsModel::createDice(std::vector<std::string> const &symbols,
-        std::vector<float> const &color, bool isOpenGL) {
+        std::vector<float> const &color) {
     std::shared_ptr<DicePhysicsModel> die;
     glm::vec3 position(0.0f, 0.0f, -1.0f);
     long nbrSides = symbols.size();
     if (nbrSides == 2) {
-        die.reset(new DiceModelCoin(symbols, position, color, isOpenGL));
+        die.reset(new DiceModelCoin(symbols, position, color));
     } else if (nbrSides == 4 && M_reverseGravity) {
-        die.reset(new DiceModelTetrahedron(symbols, position, color, isOpenGL));
+        die.reset(new DiceModelTetrahedron(symbols, position, color));
     } else if (nbrSides == 4 && !M_reverseGravity) {
         // Use the octahedron model for the four sided dice if we are not reversing gravity
         // so that we don't need to do something with the texture like put all textures on all the
         // faces like real life 4 sided die have.  It would make the textures hard to read for
         // anything other than numbers.
-        die.reset(new DiceModelHedron(symbols, position, color, 8, isOpenGL));
+        die.reset(new DiceModelHedron(symbols, position, color, 8));
     } else if (nbrSides == 12) {
-        die.reset(new DiceModelDodecahedron(symbols, position, color, isOpenGL));
+        die.reset(new DiceModelDodecahedron(symbols, position, color));
     } else if (nbrSides == 20) {
-        die.reset(new DiceModelIcosahedron(symbols, position, color, isOpenGL));
+        die.reset(new DiceModelIcosahedron(symbols, position, color));
     } else if (nbrSides == 30) {
-        die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color, isOpenGL));
+        die.reset(new DiceModelRhombicTriacontahedron(symbols, position, color));
     } else if (6 % nbrSides == 0) {
-        die.reset(new DiceModelCube(symbols, position, color, isOpenGL));
+        die.reset(new DiceModelCube(symbols, position, color));
     } else {
-        die.reset(new DiceModelHedron(symbols, position, color, 0, isOpenGL));
+        die.reset(new DiceModelHedron(symbols, position, color, 0));
     }
 
     return die;
@@ -118,8 +118,10 @@ void DicePhysicsModel::resetPosition() {
     stoppedRotationAxis = {0.0f, 0.0f, 1.0f};
     doneX = 0.0f;
     doneY = 0.0f;
+    moveAnimationStartedRadius = radius;
     stoppedPositionX = 0.0f;
     stoppedPositionY = 0.0f;
+    stoppedPositionZ = 0.0f;
     m_position = glm::vec3();
     velocity = glm::vec3();
     qTotalRotated = glm::quat();
@@ -223,7 +225,7 @@ bool DicePhysicsModel::updateModelMatrix() {
             if (stoppedAnimationTime < animationTime) {
                 animationTime = stoppedAnimationTime;
             }
-            float r = radius - (radius - stoppedRadius) / stoppedAnimationTime * animationTime;
+            float r = moveAnimationStartedRadius - (moveAnimationStartedRadius - stoppedRadius) / stoppedAnimationTime * animationTime;
             m_position.x = (doneX - stoppedPositionX) / stoppedAnimationTime * animationTime +
                          stoppedPositionX;
             m_position.y = (doneY - stoppedPositionY) / stoppedAnimationTime * animationTime +
@@ -2362,21 +2364,6 @@ void DiceModelRhombicTriacontahedron::yAlign(uint32_t faceIndex) {
     }
     stoppedRotationAxis = zaxis;
     stoppedAngle = angle;
-}
-
-glm::mat4 DiceModelRhombicTriacontahedron::alterPerspective(glm::mat4 proj) {
-    // I don't know why, but we need to invert the z-axis if using OpenGL for this dice type only.
-    // this is not needed if you cull back faces.  There is still something very wrong with this
-    // model.  The cull back faces thing is a clue.  Also, the y axis seems to be inverted (i.e.
-    // the wrong side of the dice (in y) is lit up).
-    /*if (isOpenGl) {
-        proj[0][2] *= -1;
-        proj[1][2] *= -1;
-        proj[2][2] *= -1;
-        proj[3][2] *= -1;
-    }*/
-
-    return proj;
 }
 
 constexpr float DiceModelCoin::radius;

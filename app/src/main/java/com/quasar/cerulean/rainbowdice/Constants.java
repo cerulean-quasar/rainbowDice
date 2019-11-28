@@ -40,6 +40,7 @@ public class Constants {
 
     // Log file activity
     public static final int DICE_LOG_FILE_ACTIVITY = 4;
+    public static final String LOG_ITEM_TO_LOAD = "log item to load";
 
     // DiceSidesActivity
     public static final int DICE_SIDES_ACTIVITY = 5;

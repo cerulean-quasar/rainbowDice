@@ -78,7 +78,6 @@ public class MainActivity extends AppCompatActivity {
     // for the texture dimensions.
     private static final int DICE_CONFIGURATION_ACTIVITY = 1;
 
-    private boolean surfaceReady = false;
     private Thread drawer = null;
 
     public class LogFileLoadedResult {
@@ -110,8 +109,8 @@ public class MainActivity extends AppCompatActivity {
     private GraphicsDescription graphicsDescription = null;
 
     private LogFile logFile = null;
-    private boolean drawingStarted = false;
     private AssetManager assetManager = null;
+    int logItemToLoad = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -133,13 +132,15 @@ public class MainActivity extends AppCompatActivity {
     void initGui(DiceConfigurationManager configurationFile) {
         setContentView(R.layout.activity_main);
 
+        resetDiceList(configurationFile);
+
+        // Need to do this here because we reloaded the layout.  When the layout gets reloaded,
+        // the surface gets destroyed and so does its callback.
         SurfaceView drawSurfaceView = findViewById(R.id.drawingSurface);
         drawSurfaceView.setZOrderOnTop(true);
         SurfaceHolder drawSurfaceHolder = drawSurfaceView.getHolder();
         drawSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);
         drawSurfaceHolder.addCallback(new MySurfaceCallback(this));
-
-        resetDiceList(configurationFile);
     }
 
     void resetDiceList(DiceConfigurationManager configurationFile) {
@@ -154,7 +155,6 @@ public class MainActivity extends AppCompatActivity {
             button.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    drawingStarted = true;
                     TextView result = findViewById(R.id.rollResult);
                     result.setText(getString(R.string.diceMessageToStartRolling));
                     Button b = (Button) v;
@@ -190,6 +190,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        LogFileLoadedResult result = loadFromLog(logItemToLoad);
+        if (result != null) {
+            drawStoppedDice(result.name, result.diceConfig, result.diceResult);
+        }
     }
 
     @Override
@@ -204,38 +209,37 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
             resetDiceList(new DiceConfigurationManager(this));
         } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
-            if (resultCode != RESULT_OK) {
-                // The user cancelled theme selection
-                return;
-            }
-            String themeName = data.getStringExtra(themeNameConfigValue);
-            if (themeName != null && !themeName.isEmpty()) {
-                int resID = getResources().getIdentifier(themeName, "style", getPackageName());
-                setTheme(resID);
-                initGui(new DiceConfigurationManager(this));
-                TypedValue value = new TypedValue();
-                getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
-                getWindow().setBackgroundDrawableResource(value.resourceId);
+            if (resultCode == RESULT_OK) {
+                String themeName = data.getStringExtra(themeNameConfigValue);
+                if (themeName != null && !themeName.isEmpty()) {
+                    int resID = getResources().getIdentifier(themeName, "style", getPackageName());
+                    setTheme(resID);
+                    initGui(new DiceConfigurationManager(this));
+                    TypedValue value = new TypedValue();
+                    getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
+                    getWindow().setBackgroundDrawableResource(value.resourceId);
+                }
             }
         } else if (requestCode == DICE_CUSTOMIZATION_ACTIVITY) {
             resetDiceList(new DiceConfigurationManager(this));
+        } else if (requestCode == Constants.DICE_LOG_FILE_ACTIVITY) {
+            if (resultCode == RESULT_OK) {
+                logItemToLoad = data.getIntExtra(Constants.LOG_ITEM_TO_LOAD, -1);
+            }
         } else if (requestCode == Constants.DICE_EXPORT_FILE_ACTIVITY) {
-            if (resultCode != RESULT_OK) {
-                // The user cancelled the export
-                return;
+            if (resultCode == RESULT_OK) {
+                saveDiceToExternalFile(data.getData());
             }
-            saveDiceToExternalFile(data.getData());
         } else if (requestCode == Constants.DICE_IMPORT_FILE_ACTIVITY) {
-            if (resultCode != RESULT_OK) {
-                // The user cancelled the import
-                return;
-            }
-            // close the log file so that the data can be overridden
-            logFile = null;
-            restoreDiceFromExternalFile(data.getData());
-            logFile = new LogFile(this);
+            if (resultCode == RESULT_OK) {
+                // close the log file so that the data can be overridden
+                logFile = null;
+                restoreDiceFromExternalFile(data.getData());
+                logFile = new LogFile(this);
 
-            resetDiceList(new DiceConfigurationManager(this));
+                resetDiceList(new DiceConfigurationManager(this));
+                logItemToLoad = -1;
+            }
         }
     }
 
@@ -385,8 +389,12 @@ public class MainActivity extends AppCompatActivity {
                 if (bonusValue != 0 && currentRoll) {
                     LogFile.LogItem logitem = null;
                     int logFileSize = logFile.size();
-                    if (logFileSize > 0) {
-                        logitem = logFile.getCopy(logFileSize - 1);
+                    int index = logItemToLoad;
+                    if (index < 0) {
+                        index = logFileSize - 1;
+                    }
+                    if (index > 0 && logFileSize > index) {
+                        logitem = logFile.getCopy(index);
                     }
 
                     if (logitem != null && logitem.getVersion() >= 1) {
@@ -399,6 +407,7 @@ public class MainActivity extends AppCompatActivity {
                         text.setText(result.generateResultsString(diceConfig, diceName, MainActivity.this));
 
                         logFile.addRoll(diceName, result, diceConfig);
+                        logItemToLoad = -1;
                     }
                 }
 
@@ -492,14 +501,17 @@ public class MainActivity extends AppCompatActivity {
 
     public void onReroll(View view) {
         Draw.rerollSelected();
+        logItemToLoad = -1;
     }
 
     public void onPlusReroll(View view) {
         Draw.addRerollSelected();
+        logItemToLoad = -1;
     }
 
     public void onDeleteDiceFromRoll(View view) {
         Draw.deleteSelected();
+        logItemToLoad = -1;
     }
 
     public  void onResetView(View view) {
@@ -568,10 +580,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void setSurfaceReady(boolean inIsReady) {
-        surfaceReady = inIsReady;
-    }
-
     public void drawStoppedDice(String name, DieConfiguration[] diceConfig, DiceResult diceResult) {
         int i = 0;
         int j = 1;
@@ -596,11 +604,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public LogFileLoadedResult loadFromLog() {
+    public LogFileLoadedResult loadFromLog(int i) {
         TextView text = findViewById(R.id.rollResult);
         LogFile.LogItem item = null;
         int logFileSize = logFile.size();
-        if (logFileSize > 0) {
+        if (i >= 0 && i < logFileSize) {
+            item = logFile.get(i);
+        } else if (logFileSize > 0) {
             item = logFile.get(logFileSize - 1);
         }
 
@@ -718,16 +728,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void rollTheDice(DieConfiguration[] diceConfig, String diceFileName) {
-        if (!surfaceReady) {
-            // shouldn't happen.
-            return;
-        }
-
         String err = Draw.startDrawingRoll(diceConfig, diceFileName);
         if (err != null && !err.isEmpty()) {
             TextView resultView = findViewById(R.id.rollResult);
             resultView.setText(err);
         }
+
+        // load the latest log item on pause.
+        logItemToLoad = -1;
     }
 
     public void joinDrawer() {
@@ -748,10 +756,6 @@ public class MainActivity extends AppCompatActivity {
             TextView view = findViewById(R.id.rollResult);
             view.setText(err);
         }
-    }
-
-    public boolean isDrawing() {
-        return drawingStarted;
     }
 
     private class ResultHandler implements Handler.Callback {
@@ -845,7 +849,6 @@ public class MainActivity extends AppCompatActivity {
 
                 // no dice need reroll, just update the results text view with the results.
                 logFile.addRoll(filename, diceResult, diceConfig);
-                drawingStarted = false;
                 text.setText(diceResult.generateResultsString(diceConfig, filename,
                         MainActivity.this));
             }

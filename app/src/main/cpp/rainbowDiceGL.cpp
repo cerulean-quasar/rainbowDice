@@ -200,8 +200,7 @@ void RainbowDiceGL::drawFrame() {
 
             // the projection matrix
             GLint MatrixID = glGetUniformLocation(m_programID, "proj");
-            glm::mat4 matrix = die->die()->alterPerspective(m_proj);
-            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
+            glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &m_proj[0][0]);
 
             // view matrix
             MatrixID = glGetUniformLocation(m_programID, "view");
@@ -214,7 +213,7 @@ void RainbowDiceGL::drawFrame() {
 
             // the model matrix for the normal vector
             MatrixID = glGetUniformLocation(m_programID, "normalMatrix");
-            matrix = glm::transpose(glm::inverse(model));
+            glm::mat4 matrix = glm::transpose(glm::inverse(model));
             glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &matrix[0][0]);
 
             // whether the die is selected
@@ -377,7 +376,7 @@ void RainbowDiceGL::drawFrame() {
         }
     }
 
-    if (m_diceBox != nullptr && !allStopped()) {
+    if (m_diceBox != nullptr && anyRolling()) {
         // Use the dice box shader.
         glUseProgram(m_programIDDiceBox);
         viewPos = glGetUniformLocation(m_programIDDiceBox, "viewPosition");

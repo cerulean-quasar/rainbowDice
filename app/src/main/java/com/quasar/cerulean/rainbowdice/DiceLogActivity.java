@@ -1,5 +1,6 @@
 package com.quasar.cerulean.rainbowdice;
 
+import android.content.Intent;
 import android.content.res.Configuration;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
@@ -8,11 +9,13 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class DiceLogActivity extends AppCompatActivity {
     private LogFile log;
+    private View selectedView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +68,47 @@ public class DiceLogActivity extends AppCompatActivity {
         return true;
     }
 
+    public void onLogItemClicked(View view) {
+        if (selectedView == view) {
+            view.setBackgroundColor(0x00000000);
+            selectedView = null;
+            return;
+        }
+
+        if (selectedView != null) {
+            selectedView.setBackgroundColor(0x00000000);
+        }
+        view.setBackgroundColor(0x500f0fff);
+        selectedView = view;
+    }
+
+    public void onLogLoad(MenuItem item) {
+        if (selectedView == null) {
+            setResult(RESULT_CANCELED, null);
+            return;
+        }
+
+        LinearLayout diceListLayout = findViewById(R.id.dice_log_list);
+        int nbrItems = diceListLayout.getChildCount();
+        int i;
+        for (i = 0; i < nbrItems; i++) {
+            if (selectedView == diceListLayout.getChildAt(i)) {
+                break;
+            }
+        }
+
+        if (i >= nbrItems) {
+            setResult(RESULT_CANCELED);
+            return;
+        }
+
+        Intent data = new Intent();
+        data.putExtra(Constants.LOG_ITEM_TO_LOAD, nbrItems - i - 1);
+        setResult(RESULT_OK, data);
+        finish();
+    }
     public void onLogExit(MenuItem item) {
-        setResult(RESULT_OK, null);
+        setResult(RESULT_CANCELED, null);
         finish();
     }
 }

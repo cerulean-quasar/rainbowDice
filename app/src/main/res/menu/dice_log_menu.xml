@@ -2,7 +2,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:title="@string/done"
+        android:title="@string/load"
+        app:showAsAction="ifRoom"
+        android:onClick="onLogLoad"
+        />
+    <item
+        android:title="@string/close"
         app:showAsAction="ifRoom"
         android:onClick="onLogExit"
         />

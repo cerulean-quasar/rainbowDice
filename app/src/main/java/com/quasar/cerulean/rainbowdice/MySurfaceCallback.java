@@ -37,17 +37,11 @@ public class MySurfaceCallback implements SurfaceHolder.Callback {
     }
 
     public void surfaceCreated(SurfaceHolder holder) {
-        app.setSurfaceReady(true);
         app.createWorker();
-        MainActivity.LogFileLoadedResult result = app.loadFromLog();
-        if (result != null) {
-            app.drawStoppedDice(result.name, result.diceConfig, result.diceResult);
-        }
     }
 
     public void surfaceDestroyed(SurfaceHolder holder) {
         app.joinDrawer();
-        app.setSurfaceReady(false);
         holder.getSurface().release();
     }
 }
