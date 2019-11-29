@@ -6,5 +6,6 @@
 /build
 /captures
 /app/release
+/app/debug
 /app/.cxx/
 .externalNativeBuild

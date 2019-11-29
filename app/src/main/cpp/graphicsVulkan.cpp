@@ -63,8 +63,7 @@ namespace vulkan {
     }
 
     void Instance::setupDebugCallback() {
-        if (!enableValidationLayers) return;
-
+#ifdef DEBUG
         VkDebugReportCallbackCreateInfoEXT createInfo = {};
         createInfo.sType =
                 VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
@@ -86,6 +85,7 @@ namespace vulkan {
         };
 
         m_callback.reset(callbackRaw, deleter);
+#endif
     }
 
     void Instance::createInstance() {
@@ -105,15 +105,15 @@ namespace vulkan {
             throw std::runtime_error(std::string("failed to find extension: "));
         }
 
-        if (enableValidationLayers) {
-            if (!checkValidationLayerSupport()) {
-                throw std::runtime_error(std::string("failed to find validation layers: "));
-            }
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-        } else {
-            createInfo.enabledLayerCount = 0;
+#ifdef DEBUG
+        if (!checkValidationLayerSupport()) {
+            throw std::runtime_error(std::string("failed to find validation layers: "));
         }
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+#else
+        createInfo.enabledLayerCount = 0;
+#endif
 
         auto extensions = getRequiredExtensions();
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
@@ -196,10 +196,10 @@ namespace vulkan {
         extensions.push_back("VK_KHR_surface");
         extensions.push_back("VK_KHR_android_surface");
 
+#ifdef DEBUG
         /* required to get debug messages from Vulkan */
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-        }
+        extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+#endif
 
         return extensions;
     }
@@ -389,12 +389,12 @@ namespace vulkan {
         createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-        if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-        } else {
-            createInfo.enabledLayerCount = 0;
-        }
+#ifdef DEBUG
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+#else
+        createInfo.enabledLayerCount = 0;
+#endif
 
         VkDevice logicalDeviceRaw;
         if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &logicalDeviceRaw) !=
