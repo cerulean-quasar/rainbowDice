@@ -1,5 +1,5 @@
 /**
- * Copyright 2019 Cerulean Quasar. All Rights Reserved.
+ * Copyright 2020 Cerulean Quasar. All Rights Reserved.
  *
  *  This file is part of RainbowDice.
  *
@@ -259,7 +259,11 @@ public class DieConfiguration implements Parcelable {
             m_sides[i] = new DieSideConfiguration(inSides[i]);
         }
         m_color = inColor;
-        m_rainbow = false;
+        if (inColor == null) {
+            m_rainbow = true;
+        } else {
+            m_rainbow = false;
+        }
         m_isAdditionOperation = inIsAdditionOperation;
     }
 
@@ -286,6 +290,7 @@ public class DieConfiguration implements Parcelable {
             m_sides[i] = new DieSideConfiguration(other.m_sides[i]);
         }
 
+        m_rainbow = other.m_rainbow;
         if (other.m_color == null) {
             m_color = null;
         } else {
@@ -303,6 +308,7 @@ public class DieConfiguration implements Parcelable {
             m_sides[i] = new DieSideConfiguration(other.m_sides[i]);
         }
 
+        m_rainbow = other.m_rainbow;
         if (other.m_color == null) {
             m_color = null;
         } else {
@@ -369,10 +375,10 @@ public class DieConfiguration implements Parcelable {
     public void writeToParcel(Parcel out, int flags) {
         out.writeInt(m_numberOfDice);
         out.writeInt(m_isAdditionOperation ? 1 : 0);
-        out.writeInt(m_rainbow ? 1 : 0);
-        if (!m_rainbow) {
-            for (int i = 0; i < m_color.length; i++) {
-                out.writeFloat(m_color[i]);
+        out.writeInt((m_rainbow || m_color == null) ? 1 : 0);
+        if (!m_rainbow && m_color != null) {
+            for (float dieColor : m_color) {
+                out.writeFloat(dieColor);
             }
         }
         out.writeInt(m_sides.length);
