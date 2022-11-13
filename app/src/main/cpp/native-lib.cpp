@@ -20,10 +20,10 @@
 #include <string>
 #include <cstring>
 #include <vector>
-#include <looper.h>
-#include <native_window.h>
-#include <native_window_jni.h>
-#include <asset_manager_jni.h>
+#include <android/looper.h>
+#include <android/native_window.h>
+#include <android/native_window_jni.h>
+#include <android/asset_manager_jni.h>
 #include "android.hpp"
 #include "native-lib.hpp"
 #include "drawer.hpp"

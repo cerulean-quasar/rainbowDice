@@ -71,6 +71,6 @@ float Random::getFloat(float lowerBound, float upperBound) {
 
     unsigned int random = get<unsigned int>();
     float rc = random;
-    rc = rc / std::numeric_limits<unsigned int>::max() * range + lowerBound;
+    rc = rc / static_cast<float>(std::numeric_limits<unsigned int>::max()) * range + lowerBound;
     return rc;
 }

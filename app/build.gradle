@@ -1,13 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 33
+    ndkVersion "25.1.8937393"
     defaultConfig {
         applicationId "com.quasar.cerulean.rainbowdice"
         minSdkVersion 21
-        targetSdkVersion 29
-        versionCode 24
-        versionName "1.23"
+        targetSdkVersion 33
+        versionCode 25
+        versionName "1.24"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         shaders {
@@ -35,7 +36,7 @@ android {
     sourceSets {
         debug {
             jniLibs {
-                srcDir "/home/cerulean.quasar/Android/Sdk/ndk/20.0.5594570/sources/third_party/vulkan/src/build-android/jniLibs"
+                srcDir "/opt/androidVulkanValidationLayers/lib"
             }
         }
     }

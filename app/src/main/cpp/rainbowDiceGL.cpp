@@ -22,7 +22,7 @@
 #include <GLES2/gl2ext.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <native_window.h>
+#include <android/native_window.h>
 #include <cstring>
 #include <jni.h>
 #include "rainbowDiceGL.hpp"

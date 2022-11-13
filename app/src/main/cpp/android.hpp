@@ -20,13 +20,13 @@
 #ifndef RAINBOWDICE_ANDROID_HPP
 #define RAINBOWDICE_ANDROID_HPP
 
-#include <native_window.h>
-#include <asset_manager.h>
-#include <asset_manager_jni.h>
+#include <android/native_window.h>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 #include <memory>
 #include <streambuf>
 #include <bitset>
-#include <sensor.h>
+#include <android/sensor.h>
 
 class Sensors {
 public:

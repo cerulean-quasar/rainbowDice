@@ -21,7 +21,7 @@
 #define RAINBOWDICE_GLOBAL_HPP
 
 #include <string>
-#include <native_window.h>
+#include <android/native_window.h>
 
 typedef ANativeWindow WindowType;
 

@@ -45,7 +45,7 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
-include_directories(${ANDROID_NDK}/sysroot/usr/include/android)
+#include_directories(${ANDROID_NDK}/sysroot/usr/include/android)
 include_directories(${ANDROID_NDK}/sources/third_party/vulkan/src/libs)
 include_directories(APP_GLUE_DIR ${ANDROID_NDK}/sources/android/native_app_glue)
 include_directories(/opt/glm-0.9.9.5/glm)

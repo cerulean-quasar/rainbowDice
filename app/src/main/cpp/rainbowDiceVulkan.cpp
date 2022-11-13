@@ -23,7 +23,6 @@
 #include "rainbowDiceVulkan.hpp"
 #include "TextureAtlasVulkan.h"
 #include "android.hpp"
-#include "../../../../../../Android/Sdk/ndk/20.0.5594570/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/memory"
 
 VkVertexInputBindingDescription getBindingDescriptionOutlineSquare() {
     VkVertexInputBindingDescription bindingDescription = {};
