@@ -30,6 +30,10 @@
         />
     <item
         android:title="@string/settingsMenuItem"
+        android:onClick="onSettings"
+        />
+    <item
+        android:title="@string/changeThemeMenuItem"
         android:onClick="onSelectTheme"
         />
 </menu>

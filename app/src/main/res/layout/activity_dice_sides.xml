@@ -4,7 +4,8 @@
     android:divider="?attr/divider"
     android:showDividers="middle"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
     <TextView
         android:text="@string/diceSides"
         android:layout_gravity="center"

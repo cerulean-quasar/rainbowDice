@@ -43,8 +43,8 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Locale;
 
-public class ActivityThemeSelector extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
-    ConfigurationFile configurationFile;
+public class ActivityThemeSelector extends AppCompatActivity {
+    ConfigurationFile configurationFile = null;
     String appVersionName;
     String graphicsAPIName;
     String graphicsAPIVersion;
@@ -95,39 +95,11 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         hasGravity = intent.getBooleanExtra(Constants.SENSOR_HAS_GRAVITY, false);
         hasAccelerometer = intent.getBooleanExtra(Constants.SENSOR_HAS_ACCELEROMETER, false);
 
-        initializeGui(true);
+        initializeGui();
     }
 
-    private void initializeGui(boolean loadTheme) {
-        int currentThemeId = getApplicationInfo().theme;
-        String themeName = configurationFile.getTheme();
-        if (themeName != null && !themeName.isEmpty()) {
-            currentThemeId = getResources().getIdentifier(themeName, "style", getPackageName());
-            if (loadTheme) {
-                setTheme(currentThemeId);
-            }
-        }
+    private void initializeGui() {
         setContentView(R.layout.activity_theme_selector);
-
-        Spinner themeSelector = findViewById(R.id.themeSelector);
-        ArrayAdapter<CharSequence> spinAdapter = ArrayAdapter.createFromResource(this,
-                R.array.themeArray, android.R.layout.simple_spinner_item);
-        spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-
-        String[] strings = getResources().getStringArray(R.array.themeArray);
-        int pos = 0;
-        int i=0;
-        for (String string : strings) {
-            int resID = getResources().getIdentifier(string, "style", getPackageName());
-            if (resID == currentThemeId) {
-                pos = i;
-                break;
-            }
-            i++;
-        }
-        themeSelector.setAdapter(spinAdapter);
-        themeSelector.setSelection(pos);
-        themeSelector.setOnItemSelectedListener(this);
 
         CheckBox ck = findViewById(R.id.useLegacy);
         ck.setChecked(configurationFile.useLegacy());
@@ -182,9 +154,9 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         }
         StringBuilder sensorsString = new StringBuilder();
         int length = sensors.size();
-        for (i = 0; i < length; i++) {
-            sensorsString.append(sensors.get(i));
-            if (i != length - 1) {
+        for (int sensor = 0; sensor < length; sensor++) {
+            sensorsString.append(sensors.get(sensor));
+            if (sensor != length - 1) {
                 sensorsString.append(",\n");
             }
         }
@@ -197,39 +169,6 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.dice_theme_selection_menu, menu);
         return true;
-    }
-
-    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-        if (view == null) {
-            return;
-        }
-        TextView text = (TextView) view;
-
-        String themeName = text.getText().toString();
-        int currentThemeId = getApplicationInfo().theme;
-        String currentThemeName = configurationFile.getTheme();
-        if (currentThemeName != null && !currentThemeName.isEmpty()) {
-            currentThemeId = getResources().getIdentifier(currentThemeName, "style", getPackageName());
-        }
-        int themeId = getResources().getIdentifier(themeName, "style", getPackageName());
-        if (themeId == currentThemeId) {
-            // we're already using this theme.  Just break out.
-            return;
-        }
-        configurationFile.setThemeName(themeName);
-        setTheme(themeId);
-
-        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            TypedValue value = new TypedValue();
-            getTheme().resolveAttribute(R.attr.background_landscape, value, true);
-            getWindow().setBackgroundDrawableResource(value.resourceId);
-        } else {
-            TypedValue value = new TypedValue();
-            getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
-            getWindow().setBackgroundDrawableResource(value.resourceId);
-        }
-
-        initializeGui(false);
     }
 
     public void onCheckboxClicked(View view) {
@@ -250,10 +189,6 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
         }
     }
 
-    public void onNothingSelected(AdapterView<?> parent) {
-        // do nothing
-    }
-
     public void onCancelThemeSelection(MenuItem item) {
         // return from the application without doing anything.
         setResult(RESULT_CANCELED);
@@ -261,20 +196,7 @@ public class ActivityThemeSelector extends AppCompatActivity implements AdapterV
     }
 
     public void onSaveThemeSelection(MenuItem item) {
-        Spinner spinner = findViewById(R.id.themeSelector);
-        TextView text = (TextView)spinner.getSelectedView();
-        String theme = configurationFile.getTheme();
-        if (text != null) {
-            theme = text.getText().toString();
-            configurationFile.setThemeName(theme);
-        }
-
         configurationFile.writeFile();
-
-        Intent intent = new Intent();
-        intent.putExtra(Constants.themeNameConfigValue, theme);
-
-        setResult(RESULT_OK, intent);
         finish();
     }
 }

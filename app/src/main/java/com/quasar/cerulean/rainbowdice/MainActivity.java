@@ -42,10 +42,12 @@ import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.io.BufferedReader;
@@ -206,20 +208,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DICE_CONFIGURATION_ACTIVITY) {
             resetDiceList(new DiceConfigurationManager(this));
-        } else if (requestCode == DICE_THEME_SELECTION_ACTIVITY) {
-            if (resultCode == RESULT_OK) {
-                String themeName = data.getStringExtra(themeNameConfigValue);
-                if (themeName != null && !themeName.isEmpty()) {
-                    int resID = getResources().getIdentifier(themeName, "style", getPackageName());
-                    setTheme(resID);
-                    initGui(new DiceConfigurationManager(this));
-                    TypedValue value = new TypedValue();
-                    getTheme().resolveAttribute(android.R.attr.windowBackground, value, true);
-                    getWindow().setBackgroundDrawableResource(value.resourceId);
-                }
-            }
         } else if (requestCode == DICE_CUSTOMIZATION_ACTIVITY) {
             resetDiceList(new DiceConfigurationManager(this));
         } else if (requestCode == Constants.DICE_LOG_FILE_ACTIVITY) {
@@ -476,7 +467,7 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, Constants.DICE_LOG_FILE_ACTIVITY);
     }
 
-    public void onSelectTheme(MenuItem item) {
+    public void onSettings(MenuItem item) {
         Intent intent = new Intent(this, ActivityThemeSelector.class);
         if (graphicsDescription != null) {
             intent.putExtra(Constants.SENSOR_HAS_LINEAR_ACCELERATION, graphicsDescription.hasLinearAccelerationSensor);
@@ -497,6 +488,72 @@ public class MainActivity extends AppCompatActivity {
     public void onNewDice(MenuItem item) {
         Intent intent = new Intent(this, DiceCustomizationActivity.class);
         startActivityForResult(intent, DICE_CUSTOMIZATION_ACTIVITY);
+    }
+
+    public void onSelectTheme(MenuItem item) {
+        LinearLayout layout = findViewById(R.id.activity_main_top_level);
+        LayoutInflater inflater = getLayoutInflater();
+
+        final LinearLayout themeView = (LinearLayout) inflater.inflate(
+                R.layout.change_theme_dialog, layout, false);
+
+        int currentThemeId = 0;
+        ConfigurationFile config = new ConfigurationFile(this);
+        String currentThemeName = config.getTheme();
+        if (currentThemeName != null && !currentThemeName.isEmpty()) {
+            currentThemeId = getResources().getIdentifier(currentThemeName, "style", getPackageName());
+        }
+
+        if (currentThemeId == 0) {
+            currentThemeId = getApplicationInfo().theme;
+        }
+
+        Spinner themeSelector = themeView.findViewById(R.id.themeSelector);
+        ArrayAdapter<CharSequence> spinAdapter = ArrayAdapter.createFromResource(this,
+                R.array.themeArray, R.layout.theme_spinner_entry);
+        spinAdapter.setDropDownViewResource(R.layout.theme_spinner_entry);
+
+        String[] strings = getResources().getStringArray(R.array.themeArray);
+        int i = 0;
+        for (String string : strings) {
+            int resID = getResources().getIdentifier(string, "style", getPackageName());
+            if (resID == 0) {
+                break;
+            }
+            if (resID == currentThemeId || i >= strings.length - 1) {
+                break;
+            }
+            i ++;
+        }
+
+        themeSelector.setAdapter(spinAdapter);
+        themeSelector.setSelection(i);
+
+        final Dialog themeDialog = new AlertDialog.Builder(this)
+                /*.setTitle(R.string.changeThemeMenuItem)*/.setView(themeView).show();
+
+        Button button = themeView.findViewById(R.id.cancelSelectTheme);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                themeDialog.dismiss();
+            }
+        });
+
+        Context ctx = this;
+        button = themeView.findViewById(R.id.okSelectTheme);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Spinner themeSelector = themeView.findViewById(R.id.themeSelector);
+                TextView theme = (TextView) themeSelector.getSelectedView();
+                String themeName = theme.getText().toString();
+                ConfigurationFile configFile = new ConfigurationFile(ctx);
+                configFile.setThemeName(themeName);
+                configFile.writeFile();
+                recreate();
+            }
+        });
     }
 
     public void onReroll(View view) {
@@ -855,4 +912,8 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
     }
+/*
+    MainActivity() {
+        super();
+    }*/
 }

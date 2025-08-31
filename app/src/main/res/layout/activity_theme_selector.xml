@@ -2,7 +2,8 @@
 <ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
     <LinearLayout
         android:divider="?attr/divider"
         android:showDividers="middle"
@@ -13,14 +14,6 @@
             android:columnCount="2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content">
-            <TextView
-                android:text="@string/selectTheme"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-            <Spinner
-                android:id="@+id/themeSelector"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
             <TextView
                 android:text="@string/useGravity"
                 android:layout_width="wrap_content"

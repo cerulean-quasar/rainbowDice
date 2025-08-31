@@ -62,6 +62,7 @@
     <string name="rerollText">re-roll on: %s</string>
     <string name="settingsMenuItem">Settings</string>
     <string name="openLogFile">Open Log File</string>
+    <string name="changeThemeMenuItem">Change Theme</string>
     <string name="recipes">Recipes</string>
     <string name="add">add</string>
     <string name="replace">replace</string>
