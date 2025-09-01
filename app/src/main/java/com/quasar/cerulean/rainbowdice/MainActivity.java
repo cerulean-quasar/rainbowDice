@@ -63,8 +63,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import static com.quasar.cerulean.rainbowdice.Constants.DICE_CUSTOMIZATION_ACTIVITY;
-import static com.quasar.cerulean.rainbowdice.Constants.DICE_THEME_SELECTION_ACTIVITY;
-import static com.quasar.cerulean.rainbowdice.Constants.themeNameConfigValue;
+import static com.quasar.cerulean.rainbowdice.Constants.DICE_SETTINGS_ACTIVITY;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -468,7 +467,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onSettings(MenuItem item) {
-        Intent intent = new Intent(this, ActivityThemeSelector.class);
+        Intent intent = new Intent(this, ActivitySettings.class);
         if (graphicsDescription != null) {
             intent.putExtra(Constants.SENSOR_HAS_LINEAR_ACCELERATION, graphicsDescription.hasLinearAccelerationSensor);
             intent.putExtra(Constants.SENSOR_HAS_GRAVITY, graphicsDescription.hasGravitySensor);
@@ -482,7 +481,7 @@ public class MainActivity extends AppCompatActivity {
                 intent.putExtra(Constants.GRAPHICS_DEVICE_NAME, graphicsDescription.deviceName);
             }
         }
-        startActivityForResult(intent, DICE_THEME_SELECTION_ACTIVITY);
+        startActivityForResult(intent, DICE_SETTINGS_ACTIVITY);
     }
 
     public void onNewDice(MenuItem item) {

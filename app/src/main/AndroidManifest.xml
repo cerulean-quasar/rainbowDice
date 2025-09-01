@@ -27,7 +27,7 @@
         </activity>
         <activity android:name=".DiceConfigurationActivity" />
         <activity android:name=".DiceCustomizationActivity" />
-        <activity android:name=".ActivityThemeSelector" />
+        <activity android:name=".ActivitySettings" />
         <activity android:name=".DiceLogActivity" />
         <activity android:name=".DiceSidesActivity" />
     </application>

@@ -4,11 +4,11 @@
     <item
         android:title="@string/save"
         app:showAsAction="ifRoom"
-        android:onClick="onSaveThemeSelection"
+        android:onClick="onSaveSettings"
         />
     <item
         android:title="@string/cancel"
         app:showAsAction="ifRoom"
-        android:onClick="onCancelThemeSelection"
+        android:onClick="onCancelSettings"
         />
 </menu>

@@ -43,7 +43,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Locale;
 
-public class ActivityThemeSelector extends AppCompatActivity {
+public class ActivitySettings extends AppCompatActivity {
     ConfigurationFile configurationFile = null;
     String appVersionName;
     String graphicsAPIName;
@@ -99,7 +99,7 @@ public class ActivityThemeSelector extends AppCompatActivity {
     }
 
     private void initializeGui() {
-        setContentView(R.layout.activity_theme_selector);
+        setContentView(R.layout.activity_settings);
 
         CheckBox ck = findViewById(R.id.useLegacy);
         ck.setChecked(configurationFile.useLegacy());
@@ -167,7 +167,7 @@ public class ActivityThemeSelector extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.dice_theme_selection_menu, menu);
+        inflater.inflate(R.menu.dice_settings_menu, menu);
         return true;
     }
 
@@ -189,13 +189,13 @@ public class ActivityThemeSelector extends AppCompatActivity {
         }
     }
 
-    public void onCancelThemeSelection(MenuItem item) {
+    public void onCancelSettings(MenuItem item) {
         // return from the application without doing anything.
         setResult(RESULT_CANCELED);
         finish();
     }
 
-    public void onSaveThemeSelection(MenuItem item) {
+    public void onSaveSettings(MenuItem item) {
         configurationFile.writeFile();
         finish();
     }
