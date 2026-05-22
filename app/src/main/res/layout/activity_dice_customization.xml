@@ -135,12 +135,14 @@
             android:layout_height="wrap_content">
             <Button
                 android:id="@+id/otherButton"
+                android:labelFor="@id/otherText"
                 android:onClick="dxClicked"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/diceNumberOfSidesOther" />
             <EditText
                 android:id="@+id/otherText"
+                android:importantForAutofill="no"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:inputType="number"

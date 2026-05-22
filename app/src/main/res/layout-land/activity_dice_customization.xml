@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/customization_main_layout"
     android:orientation="horizontal"
     android:divider="?attr/divider_vertical"
     android:showDividers="middle"
@@ -44,6 +45,7 @@
         <include layout="@layout/customization_main"/>
         <Button
             android:id="@+id/otherButton"
+            android:labelFor="@id/otherText"
             android:onClick="dxClicked"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintLeft_toRightOf="@id/d6Button"
@@ -55,6 +57,7 @@
             android:text="@string/diceNumberOfSidesOther" />
         <EditText
             android:id="@+id/otherText"
+            android:importantForAutofill="no"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintRight_toLeftOf="@id/d4Button"
             app:layout_constraintLeft_toRightOf="@id/otherButton"

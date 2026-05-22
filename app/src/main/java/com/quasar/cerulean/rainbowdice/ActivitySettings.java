@@ -174,18 +174,15 @@ public class ActivitySettings extends AppCompatActivity {
     public void onCheckboxClicked(View view) {
         boolean checked = ((CheckBox) view).isChecked();
 
-        switch (view.getId()) {
-            case R.id.useGravity:
-                configurationFile.setUseGravity(checked);
-                break;
-            case R.id.drawRollingDice:
-                configurationFile.setDrawRollingDice(checked);
-                break;
-            case R.id.useLegacy:
-                configurationFile.setUseLegacy(checked);
-                break;
-            case R.id.reverseGravity:
-                configurationFile.setReverseGravity(checked);
+        int id = view.getId();
+        if (id == R.id.useGravity) {
+            configurationFile.setUseGravity(checked);
+        } else if (id == R.id.drawRollingDice) {
+            configurationFile.setDrawRollingDice(checked);
+        } else if (id == R.id.useLegacy) {
+            configurationFile.setUseLegacy(checked);
+        } else if (id == R.id.reverseGravity) {
+            configurationFile.setReverseGravity(checked);
         }
     }
 

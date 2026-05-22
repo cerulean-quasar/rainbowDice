@@ -30,7 +30,7 @@ std::unique_ptr<AssetManagerWrapper> assetWrapper;
 constexpr int Sensors::MAX_EVENT_REPORT_TIME;
 
 void Sensors::initSensors(std::bitset<3> inWhichSensors) {
-    m_sensorManager = ASensorManager_getInstance();
+    m_sensorManager = ASensorManager_getInstanceForPackage(packageName);
     if (inWhichSensors.test(LINEAR_ACCELERATION_SENSOR)) {
         m_sensorLinearAcceleration = ASensorManager_getDefaultSensor(m_sensorManager,
                                                                      ASENSOR_TYPE_LINEAR_ACCELERATION);

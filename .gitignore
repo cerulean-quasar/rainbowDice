@@ -9,3 +9,4 @@
 /app/debug
 /app/.cxx/
 .externalNativeBuild
+gradle/gradle-daemon-jvm.properties
