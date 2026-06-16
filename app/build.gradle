@@ -5,15 +5,15 @@ plugins {
 android {
     namespace 'com.quasar.cerulean.rainbowdice'
     compileSdk = 36.1
-    ndkVersion = "27.3.13750724"
+    ndkVersion = "29.0.14206865"
 
-    /*sourceSets {
+    sourceSets {
         debug {
             jniLibs {
-                srcDir = "/opt/androidVulkanValidationLayers/lib"
+                sourceSets { "/opt/android-vulkan-validation-layers-1.4.350.0" }
             }
         }
-    }*/
+    }
 
     defaultConfig {
         applicationId "com.quasar.cerulean.rainbowdice"
